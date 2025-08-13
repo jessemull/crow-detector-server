@@ -1,0 +1,38 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: The ID of the VPC where the resources will be deployed.
+
+Resources:
+  DatabaseSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable access to Postgres on port 5432
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          CidrIp: 0.0.0.0/0
+
+  PostgresDB:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      AllocatedStorage: 20
+      DBInstanceClass: db.t3.micro
+      Engine: postgres
+      EngineVersion: "15.9"
+      MasterUsername: "{{resolve:secretsmanager:crow-detector-db:SecretString:username}}"
+      MasterUserPassword: "{{resolve:secretsmanager:crow-detector-db:SecretString:password}}"
+      DBName: yourdbname
+      PubliclyAccessible: false
+      StorageType: gp2
+      BackupRetentionPeriod: 7
+      MultiAZ: false
+      StorageEncrypted: false
+      VPCSecurityGroups:
+        - !Ref DatabaseSecurityGroup
