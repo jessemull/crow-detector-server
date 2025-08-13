@@ -1,1 +1,1 @@
-export * from './detection-entity';
+export * from './detection-event.entity';
