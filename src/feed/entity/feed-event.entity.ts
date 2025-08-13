@@ -4,14 +4,14 @@ import {
   Entity,
   OneToMany,
   PrimaryGeneratedColumn,
-  UpdateDateColumn
+  UpdateDateColumn,
 } from 'typeorm';
 import { Source } from 'src/common/types';
-import { DetectionEvent } from 'src/detection';
+import { DetectionEvent } from 'src/detection/entity/detection-event.entity';
 
 enum Status {
   ACCEPTED = 'ACCEPTED',
-  REJECTED = 'REJECTED'
+  REJECTED = 'REJECTED',
 }
 
 @Entity('feed_event')
@@ -28,9 +28,13 @@ export class FeedEvent {
   @Column({ nullable: true })
   croppedImageUrl?: string;
 
-  @OneToMany(() => DetectionEvent, (detectionEvent) => detectionEvent.feedEvent, {
-    cascade: true,
-  })
+  @OneToMany(
+    () => DetectionEvent,
+    (detectionEvent) => detectionEvent.feedEvent,
+    {
+      cascade: true,
+    },
+  )
   detectionEvents: DetectionEvent[];
 
   @Column()
@@ -54,5 +58,5 @@ export class FeedEvent {
   status?: Status;
 
   @UpdateDateColumn()
-  updatedAt: Date;  
+  updatedAt: Date;
 }

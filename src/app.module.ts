@@ -16,8 +16,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
       username: process.env.RDS_USERNAME,
     }),
     DetectionModule,
-    FeedModule
+    FeedModule,
   ],
 })
-
 export class AppModule {}

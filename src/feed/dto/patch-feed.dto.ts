@@ -1,4 +1,4 @@
-import { IsEnum, IsNumber, IsString, IsUrl, IsUUID } from 'class-validator';
+import { IsEnum, IsNumber, IsString, IsUUID } from 'class-validator';
 import { Status } from 'src/common/types';
 
 export class PatchFeedDTO {

@@ -1,11 +1,11 @@
-import { FeedEvent } from 'src/feed/entity';
+import { FeedEvent } from 'src/feed/entity/feed-event.entity';
 import {
   Column,
   CreateDateColumn,
   Entity,
   ManyToOne,
   PrimaryGeneratedColumn,
-  UpdateDateColumn
+  UpdateDateColumn,
 } from 'typeorm';
 
 @Entity('detection_event')

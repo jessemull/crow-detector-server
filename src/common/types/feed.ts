@@ -9,7 +9,7 @@ export enum Source {
 
 export enum Status {
   ACCEPTED = 'ACCEPTED',
-  REJECTED = 'REJECTED'
+  REJECTED = 'REJECTED',
 }
 
 export interface FeedResponse {

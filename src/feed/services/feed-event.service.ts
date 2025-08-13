@@ -1,6 +1,6 @@
 import { Between, Repository } from 'typeorm';
-import { CreateFeedDTO } from '../dto';
-import { FeedEvent } from '../entity';
+import { CreateFeedDTO } from '../dto/create-feed.dto';
+import { FeedEvent } from '../entity/feed-event.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PatchFeedDTO } from '../dto/patch-feed.dto';
@@ -9,22 +9,22 @@ import { PatchFeedDTO } from '../dto/patch-feed.dto';
 export class FeedEventService {
   constructor(
     @InjectRepository(FeedEvent)
-    private feedEventRepository: Repository<FeedEvent>
+    private feedEventRepository: Repository<FeedEvent>,
   ) {}
 
   async create(createFeedDTO: CreateFeedDTO): Promise<FeedEvent> {
     const { imageUrl, source } = createFeedDTO;
 
-    const event = await this.feedEventRepository.create({
+    const event = this.feedEventRepository.create({
       imageUrl,
-      source
+      source,
     });
 
     return this.feedEventRepository.save(event);
   }
 
-  async find(limit?: number, from?: string, to?: string) {
-    const where: any = {};
+  async find(limit?: number, from?: string, to?: string): Promise<FeedEvent[]> {
+    const where: Record<string, any> = {};
 
     if (from && to) {
       where.createdAt = Between(new Date(from), new Date(to));
@@ -43,15 +43,15 @@ export class FeedEventService {
     return this.feedEventRepository.findOne({
       where: { id },
       relations: ['detectionEvents'],
-    })
+    });
   }
 
   async update(patchFeedDTO: PatchFeedDTO): Promise<FeedEvent | null> {
     const { id, confidence, croppedImageUrl, status } = patchFeedDTO;
 
     const feedEvent = await this.feedEventRepository.findOne({
-      where: { id }
-    })
+      where: { id },
+    });
 
     if (!feedEvent) {
       throw new NotFoundException(`Feed event with id ${id} not found!`);
@@ -60,7 +60,7 @@ export class FeedEventService {
     await this.feedEventRepository.update(id, {
       confidence,
       croppedImageUrl,
-      status
+      status,
     });
 
     return this.findById(id);
