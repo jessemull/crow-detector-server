@@ -84,4 +84,4 @@ jobs:
         with:
           name: build-artifacts
           path: dist
-          retention-days: 7 
+          retention-days: 7

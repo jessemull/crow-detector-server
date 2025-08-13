@@ -78,6 +78,8 @@ Resources:
                 - IsDev
                 - !ImportValue crow-detector-rds-dev-DatabaseName
                 - !ImportValue crow-detector-rds-prod-DatabaseName
+            - Name: SSL_REJECT_UNAUTHORIZED
+              Value: 'true'
           Secrets:
             - Name: RDS_USERNAME
               ValueFrom: !Sub 'crow-detector-db-${Environment}:SecretString:username'

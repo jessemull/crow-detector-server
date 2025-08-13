@@ -8,10 +8,6 @@ Parameters:
     AllowedValues:
       - dev
       - prod
-  
-  DatabaseSecurityGroupId:
-    Type: String
-    Description: The ID of the database security group from the security groups stack
 
 Conditions:
   IsDev: !Equals [!Ref Environment, 'dev']
@@ -36,7 +32,10 @@ Resources:
       MultiAZ: !If [IsDev, false, true]
       StorageEncrypted: !If [IsDev, false, true]
       VPCSecurityGroups:
-        - !Ref DatabaseSecurityGroupId
+        - !If 
+          - IsDev
+          - !ImportValue crow-detector-db-sg-dev
+          - !ImportValue crow-detector-db-sg-prod
 
 Outputs:
   DatabaseEndpoint:
@@ -56,9 +55,3 @@ Outputs:
     Value: !Sub 'crow_detector_db_${Environment}'
     Export:
       Name: !Sub 'crow-detector-rds-${Environment}-DatabaseName'
-  
-  SecurityGroupId:
-    Description: The ID of the database security group
-    Value: !Ref DatabaseSecurityGroupId
-    Export:
-      Name: !Sub 'crow-detector-rds-${Environment}-SecurityGroupId'

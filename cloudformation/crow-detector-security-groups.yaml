@@ -28,7 +28,7 @@ Resources:
           ToPort: 5432
           CidrIp: !If 
             - IsDev
-            - 129.95.236.75/32
+            - 76.115.125.73/32
             - 0.0.0.0/0
         - IpProtocol: tcp
           FromPort: 5432

@@ -13,7 +13,7 @@ on:
           - prod
 
 jobs:
-  deploy-ecs:
+  deploy:
     name: Deploy to ECS Fargate
     runs-on: ubuntu-latest
     steps:
@@ -76,27 +76,3 @@ jobs:
             --capabilities CAPABILITY_NAMED_IAM \
             --region us-west-2
 
-      - name: Wait for Task Definition to be Available
-        run: |
-          echo "Waiting for task definition to be available..."
-          sleep 30
-
-      - name: Run ECS Task After Deployment
-        run: |
-          if [[ "${{ github.event.inputs.environment }}" == "prod" ]]; then
-            CLUSTER="crow-detector-prod"
-            TASK_DEF="crow-detector-task-prod"
-          else
-            CLUSTER="crow-detector-dev"
-            TASK_DEF="crow-detector-task-dev"
-          fi
-          
-          TASK_ARN=$(aws ecs run-task \
-            --cluster $CLUSTER \
-            --task-definition $TASK_DEF \
-            --launch-type FARGATE \
-            --network-configuration "awsvpcConfiguration={subnets=[subnet-02ce757a,subnet-2655df7b,subnet-e22085a8,subnet-badfdd91],securityGroups=[sg-09812900f87093af6],assignPublicIp=ENABLED}" \
-            --query 'tasks[0].taskArn' \
-            --output text)
-          
-          echo "Task started with ARN: $TASK_ARN" 
