@@ -1,0 +1,130 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'ECS Task Definition for Crow Detector Server'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: 'dev'
+    AllowedValues:
+      - dev
+      - prod
+  
+  ContainerImage:
+    Type: String
+    Description: The URI of the container image to deploy
+
+Mappings:
+  EnvConfig:
+    dev:
+      Subnets:
+        - subnet-02ce757a
+        - subnet-2655df7b
+        - subnet-e22085a8
+        - subnet-badfdd91
+      SecurityGroupExport: crow-detector-ecs-sg-dev
+      LogLevel: 'info'
+      Cpu: '256'
+      Memory: '512'
+    prod:
+      Subnets:
+        - subnet-02ce757a
+        - subnet-2655df7b
+        - subnet-e22085a8
+        - subnet-badfdd91
+      SecurityGroupExport: crow-detector-ecs-sg-prod
+      LogLevel: 'warn'
+      Cpu: '512'
+      Memory: '1024'
+
+Conditions:
+  IsDev: !Equals [!Ref Environment, 'dev']
+
+Resources:
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub 'crow-detector-task-${Environment}'
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Cpu: !FindInMap [EnvConfig, !Ref Environment, Cpu]
+      Memory: !FindInMap [EnvConfig, !Ref Environment, Memory]
+      ExecutionRoleArn: !If 
+        - IsDev
+        - !ImportValue crow-detector-iam-roles-dev-TaskExecutionRoleArn
+        - !ImportValue crow-detector-iam-roles-prod-TaskExecutionRoleArn
+      TaskRoleArn: !If 
+        - IsDev
+        - !ImportValue crow-detector-iam-roles-dev-TaskRoleArn
+        - !ImportValue crow-detector-iam-roles-prod-TaskRoleArn
+      ContainerDefinitions:
+        - Name: crow-detector-app
+          Image: !Ref ContainerImage
+          PortMappings:
+            - ContainerPort: 3000
+              Protocol: tcp
+          Environment:
+            - Name: NODE_ENV
+              Value: !Ref Environment
+            - Name: PORT
+              Value: '3000'
+            - Name: RDS_HOST
+              Value: !If 
+                - IsDev
+                - !ImportValue crow-detector-rds-dev-DatabaseEndpoint
+                - !ImportValue crow-detector-rds-prod-DatabaseEndpoint
+            - Name: RDS_DATABASE
+              Value: !If 
+                - IsDev
+                - !ImportValue crow-detector-rds-dev-DatabaseName
+                - !ImportValue crow-detector-rds-prod-DatabaseName
+          Secrets:
+            - Name: RDS_USERNAME
+              ValueFrom: !Sub 'crow-detector-db-${Environment}:SecretString:username'
+            - Name: RDS_PASSWORD
+              ValueFrom: !Sub 'crow-detector-db-${Environment}:SecretString:password'
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Sub '/ecs/crow-detector-${Environment}'
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ecs
+          HealthCheck:
+            Command:
+              - CMD-SHELL
+              - curl -f http://localhost:3000/health || exit 1
+            Interval: 30
+            Timeout: 5
+            Retries: 3
+            StartPeriod: 60
+
+  ECSService:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Sub 'crow-detector-service-${Environment}'
+      Cluster: !Sub 'crow-detector-${Environment}'
+      TaskDefinition: !Ref TaskDefinition
+      DesiredCount: !If [IsDev, 1, 2]
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups:
+            - !If 
+              - IsDev
+              - !ImportValue crow-detector-ecs-sg-dev
+              - !ImportValue crow-detector-ecs-sg-prod
+          Subnets: !FindInMap [EnvConfig, !Ref Environment, Subnets]
+
+Outputs:
+  TaskDefinitionArn:
+    Description: The ARN of the ECS task definition
+    Value: !Ref TaskDefinition
+    Export:
+      Name: !Sub '${AWS::StackName}-TaskDefinitionArn'
+
+  ServiceName:
+    Description: The name of the ECS service
+    Value: !Ref ECSService
+    Export:
+      Name: !Sub '${AWS::StackName}-ServiceName' 

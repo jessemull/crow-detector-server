@@ -9,36 +9,14 @@ Parameters:
       - dev
       - prod
   
-  VpcId:
-    Type: AWS::EC2::VPC::Id
-    Description: The ID of the VPC where the resources will be deployed.
+  DatabaseSecurityGroupId:
+    Type: String
+    Description: The ID of the database security group from the security groups stack
 
 Conditions:
   IsDev: !Equals [!Ref Environment, 'dev']
 
 Resources:
-  DatabaseSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupName: !Sub 'crow-detector-db-sg-${Environment}'
-      GroupDescription: !Sub 'Enable access to Postgres on port 5432 for ${Environment} environment'
-      VpcId: !Ref VpcId
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 5432
-          ToPort: 5432
-          CidrIp: !If 
-            - IsDev
-            - 191.96.37.20/32
-            - 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 5432
-          ToPort: 5432
-          CidrIp: !If 
-            - IsDev
-            - 129.95.236.75/32
-            - 0.0.0.0/0
-
   PostgresDB:
     Type: AWS::RDS::DBInstance
     DeletionPolicy: Snapshot
@@ -58,29 +36,29 @@ Resources:
       MultiAZ: !If [IsDev, false, true]
       StorageEncrypted: !If [IsDev, false, true]
       VPCSecurityGroups:
-        - !Ref DatabaseSecurityGroup
+        - !Ref DatabaseSecurityGroupId
 
 Outputs:
   DatabaseEndpoint:
     Description: The endpoint of the RDS database
     Value: !GetAtt PostgresDB.Endpoint.Address
     Export:
-      Name: !Sub '${AWS::StackName}-DatabaseEndpoint'
+      Name: !Sub 'crow-detector-rds-${Environment}-DatabaseEndpoint'
   
   DatabasePort:
     Description: The port of the RDS database
     Value: !GetAtt PostgresDB.Endpoint.Port
     Export:
-      Name: !Sub '${AWS::StackName}-DatabasePort'
+      Name: !Sub 'crow-detector-rds-${Environment}-DatabasePort'
   
   DatabaseName:
     Description: The name of the RDS database
     Value: !Sub 'crow_detector_db_${Environment}'
     Export:
-      Name: !Sub '${AWS::StackName}-DatabaseName'
+      Name: !Sub 'crow-detector-rds-${Environment}-DatabaseName'
   
   SecurityGroupId:
     Description: The ID of the database security group
-    Value: !Ref DatabaseSecurityGroup
+    Value: !Ref DatabaseSecurityGroupId
     Export:
-      Name: !Sub '${AWS::StackName}-SecurityGroupId'
+      Name: !Sub 'crow-detector-rds-${Environment}-SecurityGroupId'
