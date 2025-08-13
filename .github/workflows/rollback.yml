@@ -1,0 +1,49 @@
+name: Rollback Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to rollback'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - prod
+      container_image:
+        description: 'Container image to rollback to (e.g., 123456789012.dkr.ecr.us-west-2.amazonaws.com/crow-detector:abc123)'
+        required: true
+        type: string
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+
+      - name: Rollback ECS service
+        run: |
+          echo "Rolling back ${{ github.event.inputs.environment }} environment to image: ${{ github.event.inputs.container_image }}"
+          
+          # Deploy the task definition with the rollback image using CloudFormation
+          aws cloudformation deploy \
+            --template-file cloudformation/crow-detector-ecs-task.yaml \
+            --stack-name crow-detector-ecs-task-${{ github.event.inputs.environment }} \
+            --parameter-overrides \
+              Environment=${{ github.event.inputs.environment }} \
+              ContainerImage=${{ github.event.inputs.container_image }} \
+            --capabilities CAPABILITY_IAM \
+            --region us-west-2
+          
+          echo "Rollback initiated successfully!"

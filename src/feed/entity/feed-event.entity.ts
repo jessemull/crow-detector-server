@@ -40,7 +40,7 @@ export class FeedEvent {
   @Column()
   imageUrl: string;
 
-  @Column()
+  @Column({ nullable: true })
   isAppropriate: boolean;
 
   @Column({
