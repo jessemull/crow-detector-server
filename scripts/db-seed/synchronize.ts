@@ -3,7 +3,6 @@
 import { config } from 'dotenv';
 import { DatabaseSeeder } from './seeder';
 
-// Load environment variables
 config();
 
 async function main() {

@@ -19,7 +19,8 @@ dotenv.config();
       type: 'postgres',
       username: process.env.RDS_USERNAME,
       ssl: {
-        rejectUnauthorized: process.env.SSL_REJECT_UNAUTHORIZED === 'false' ? false : true,
+        rejectUnauthorized:
+          process.env.SSL_REJECT_UNAUTHORIZED === 'false' ? false : true,
       },
     }),
     DetectionModule,

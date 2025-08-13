@@ -1,11 +1,10 @@
 #!/usr/bin/env ts-node
 
-import { config } from 'dotenv';
 import { DataSource } from 'typeorm';
-import { FeedEvent } from '../../src/feed/entity/feed-event.entity';
 import { DetectionEvent } from '../../src/detection/entity/detection-event.entity';
+import { FeedEvent } from '../../src/feed/entity/feed-event.entity';
+import { config } from 'dotenv';
 
-// Load environment variables
 config();
 
 async function testConnection() {
@@ -34,11 +33,9 @@ async function testConnection() {
     await dataSource.initialize();
           console.log('Database connection successful!');
     
-    // Test a simple query
     const result = await dataSource.query('SELECT NOW() as current_time');
     console.log('Current database time:', result[0].current_time);
     
-    // Check table counts
     const feedEventCount = await dataSource.getRepository(FeedEvent).count();
     const detectionEventCount = await dataSource.getRepository(DetectionEvent).count();
     
