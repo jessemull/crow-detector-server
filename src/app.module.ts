@@ -1,7 +1,11 @@
+import dotenv from 'dotenv';
 import { DetectionModule } from './detection/detection.module';
 import { FeedModule } from './feed/feed.module';
+import { HealthModule } from './health/health.module';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+
+dotenv.config();
 
 @Module({
   imports: [
@@ -17,6 +21,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
     }),
     DetectionModule,
     FeedModule,
+    HealthModule,
   ],
 })
 export class AppModule {}
