@@ -1,10 +1,10 @@
 import { FeedEvent } from 'src/feed';
 
 export enum Source {
-  API = 'api',
-  BUTTON = 'button',
-  SCRIPT = 'script',
-  TEST = 'test',
+  API = 'API',
+  BUTTON = 'BUTTON',
+  SCRIPT = 'SCRIPT',
+  TEST = 'TEST',
 }
 
 export enum Status {
