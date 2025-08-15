@@ -15,7 +15,6 @@ describe('TypeORM Configuration', () => {
   it('should configure TypeORM with default SSL settings when SSL_REJECT_UNAUTHORIZED is not set to false', () => {
     delete process.env.SSL_REJECT_UNAUTHORIZED;
 
-    // Test that TypeORM.forRoot can be called
     const result = TypeOrmModule.forRoot({});
     expect(result).toBeDefined();
     expect(TypeOrmModule.forRoot).toHaveBeenCalledWith({});

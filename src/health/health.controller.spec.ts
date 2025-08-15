@@ -60,7 +60,6 @@ describe('HealthController', () => {
     it('should call database ping check', async () => {
       mockHealthService.check.mockImplementation(
         async (checks: Array<() => Promise<void>>) => {
-          // Execute the health check functions that were passed
           if (Array.isArray(checks)) {
             for (const check of checks) {
               if (typeof check === 'function') {
@@ -74,10 +73,8 @@ describe('HealthController', () => {
 
       await controller.check();
 
-      // Verify that the health check was called with a function
       expect(healthService.check).toHaveBeenCalledWith([expect.any(Function)]);
 
-      // Verify that the TypeOrmHealthIndicator pingCheck was called
       expect(dbHealthIndicator.pingCheck).toHaveBeenCalledWith('database');
     });
 
