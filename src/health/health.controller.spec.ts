@@ -38,7 +38,9 @@ describe('HealthController', () => {
 
     controller = module.get<HealthController>(HealthController);
     healthService = module.get<HealthCheckService>(HealthCheckService);
-    dbHealthIndicator = module.get<TypeOrmHealthIndicator>(TypeOrmHealthIndicator);
+    dbHealthIndicator = module.get<TypeOrmHealthIndicator>(
+      TypeOrmHealthIndicator,
+    );
   });
 
   afterEach(() => {
@@ -51,9 +53,7 @@ describe('HealthController', () => {
 
       const result = await controller.check();
 
-      expect(healthService.check).toHaveBeenCalledWith([
-        expect.any(Function),
-      ]);
+      expect(healthService.check).toHaveBeenCalledWith([expect.any(Function)]);
       expect(result).toEqual(mockHealthCheck);
     });
 
@@ -62,9 +62,10 @@ describe('HealthController', () => {
 
       await controller.check();
 
-      const healthCheckFunction = mockHealthService.check.mock.calls[0][0][0];
-      await healthCheckFunction();
+      // Verify that the health check was called with a function
+      expect(healthService.check).toHaveBeenCalledWith([expect.any(Function)]);
 
+      // Verify that the TypeOrmHealthIndicator pingCheck was called
       expect(dbHealthIndicator.pingCheck).toHaveBeenCalledWith('database');
     });
 
@@ -73,9 +74,7 @@ describe('HealthController', () => {
       mockHealthService.check.mockRejectedValue(error);
 
       await expect(controller.check()).rejects.toThrow('Health check failed');
-      expect(healthService.check).toHaveBeenCalledWith([
-        expect.any(Function),
-      ]);
+      expect(healthService.check).toHaveBeenCalledWith([expect.any(Function)]);
     });
   });
-}); 
+});

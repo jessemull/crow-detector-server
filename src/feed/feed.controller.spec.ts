@@ -73,7 +73,9 @@ describe('FeedController', () => {
       const error = new Error('Service error');
       mockFeedEventService.create.mockRejectedValue(error);
 
-      await expect(controller.feedEvent(createFeedDTO)).rejects.toThrow('Service error');
+      await expect(controller.feedEvent(createFeedDTO)).rejects.toThrow(
+        'Service error',
+      );
       expect(service.create).toHaveBeenCalledWith(createFeedDTO);
     });
   });
@@ -83,7 +85,11 @@ describe('FeedController', () => {
       const mockEvents = [mockFeedEvent];
       mockFeedEventService.find.mockResolvedValue(mockEvents);
 
-      const result = await controller.getFeedEvents(10, '2024-01-01', '2024-12-31');
+      const result = await controller.getFeedEvents(
+        10,
+        '2024-01-01',
+        '2024-12-31',
+      );
 
       expect(service.find).toHaveBeenCalledWith(10, '2024-01-01', '2024-12-31');
       expect(result).toEqual(mockEvents);
@@ -107,7 +113,9 @@ describe('FeedController', () => {
       const error = new Error('Service error');
       mockFeedEventService.find.mockRejectedValue(error);
 
-      await expect(controller.getFeedEvents(10, '2024-01-01', '2024-12-31')).rejects.toThrow('Service error');
+      await expect(
+        controller.getFeedEvents(10, '2024-01-01', '2024-12-31'),
+      ).rejects.toThrow('Service error');
     });
   });
 
@@ -143,7 +151,9 @@ describe('FeedController', () => {
       const error = new Error('Service error');
       mockFeedEventService.update.mockRejectedValue(error);
 
-      await expect(controller.updateFeedEvent(patchFeedDTO)).rejects.toThrow('Service error');
+      await expect(controller.updateFeedEvent(patchFeedDTO)).rejects.toThrow(
+        'Service error',
+      );
       expect(service.update).toHaveBeenCalledWith(patchFeedDTO);
     });
   });

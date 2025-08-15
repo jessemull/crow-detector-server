@@ -1,4 +1,7 @@
 #!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
 
+# Always run linting on all TypeScript files
+npm run lint
+
+# Run lint-staged for additional checks on staged files
 npx lint-staged

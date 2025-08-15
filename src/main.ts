@@ -23,6 +23,9 @@ export async function bootstrap() {
 
 /* c8 ignore start */
 if (require.main === module) {
-  bootstrap();
+  bootstrap().catch((error) => {
+    console.error('Failed to start application:', error);
+    process.exit(1);
+  });
 }
 /* c8 ignore stop */

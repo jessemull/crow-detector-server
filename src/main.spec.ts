@@ -1,6 +1,6 @@
 import { bootstrap } from './main';
 import { NestFactory } from '@nestjs/core';
-import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
+import { FastifyAdapter } from '@nestjs/platform-fastify';
 
 jest.mock('@nestjs/core');
 jest.mock('@nestjs/platform-fastify');
@@ -13,13 +13,15 @@ describe('bootstrap', () => {
 
     jest.spyOn(NestFactory, 'create').mockResolvedValue({
       listen: listenMock,
-    } as any);
+    } as unknown as ReturnType<typeof NestFactory.create>);
 
-    jest.spyOn(process, 'exit').mockImplementation(((code?: number) => {
+    jest.spyOn(process, 'exit').mockImplementation((code?: number) => {
       throw new Error(`process.exit called with code ${code}`);
-    }) as any);
+    });
 
-    jest.spyOn(console, 'error').mockImplementation(() => {});
+    jest.spyOn(console, 'error').mockImplementation(() => {
+      // Mock implementation - no action needed
+    });
   });
 
   afterEach(() => {
@@ -29,7 +31,10 @@ describe('bootstrap', () => {
   it('should start the app on default port', async () => {
     process.env.PORT = undefined;
     await bootstrap();
-    expect(NestFactory.create).toHaveBeenCalledWith(expect.any(Function), expect.any(FastifyAdapter));
+    expect(NestFactory.create).toHaveBeenCalledWith(
+      expect.any(Function),
+      expect.any(FastifyAdapter),
+    );
     expect(listenMock).toHaveBeenCalledWith(3000);
   });
 
@@ -48,7 +53,12 @@ describe('bootstrap', () => {
   it('should handle bootstrap errors', async () => {
     const error = new Error('fail');
     jest.spyOn(NestFactory, 'create').mockRejectedValue(error);
-    await expect(bootstrap()).rejects.toThrow('process.exit called with code 1');
-    expect(console.error).toHaveBeenCalledWith('Failed to start application:', error);
+    await expect(bootstrap()).rejects.toThrow(
+      'process.exit called with code 1',
+    );
+    expect(console.error).toHaveBeenCalledWith(
+      'Failed to start application:',
+      error,
+    );
   });
 });

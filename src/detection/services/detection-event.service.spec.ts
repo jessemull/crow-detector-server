@@ -58,7 +58,9 @@ describe('DetectionEventService', () => {
     }).compile();
 
     service = module.get<DetectionEventService>(DetectionEventService);
-    repository = module.get<Repository<DetectionEvent>>(getRepositoryToken(DetectionEvent));
+    repository = module.get<Repository<DetectionEvent>>(
+      getRepositoryToken(DetectionEvent),
+    );
   });
 
   afterEach(() => {
@@ -75,7 +77,7 @@ describe('DetectionEventService', () => {
       const createdEvent = { ...mockDetectionEvent, ...createDetectionDTO };
       mockRepository.create.mockReturnValue(createdEvent);
       mockRepository.save.mockResolvedValue(createdEvent);
-      
+
       mockRepository.findOne.mockResolvedValueOnce(mockFeedEvent);
 
       const result = await service.create(createDetectionDTO);
@@ -115,7 +117,9 @@ describe('DetectionEventService', () => {
       mockRepository.create.mockReturnValue({});
       mockRepository.save.mockRejectedValue(error);
 
-      await expect(service.create(createDetectionDTO)).rejects.toThrow('Repository error');
+      await expect(service.create(createDetectionDTO)).rejects.toThrow(
+        'Repository error',
+      );
     });
   });
 
@@ -188,7 +192,9 @@ describe('DetectionEventService', () => {
       const error = new Error('Repository error');
       mockRepository.find.mockRejectedValue(error);
 
-      await expect(service.find(10, '2024-01-01', '2024-12-31')).rejects.toThrow('Repository error');
+      await expect(
+        service.find(10, '2024-01-01', '2024-12-31'),
+      ).rejects.toThrow('Repository error');
     });
   });
 
@@ -234,14 +240,18 @@ describe('DetectionEventService', () => {
 
       mockRepository.findOne.mockResolvedValue(mockDetectionEvent);
       mockRepository.update.mockResolvedValue({ affected: 1 });
-      mockRepository.findOne.mockResolvedValueOnce(mockDetectionEvent).mockResolvedValueOnce({
-        ...mockDetectionEvent,
-        ...patchDetectionDTO,
-      });
+      mockRepository.findOne
+        .mockResolvedValueOnce(mockDetectionEvent)
+        .mockResolvedValueOnce({
+          ...mockDetectionEvent,
+          ...patchDetectionDTO,
+        });
 
       const result = await service.update(patchDetectionDTO);
 
-      expect(repository.findOne).toHaveBeenCalledWith({ where: { id: patchDetectionDTO.id } });
+      expect(repository.findOne).toHaveBeenCalledWith({
+        where: { id: patchDetectionDTO.id },
+      });
       expect(repository.update).toHaveBeenCalledWith(patchDetectionDTO.id, {
         confidence: patchDetectionDTO.confidence,
         crowCount: patchDetectionDTO.crowCount,
@@ -261,7 +271,9 @@ describe('DetectionEventService', () => {
       await expect(service.update(patchDetectionDTO)).rejects.toThrow(
         NotFoundException,
       );
-      expect(repository.findOne).toHaveBeenCalledWith({ where: { id: patchDetectionDTO.id } });
+      expect(repository.findOne).toHaveBeenCalledWith({
+        where: { id: patchDetectionDTO.id },
+      });
     });
 
     it('should handle repository errors', async () => {
@@ -274,7 +286,9 @@ describe('DetectionEventService', () => {
       const error = new Error('Repository error');
       mockRepository.findOne.mockRejectedValue(error);
 
-      await expect(service.update(patchDetectionDTO)).rejects.toThrow('Repository error');
+      await expect(service.update(patchDetectionDTO)).rejects.toThrow(
+        'Repository error',
+      );
     });
   });
-}); 
+});

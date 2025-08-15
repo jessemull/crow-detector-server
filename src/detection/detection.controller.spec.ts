@@ -67,7 +67,7 @@ describe('DetectionController', () => {
         data: mockDetectionEvent,
         message: 'Detection event created successfully!',
       };
-      
+
       expect(response.data).toBe(mockDetectionEvent);
       expect(response.message).toBe('Detection event created successfully!');
       expect(response).toHaveProperty('data');
@@ -79,7 +79,7 @@ describe('DetectionController', () => {
         data: mockDetectionEvent,
         message: 'Detection event updated successfully!',
       };
-      
+
       expect(response.data).toBe(mockDetectionEvent);
       expect(response.message).toBe('Detection event updated successfully!');
       expect(response).toHaveProperty('data');
@@ -151,7 +151,11 @@ describe('DetectionController', () => {
         confidence: 0.98,
         crowCount: 8,
       };
-      const updatedEvent = { ...mockDetectionEvent, confidence: 0.98, crowCount: 8 };
+      const updatedEvent = {
+        ...mockDetectionEvent,
+        confidence: 0.98,
+        crowCount: 8,
+      };
       mockDetectionEventService.update.mockResolvedValue(updatedEvent);
 
       const result = await controller.updateCrowDetectedEvent(patchDTO);
@@ -173,9 +177,9 @@ describe('DetectionController', () => {
       const error = new Error('Service error');
       mockDetectionEventService.update.mockRejectedValue(error);
 
-      await expect(controller.updateCrowDetectedEvent(patchDTO)).rejects.toThrow(
-        'Service error',
-      );
+      await expect(
+        controller.updateCrowDetectedEvent(patchDTO),
+      ).rejects.toThrow('Service error');
       expect(service.update).toHaveBeenCalledWith(patchDTO);
     });
   });

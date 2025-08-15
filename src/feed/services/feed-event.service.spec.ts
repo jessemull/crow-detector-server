@@ -43,7 +43,9 @@ describe('FeedEventService', () => {
     }).compile();
 
     service = module.get<FeedEventService>(FeedEventService);
-    repository = module.get<Repository<FeedEvent>>(getRepositoryToken(FeedEvent));
+    repository = module.get<Repository<FeedEvent>>(
+      getRepositoryToken(FeedEvent),
+    );
   });
 
   afterEach(() => {
@@ -78,7 +80,9 @@ describe('FeedEventService', () => {
       mockRepository.create.mockReturnValue({});
       mockRepository.save.mockRejectedValue(error);
 
-      await expect(service.create(createFeedDTO)).rejects.toThrow('Repository error');
+      await expect(service.create(createFeedDTO)).rejects.toThrow(
+        'Repository error',
+      );
     });
   });
 
@@ -151,7 +155,9 @@ describe('FeedEventService', () => {
       const error = new Error('Repository error');
       mockRepository.find.mockRejectedValue(error);
 
-      await expect(service.find(10, '2024-01-01', '2024-12-31')).rejects.toThrow('Repository error');
+      await expect(
+        service.find(10, '2024-01-01', '2024-12-31'),
+      ).rejects.toThrow('Repository error');
     });
   });
 
@@ -198,14 +204,18 @@ describe('FeedEventService', () => {
 
       mockRepository.findOne.mockResolvedValue(mockFeedEvent);
       mockRepository.update.mockResolvedValue({ affected: 1 });
-      mockRepository.findOne.mockResolvedValueOnce(mockFeedEvent).mockResolvedValueOnce({
-        ...mockFeedEvent,
-        ...patchFeedDTO,
-      });
+      mockRepository.findOne
+        .mockResolvedValueOnce(mockFeedEvent)
+        .mockResolvedValueOnce({
+          ...mockFeedEvent,
+          ...patchFeedDTO,
+        });
 
       const result = await service.update(patchFeedDTO);
 
-      expect(repository.findOne).toHaveBeenCalledWith({ where: { id: patchFeedDTO.id } });
+      expect(repository.findOne).toHaveBeenCalledWith({
+        where: { id: patchFeedDTO.id },
+      });
       expect(repository.update).toHaveBeenCalledWith(patchFeedDTO.id, {
         confidence: patchFeedDTO.confidence,
         croppedImageUrl: patchFeedDTO.croppedImageUrl,
@@ -227,7 +237,9 @@ describe('FeedEventService', () => {
       await expect(service.update(patchFeedDTO)).rejects.toThrow(
         NotFoundException,
       );
-      expect(repository.findOne).toHaveBeenCalledWith({ where: { id: patchFeedDTO.id } });
+      expect(repository.findOne).toHaveBeenCalledWith({
+        where: { id: patchFeedDTO.id },
+      });
     });
 
     it('should handle repository errors', async () => {
@@ -241,7 +253,9 @@ describe('FeedEventService', () => {
       const error = new Error('Repository error');
       mockRepository.findOne.mockRejectedValue(error);
 
-      await expect(service.update(patchFeedDTO)).rejects.toThrow('Repository error');
+      await expect(service.update(patchFeedDTO)).rejects.toThrow(
+        'Repository error',
+      );
     });
   });
-}); 
+});
