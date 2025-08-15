@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from './../src/app.module';
 import { Source, Status } from '../src/common/types';
@@ -13,6 +13,13 @@ describe('AppController (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.useGlobalPipes(
+      new ValidationPipe({
+        transform: true,
+        whitelist: true,
+        forbidNonWhitelisted: true,
+      }),
+    );
     await app.init();
   });
 
@@ -109,7 +116,7 @@ describe('AppController (e2e)', () => {
     let detectionEventId: string;
     let feedEventId: string;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       // Create a feed event first for detection tests
       const createFeedDTO = {
         imageUrl: 'https://example.com/feed-for-detection.jpg',
@@ -123,24 +130,23 @@ describe('AppController (e2e)', () => {
       feedEventId = response.body.data.id;
     });
 
-    it('/detection (POST) - should create a detection event', () => {
+    it('/detection (POST) - should create a detection event', async () => {
       const createDetectionDTO = {
         feedEvent: feedEventId,
         imageUrl: 'https://example.com/detection-image.jpg',
       };
 
-      return request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .post('/detection')
         .send(createDetectionDTO)
-        .expect(201)
-        .expect((res) => {
-          expect(res.body).toHaveProperty('data');
-          expect(res.body).toHaveProperty('message');
-          expect(res.body.data).toHaveProperty('id');
-          expect(res.body.data.imageUrl).toBe(createDetectionDTO.imageUrl);
-          expect(res.body.data.feedEvent.id).toBe(feedEventId);
-          detectionEventId = res.body.data.id;
-        });
+        .expect(201);
+
+      expect(response.body).toHaveProperty('data');
+      expect(response.body).toHaveProperty('message');
+      expect(response.body.data).toHaveProperty('id');
+      expect(response.body.data.imageUrl).toBe(createDetectionDTO.imageUrl);
+      expect(response.body.data.feedEvent.id).toBe(feedEventId);
+      detectionEventId = response.body.data.id;
     });
 
     it('/detection (GET) - should return detection events', () => {

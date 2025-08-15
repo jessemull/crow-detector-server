@@ -33,6 +33,7 @@
     "@nestjs/platform-fastify": "^11.1.5",
     "@nestjs/terminus": "^11.0.0",
     "@nestjs/typeorm": "^11.0.0",
+    "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
     "dotenv": "^17.2.1",
     "pg": "^8.16.3",
@@ -95,7 +96,9 @@
     },
     "forceExit": true,
     "detectOpenHandles": true,
-    "setupFilesAfterEnv": ["<rootDir>/../test/setup.ts"]
+    "setupFilesAfterEnv": [
+      "<rootDir>/../test/setup.ts"
+    ]
   },
   "config": {
     "commitizen": {

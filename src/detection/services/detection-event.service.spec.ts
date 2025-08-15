@@ -134,6 +134,7 @@ describe('DetectionEventService', () => {
         order: { createdAt: 'DESC' },
         take: undefined,
         where: {},
+        relations: ['feedEvent'],
       });
       expect(result).toEqual(mockEvents);
     });
@@ -149,6 +150,7 @@ describe('DetectionEventService', () => {
         order: { createdAt: 'DESC' },
         take: limit,
         where: {},
+        relations: ['feedEvent'],
       });
       expect(result).toEqual(mockEvents);
     });
@@ -166,6 +168,7 @@ describe('DetectionEventService', () => {
         order: { createdAt: 'DESC' },
         take: undefined,
         where: { createdAt: Between(fromDate, now) },
+        relations: ['feedEvent'],
       });
       expect(result).toEqual(mockEvents);
     });
@@ -184,6 +187,7 @@ describe('DetectionEventService', () => {
         order: { createdAt: 'DESC' },
         take: undefined,
         where: { createdAt: Between(fromDate, toDate) },
+        relations: ['feedEvent'],
       });
       expect(result).toEqual(mockEvents);
     });

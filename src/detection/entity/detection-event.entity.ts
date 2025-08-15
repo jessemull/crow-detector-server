@@ -13,7 +13,16 @@ export class DetectionEvent {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ nullable: true, type: 'decimal', precision: 3, scale: 2 })
+  @Column({
+    nullable: true,
+    type: 'decimal',
+    precision: 3,
+    scale: 2,
+    transformer: {
+      to: (value: number) => value,
+      from: (value: string) => (value ? parseFloat(value) : null),
+    },
+  })
   confidence?: number;
 
   @CreateDateColumn()
