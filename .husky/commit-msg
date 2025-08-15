@@ -1,0 +1,19 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Check if commit message follows conventional commit format
+if ! head -1 "$1" | grep -qE "^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?: .{1,}$"; then
+  echo "❌ Invalid commit message format!"
+  echo "Please use conventional commit format: type(scope): description"
+  echo "Examples:"
+  echo "  feat: add new feature"
+  echo "  fix: resolve bug"
+  echo "  docs: update documentation"
+  echo "  style: format code"
+  echo "  refactor: restructure code"
+  echo "  test: add tests"
+  echo "  chore: maintenance tasks"
+  echo ""
+  echo "Or use: npm run commit"
+  exit 1
+fi
