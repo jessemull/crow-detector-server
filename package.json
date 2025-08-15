@@ -92,7 +92,10 @@
     "testEnvironment": "node",
     "moduleNameMapper": {
       "^src/(.*)$": "<rootDir>/$1"
-    }
+    },
+    "forceExit": true,
+    "detectOpenHandles": true,
+    "setupFilesAfterEnv": ["<rootDir>/../test/setup.ts"]
   },
   "config": {
     "commitizen": {

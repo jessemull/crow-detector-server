@@ -58,7 +58,19 @@ describe('HealthController', () => {
     });
 
     it('should call database ping check', async () => {
-      mockHealthService.check.mockResolvedValue(mockHealthCheck);
+      mockHealthService.check.mockImplementation(
+        async (checks: Array<() => Promise<void>>) => {
+          // Execute the health check functions that were passed
+          if (Array.isArray(checks)) {
+            for (const check of checks) {
+              if (typeof check === 'function') {
+                await check();
+              }
+            }
+          }
+          return mockHealthCheck;
+        },
+      );
 
       await controller.check();
 
