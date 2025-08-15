@@ -1,0 +1,56 @@
+// bootstrap.spec.ts
+import { bootstrap } from './main';
+import { NestFactory } from '@nestjs/core';
+import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
+
+jest.mock('@nestjs/core');
+jest.mock('@nestjs/platform-fastify');
+
+describe('bootstrap', () => {
+  let listenMock: jest.Mock;
+
+  beforeEach(() => {
+    listenMock = jest.fn().mockResolvedValue(undefined);
+
+    // Spy on create
+    jest.spyOn(NestFactory, 'create').mockResolvedValue({
+      listen: listenMock,
+    } as any);
+
+    jest.spyOn(process, 'exit').mockImplementation(((code?: number) => {
+      throw new Error(`process.exit called with code ${code}`);
+    }) as any);
+
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('should start the app on default port', async () => {
+    process.env.PORT = undefined;
+    await bootstrap();
+    expect(NestFactory.create).toHaveBeenCalledWith(expect.any(Function), expect.any(FastifyAdapter));
+    expect(listenMock).toHaveBeenCalledWith(3000);
+  });
+
+  it('should start the app on process.env.PORT', async () => {
+    process.env.PORT = '5000';
+    await bootstrap();
+    expect(listenMock).toHaveBeenCalledWith(5000);
+  });
+
+  it('should default to 3000 if process.env.PORT is not a number', async () => {
+    delete process.env.PORT;
+    await bootstrap();
+    expect(listenMock).toHaveBeenCalledWith(3000);
+  });
+
+  it('should handle bootstrap errors', async () => {
+    const error = new Error('fail');
+    jest.spyOn(NestFactory, 'create').mockRejectedValue(error);
+    await expect(bootstrap()).rejects.toThrow('process.exit called with code 1');
+    expect(console.error).toHaveBeenCalledWith('Failed to start application:', error);
+  });
+});

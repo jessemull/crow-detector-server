@@ -7,6 +7,7 @@
   "license": "UNLICENSED",
   "scripts": {
     "build": "nest build",
+    "coverage:open": "open ./coverage/lcov-report/index.html",
     "db:reset": "ts-node -r tsconfig-paths/register scripts/db-seed/reset.ts",
     "db:seed": "ts-node -r tsconfig-paths/register scripts/db-seed/seed.ts",
     "db:synchronize": "ts-node -r tsconfig-paths/register scripts/db-seed/synchronize.ts",
@@ -75,9 +76,16 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "**/*.(t|j)s",
+      "!**/*.dto.ts",
+      "!**/*.entity.ts",
+      "!**/index.ts"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "coverageProvider": "v8",
+    "testEnvironment": "node",
+    "moduleNameMapper": {
+      "^src/(.*)$": "<rootDir>/$1"
+    }
   }
 }
