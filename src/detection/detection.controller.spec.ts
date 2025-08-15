@@ -55,19 +55,14 @@ describe('DetectionController', () => {
     service = module.get<DetectionEventService>(DetectionEventService);
   });
 
-  // ------------------------------
-  // Explicit constructor and response coverage tests
-  // ------------------------------
   describe('constructor and response coverage', () => {
     it('should cover constructor explicitly', () => {
-      // Force constructor execution for coverage
       const instance = new DetectionController(service);
       expect(instance).toBeDefined();
       expect(instance).toBeInstanceOf(DetectionController);
     });
 
     it('should cover response object creation explicitly', () => {
-      // Test response object creation logic
       const response = {
         data: mockDetectionEvent,
         message: 'Detection event created successfully!',
@@ -80,7 +75,6 @@ describe('DetectionController', () => {
     });
 
     it('should cover update response object creation', () => {
-      // Test update response object creation logic
       const response = {
         data: mockDetectionEvent,
         message: 'Detection event updated successfully!',
@@ -93,9 +87,6 @@ describe('DetectionController', () => {
     });
   });
 
-  // ------------------------------
-  // Standard Nest TestingModule tests
-  // ------------------------------
   describe('crowDetectedEvent', () => {
     it('should create a detection event successfully', async () => {
       const dto: CreateDetectionDTO = {

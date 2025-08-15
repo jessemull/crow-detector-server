@@ -62,7 +62,6 @@ describe('HealthController', () => {
 
       await controller.check();
 
-      // Verify the function passed to healthService.check calls dbHealthIndicator.pingCheck
       const healthCheckFunction = mockHealthService.check.mock.calls[0][0][0];
       await healthCheckFunction();
 

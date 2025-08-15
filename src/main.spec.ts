@@ -1,4 +1,3 @@
-// bootstrap.spec.ts
 import { bootstrap } from './main';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
@@ -12,7 +11,6 @@ describe('bootstrap', () => {
   beforeEach(() => {
     listenMock = jest.fn().mockResolvedValue(undefined);
 
-    // Spy on create
     jest.spyOn(NestFactory, 'create').mockResolvedValue({
       listen: listenMock,
     } as any);

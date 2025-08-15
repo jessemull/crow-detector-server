@@ -76,7 +76,6 @@ describe('DetectionEventService', () => {
       mockRepository.create.mockReturnValue(createdEvent);
       mockRepository.save.mockResolvedValue(createdEvent);
       
-      // Mock the feedEvent repository findOne call
       mockRepository.findOne.mockResolvedValueOnce(mockFeedEvent);
 
       const result = await service.create(createDetectionDTO);
@@ -95,7 +94,6 @@ describe('DetectionEventService', () => {
         imageUrl: 'https://example.com/detection-image.jpg',
       };
 
-      // Mock the feedEvent repository findOne call to return null
       mockRepository.findOne.mockResolvedValueOnce(null);
 
       await expect(service.create(createDetectionDTO)).rejects.toThrow(
