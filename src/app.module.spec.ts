@@ -13,7 +13,6 @@ describe('AppModule Configuration', () => {
     it('should configure SSL rejectUnauthorized as true when SSL_REJECT_UNAUTHORIZED is not set to false', () => {
       delete process.env.SSL_REJECT_UNAUTHORIZED;
 
-      // Test the ternary logic directly
       const sslRejectUnauthorized =
         process.env.SSL_REJECT_UNAUTHORIZED === 'false' ? false : true;
 
@@ -23,7 +22,6 @@ describe('AppModule Configuration', () => {
     it('should configure SSL rejectUnauthorized as false when SSL_REJECT_UNAUTHORIZED is set to false', () => {
       process.env.SSL_REJECT_UNAUTHORIZED = 'false';
 
-      // Test the ternary logic directly
       const sslRejectUnauthorized =
         process.env.SSL_REJECT_UNAUTHORIZED === 'false' ? false : true;
 
@@ -33,7 +31,6 @@ describe('AppModule Configuration', () => {
     it('should configure SSL rejectUnauthorized as true when SSL_REJECT_UNAUTHORIZED is set to other values', () => {
       process.env.SSL_REJECT_UNAUTHORIZED = 'true';
 
-      // Test the ternary logic directly
       const sslRejectUnauthorized =
         process.env.SSL_REJECT_UNAUTHORIZED === 'false' ? false : true;
 
@@ -45,7 +42,6 @@ describe('AppModule Configuration', () => {
     it('should configure synchronize as true in non-production environments', () => {
       process.env.NODE_ENV = 'development';
 
-      // Test the ternary logic directly
       const synchronize = process.env.NODE_ENV !== 'production';
 
       expect(synchronize).toBe(true);
@@ -54,7 +50,6 @@ describe('AppModule Configuration', () => {
     it('should configure synchronize as false in production environments', () => {
       process.env.NODE_ENV = 'production';
 
-      // Test the ternary logic directly
       const synchronize = process.env.NODE_ENV !== 'production';
 
       expect(synchronize).toBe(false);
@@ -63,7 +58,6 @@ describe('AppModule Configuration', () => {
     it('should configure synchronize as true when NODE_ENV is not set', () => {
       delete process.env.NODE_ENV;
 
-      // Test the ternary logic directly
       const synchronize = process.env.NODE_ENV !== 'production';
 
       expect(synchronize).toBe(true);
