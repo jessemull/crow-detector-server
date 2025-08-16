@@ -1,15 +1,6 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Query,
-} from '@nestjs/common';
-import { DetectionEventService } from './services/detection-event.service';
+import { Body, Controller, Get, Patch, Post, Query } from '@nestjs/common';
 import { CreateDetectionDTO } from './dto/create-detection.dto';
-import { DetectionEvent } from './entity/detection-event.entity';
+import { DetectionEventService } from './services/detection-event.service';
 import { DetectionResponse } from 'src/common/types';
 import { PatchDetectionDTO } from './dto/patch-detection.dto';
 
@@ -34,7 +25,6 @@ export class DetectionController {
     @Query('from') from: string,
     @Query('to') to: string,
   ): Promise<any[]> {
-    // Assuming DetectionEvent[] is replaced by any[] or a different type
     return this.detectionEventService.find(limit, from, to);
   }
 
