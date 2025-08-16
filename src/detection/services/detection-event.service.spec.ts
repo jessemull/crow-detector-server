@@ -1,37 +1,37 @@
+import { CreateDetectionDTO } from '../dto/create-detection.dto';
+import { DetectionEvent } from '../entity/detection-event.entity';
+import { DetectionEventService } from './detection-event.service';
+import { FeedEvent } from '../../feed/entity/feed-event.entity';
+import { NotFoundException } from '@nestjs/common';
+import { PatchDetectionDTO } from '../dto/patch-detection.dto';
+import { Repository, Between } from 'typeorm';
+import { Source, Status } from '../../common/types';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository, Between } from 'typeorm';
-import { DetectionEventService } from './detection-event.service';
-import { DetectionEvent } from '../entity/detection-event.entity';
-import { CreateDetectionDTO } from '../dto/create-detection.dto';
-import { PatchDetectionDTO } from '../dto/patch-detection.dto';
-import { FeedEvent } from '../../feed/entity/feed-event.entity';
-import { Source, Status } from '../../common/types';
-import { NotFoundException } from '@nestjs/common';
 
 describe('DetectionEventService', () => {
   let service: DetectionEventService;
   let repository: Repository<DetectionEvent>;
 
   const mockFeedEvent: FeedEvent = {
+    createdAt: new Date(),
+    detectionEvents: [],
     id: 'feed-uuid',
     imageUrl: 'https://example.com/feed-image.jpg',
+    isAppropriate: true,
     source: Source.API,
     status: Status.ACCEPTED,
-    isAppropriate: true,
-    createdAt: new Date(),
     updatedAt: new Date(),
-    detectionEvents: [],
   };
 
   const mockDetectionEvent: DetectionEvent = {
-    id: 'detection-uuid',
     confidence: 0.95,
     createdAt: new Date(),
-    updatedAt: new Date(),
     crowCount: 5,
-    imageUrl: 'https://example.com/detection-image.jpg',
     feedEvent: mockFeedEvent,
+    id: 'detection-uuid',
+    imageUrl: 'https://example.com/detection-image.jpg',
+    updatedAt: new Date(),
   };
 
   const mockRepository = {

@@ -1,11 +1,11 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { HealthController } from './health.controller';
 import { HealthCheckService, TypeOrmHealthIndicator } from '@nestjs/terminus';
+import { HealthController } from './health.controller';
+import { Test, TestingModule } from '@nestjs/testing';
 
 describe('HealthController', () => {
   let controller: HealthController;
-  let healthService: HealthCheckService;
   let dbHealthIndicator: TypeOrmHealthIndicator;
+  let healthService: HealthCheckService;
 
   const mockHealthCheck = {
     database: {

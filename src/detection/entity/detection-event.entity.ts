@@ -15,9 +15,9 @@ export class DetectionEvent {
 
   @Column({
     nullable: true,
-    type: 'decimal',
     precision: 3,
     scale: 2,
+    type: 'decimal',
     transformer: {
       to: (value: number) => value,
       from: (value: string) => (value ? parseFloat(value) : null),

@@ -1,11 +1,11 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { DetectionController } from './detection.controller';
-import { DetectionEventService } from './services/detection-event.service';
 import { CreateDetectionDTO } from './dto/create-detection.dto';
-import { PatchDetectionDTO } from './dto/patch-detection.dto';
+import { DetectionController } from './detection.controller';
 import { DetectionEvent } from './entity/detection-event.entity';
+import { DetectionEventService } from './services/detection-event.service';
 import { FeedEvent } from '../feed/entity/feed-event.entity';
+import { PatchDetectionDTO } from './dto/patch-detection.dto';
 import { Source, Status } from '../common/types';
+import { Test, TestingModule } from '@nestjs/testing';
 
 describe('DetectionController', () => {
   let controller: DetectionController;

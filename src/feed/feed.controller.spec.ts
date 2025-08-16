@@ -1,24 +1,24 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { FeedController } from './feed.controller';
-import { FeedEventService } from './services/feed-event.service';
 import { CreateFeedDTO } from './dto/create-feed.dto';
-import { PatchFeedDTO } from './dto/patch-feed.dto';
+import { FeedController } from './feed.controller';
 import { FeedEvent } from './entity/feed-event.entity';
+import { FeedEventService } from './services/feed-event.service';
+import { PatchFeedDTO } from './dto/patch-feed.dto';
 import { Source, Status } from '../common/types';
+import { Test, TestingModule } from '@nestjs/testing';
 
 describe('FeedController', () => {
   let controller: FeedController;
   let service: FeedEventService;
 
   const mockFeedEvent: FeedEvent = {
+    createdAt: new Date(),
+    detectionEvents: [],
     id: 'test-uuid',
     imageUrl: 'https://example.com/image.jpg',
+    isAppropriate: true,
     source: Source.API,
     status: Status.ACCEPTED,
-    isAppropriate: true,
-    createdAt: new Date(),
     updatedAt: new Date(),
-    detectionEvents: [],
   };
 
   const mockFeedEventService = {

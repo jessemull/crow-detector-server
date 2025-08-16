@@ -1,33 +1,33 @@
+import { CreateFeedDTO } from '../dto/create-feed.dto';
+import { FeedEvent } from '../entity/feed-event.entity';
+import { FeedEventService } from './feed-event.service';
+import { NotFoundException } from '@nestjs/common';
+import { PatchFeedDTO } from '../dto/patch-feed.dto';
+import { Repository, Between } from 'typeorm';
+import { Source, Status } from '../../common/types';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository, Between } from 'typeorm';
-import { FeedEventService } from './feed-event.service';
-import { FeedEvent } from '../entity/feed-event.entity';
-import { CreateFeedDTO } from '../dto/create-feed.dto';
-import { PatchFeedDTO } from '../dto/patch-feed.dto';
-import { Source, Status } from '../../common/types';
-import { NotFoundException } from '@nestjs/common';
 
 describe('FeedEventService', () => {
   let service: FeedEventService;
   let repository: Repository<FeedEvent>;
 
   const mockFeedEvent: FeedEvent = {
+    createdAt: new Date(),
+    detectionEvents: [],
     id: 'test-uuid',
     imageUrl: 'https://example.com/image.jpg',
+    isAppropriate: true,
     source: Source.API,
     status: Status.ACCEPTED,
-    isAppropriate: true,
-    createdAt: new Date(),
     updatedAt: new Date(),
-    detectionEvents: [],
   };
 
   const mockRepository = {
     create: jest.fn(),
-    save: jest.fn(),
     find: jest.fn(),
     findOne: jest.fn(),
+    save: jest.fn(),
     update: jest.fn(),
   };
 

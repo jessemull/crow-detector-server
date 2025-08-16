@@ -1,6 +1,6 @@
-import { bootstrap } from './main';
-import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter } from '@nestjs/platform-fastify';
+import { NestFactory } from '@nestjs/core';
+import { bootstrap } from './main';
 
 jest.mock('@nestjs/core');
 jest.mock('@nestjs/platform-fastify');
