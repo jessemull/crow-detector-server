@@ -1,4 +1,4 @@
-name: Auto Deploy to Dev
+name: Deploy On Merge
 
 on:
   push:
