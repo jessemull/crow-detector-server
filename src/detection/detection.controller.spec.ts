@@ -134,6 +134,16 @@ describe('DetectionController', () => {
       expect(result).toEqual(mockEvents);
     });
 
+    it('should return detection events without parameters', async () => {
+      const mockEvents = [mockDetectionEvent];
+      mockDetectionEventService.find.mockResolvedValue(mockEvents);
+
+      const result = await controller.getDetectionEvents(0, '', '');
+
+      expect(service.find).toHaveBeenCalledWith(0, '', '');
+      expect(result).toEqual(mockEvents);
+    });
+
     it('should propagate service errors', async () => {
       const error = new Error('Service error');
       mockDetectionEventService.find.mockRejectedValue(error);
