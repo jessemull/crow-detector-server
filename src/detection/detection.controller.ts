@@ -1,6 +1,5 @@
 import { Body, Controller, Get, Patch, Post, Query } from '@nestjs/common';
 import { CreateDetectionDTO } from './dto/create-detection.dto';
-import { DetectionEvent } from './entity/detection-event.entity';
 import { DetectionEventService } from './services/detection-event.service';
 import { DetectionResponse } from 'src/common/types';
 import { PatchDetectionDTO } from './dto/patch-detection.dto';
@@ -25,7 +24,7 @@ export class DetectionController {
     @Query('limit') limit: number,
     @Query('from') from: string,
     @Query('to') to: string,
-  ): Promise<DetectionEvent[]> {
+  ): Promise<any[]> {
     return this.detectionEventService.find(limit, from, to);
   }
 

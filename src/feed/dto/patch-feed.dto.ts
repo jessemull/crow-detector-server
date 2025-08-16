@@ -1,4 +1,5 @@
 import { IsEnum, IsNumber, IsString, IsUUID } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { Status } from 'src/common/types';
 
 export class PatchFeedDTO {
@@ -6,6 +7,7 @@ export class PatchFeedDTO {
   id: string;
 
   @IsNumber()
+  @Transform(({ value }) => Number(value))
   confidence: number;
 
   @IsString()

@@ -55,6 +55,7 @@ export class DetectionEventService {
       order: { createdAt: 'DESC' },
       take: limit,
       where,
+      relations: ['feedEvent'],
     });
   }
 

@@ -1,9 +1,8 @@
 import { Between, Repository } from 'typeorm';
-import { CreateFeedDTO } from '../dto/create-feed.dto';
-import { FeedEvent } from '../entity/feed-event.entity';
+import { CreateFeedDTO, PatchFeedDTO } from '../dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PatchFeedDTO } from '../dto/patch-feed.dto';
+import { FeedEvent } from '../entity/feed-event.entity';
 
 @Injectable()
 export class FeedEventService {
