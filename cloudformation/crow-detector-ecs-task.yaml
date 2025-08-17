@@ -80,9 +80,9 @@ Resources:
                 - !ImportValue crow-detector-rds-prod-DatabaseName
           Secrets:
             - Name: RDS_USERNAME
-              ValueFrom: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:crow-detector-db-${Environment}:username::'
+              ValueFrom: !Sub 'arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:crow-detector-db-${Environment}:username::'
             - Name: RDS_PASSWORD
-              ValueFrom: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:crow-detector-db-${Environment}:password::'
+              ValueFrom: !Sub 'arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:crow-detector-db-${Environment}:password::'
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -106,9 +106,16 @@ Resources:
       TaskDefinition: !Ref TaskDefinition
       DesiredCount: !If [IsDev, 1, 2]
       LaunchType: FARGATE
+      LoadBalancers:
+        - TargetGroupArn: !If 
+            - IsDev
+            - !ImportValue crow-detector-tg-dev
+            - !ImportValue crow-detector-tg-prod
+          ContainerName: crow-detector-app
+          ContainerPort: 3000
       NetworkConfiguration:
         AwsvpcConfiguration:
-          AssignPublicIp: ENABLED
+          AssignPublicIp: DISABLED
           SecurityGroups:
             - !If 
               - IsDev
