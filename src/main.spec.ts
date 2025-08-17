@@ -35,19 +35,19 @@ describe('bootstrap', () => {
       expect.any(Function),
       expect.any(FastifyAdapter),
     );
-    expect(listenMock).toHaveBeenCalledWith(3000);
+    expect(listenMock).toHaveBeenCalledWith(3000, '0.0.0.0');
   });
 
   it('should start the app on process.env.PORT', async () => {
     process.env.PORT = '5000';
     await bootstrap();
-    expect(listenMock).toHaveBeenCalledWith(5000);
+    expect(listenMock).toHaveBeenCalledWith(5000, '0.0.0.0');
   });
 
   it('should default to 3000 if process.env.PORT is not a number', async () => {
     delete process.env.PORT;
     await bootstrap();
-    expect(listenMock).toHaveBeenCalledWith(3000);
+    expect(listenMock).toHaveBeenCalledWith(3000, '0.0.0.0');
   });
 
   it('should handle bootstrap errors', async () => {
