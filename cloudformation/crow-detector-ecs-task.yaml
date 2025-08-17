@@ -82,9 +82,9 @@ Resources:
               Value: 'true'
           Secrets:
             - Name: RDS_USERNAME
-              ValueFrom: !Sub 'crow-detector-db-${Environment}:SecretString:username'
+              ValueFrom: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:crow-detector-db-${Environment}:username::'
             - Name: RDS_PASSWORD
-              ValueFrom: !Sub 'crow-detector-db-${Environment}:SecretString:password'
+              ValueFrom: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:crow-detector-db-${Environment}:password::'
           LogConfiguration:
             LogDriver: awslogs
             Options:
