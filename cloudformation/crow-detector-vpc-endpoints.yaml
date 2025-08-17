@@ -11,8 +11,14 @@ Parameters:
     Type: AWS::EC2::VPC::Id
     Description: The ID of the VPC where the resources will be deployed.
 
+  RouteTableId:
+    Type: String
+    Description: The ID of the route table for the private subnets (needed for S3 Gateway endpoint)
+    Default: ''
+
 Conditions:
   IsDev: !Equals [!Ref Environment, 'dev']
+  HasRouteTable: !Not [!Equals [!Ref RouteTableId, '']]
 
 Resources:
   SecretsManagerEndpoint:
@@ -31,6 +37,53 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub 'crow-detector-secretsmanager-endpoint-${Environment}'
+
+  ECRAPIEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ecr.api'
+      VpcEndpointType: Interface
+      SubnetIds:
+        - subnet-2655df7b  # Your private subnets
+        - subnet-e22085a8
+        - subnet-badfdd91
+      SecurityGroupIds:
+        - !Ref VPCEndpointSecurityGroup
+      PrivateDnsEnabled: true
+      Tags:
+        - Key: Name
+          Value: !Sub 'crow-detector-ecr-api-endpoint-${Environment}'
+
+  ECRDockerEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ecr.dkr'
+      VpcEndpointType: Interface
+      SubnetIds:
+        - subnet-2655df7b  # Your private subnets
+        - subnet-e22085a8
+        - subnet-badfdd91
+      SecurityGroupIds:
+        - !Ref VPCEndpointSecurityGroup
+      PrivateDnsEnabled: true
+      Tags:
+        - Key: Name
+          Value: !Sub 'crow-detector-ecr-docker-endpoint-${Environment}'
+
+  S3GatewayEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: HasRouteTable
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
+      VpcEndpointType: Gateway
+      RouteTableIds:
+        - !Ref RouteTableId
+      Tags:
+        - Key: Name
+          Value: !Sub 'crow-detector-s3-gateway-endpoint-${Environment}'
 
   VPCEndpointSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -56,6 +109,25 @@ Outputs:
     Value: !Ref SecretsManagerEndpoint
     Export:
       Name: !Sub 'crow-detector-secretsmanager-endpoint-${Environment}'
+
+  ECRAPIEndpointId:
+    Description: ID of the ECR API VPC endpoint
+    Value: !Ref ECRAPIEndpoint
+    Export:
+      Name: !Sub 'crow-detector-ecr-api-endpoint-${Environment}'
+
+  ECRDockerEndpointId:
+    Description: ID of the ECR Docker VPC endpoint
+    Value: !Ref ECRDockerEndpoint
+    Export:
+      Name: !Sub 'crow-detector-ecr-docker-endpoint-${Environment}'
+
+  S3GatewayEndpointId:
+    Description: ID of the S3 Gateway VPC endpoint
+    Value: !If [HasRouteTable, !Ref S3GatewayEndpoint, !Ref 'AWS::NoValue']
+    Export:
+      Name: !Sub 'crow-detector-s3-gateway-endpoint-${Environment}'
+    Condition: HasRouteTable
 
   VPCEndpointSecurityGroupId:
     Description: ID of the VPC endpoint security group
