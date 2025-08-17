@@ -1,6 +1,6 @@
 # Multi-stage build for production.
 
-FROM node:18-alpine AS builder
+FROM node:22-alpine AS builder
 
 # Set working directory.
 
@@ -10,9 +10,9 @@ WORKDIR /app
 
 COPY package*.json ./
 
-# Install dependencies.
+# Install all dependencies (including dev dependencies) for building.
 
-RUN npm ci --only=production
+RUN npm ci
 
 # Copy source code.
 
@@ -24,7 +24,7 @@ RUN npm run build
 
 # Production stage.
 
-FROM node:18-alpine AS production
+FROM node:22-alpine AS production
 
 # Install dumb-init for proper signal handling.
 
@@ -43,13 +43,13 @@ WORKDIR /app
 
 COPY package*.json ./
 
-# Install only production dependencies.
+# Install only production dependencies, skipping prepare script.
 
-RUN npm ci --only=production && npm cache clean --force
+RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
 # Copy built application from builder stage.
 
-COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
+COPY --from=builder --chown=nestjs:nodejs /app/dist/src ./dist
 
 # Copy any additional files needed at runtime.
 
@@ -74,4 +74,4 @@ ENTRYPOINT ["dumb-init", "--"]
 
 # Start the application.
 
-CMD ["node", "dist/main"]
+CMD ["node", "dist/main.js"]
