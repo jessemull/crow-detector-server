@@ -55,7 +55,7 @@ Resources:
           CidrIp: !If 
             - IsDev
             - 76.115.125.73/32
-            - 0.0.0.0/1
+            - 0.0.0.0/0
       SecurityGroupEgress:
         - IpProtocol: tcp
           FromPort: 443
