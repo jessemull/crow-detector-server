@@ -1,0 +1,64 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'VPC Endpoints for AWS Services'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: 'dev'
+    AllowedValues: ['dev', 'prod']
+  
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: The ID of the VPC where the resources will be deployed.
+
+Conditions:
+  IsDev: !Equals [!Ref Environment, 'dev']
+
+Resources:
+  SecretsManagerEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.secretsmanager'
+      VpcEndpointType: Interface
+      SubnetIds:
+        - subnet-2655df7b  # Your private subnets
+        - subnet-e22085a8
+        - subnet-badfdd91
+      SecurityGroupIds:
+        - !Ref VPCEndpointSecurityGroup
+      PrivateDnsEnabled: true
+      Tags:
+        - Key: Name
+          Value: !Sub 'crow-detector-secretsmanager-endpoint-${Environment}'
+
+  VPCEndpointSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub 'crow-detector-vpce-sg-${Environment}'
+      GroupDescription: Security group for VPC endpoints
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: !If 
+            - IsDev
+            - !ImportValue crow-detector-ecs-sg-dev
+            - !ImportValue crow-detector-ecs-sg-prod
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+
+Outputs:
+  SecretsManagerEndpointId:
+    Description: ID of the Secrets Manager VPC endpoint
+    Value: !Ref SecretsManagerEndpoint
+    Export:
+      Name: !Sub 'crow-detector-secretsmanager-endpoint-${Environment}'
+
+  VPCEndpointSecurityGroupId:
+    Description: ID of the VPC endpoint security group
+    Value: !Ref VPCEndpointSecurityGroup
+    Export:
+      Name: !Sub 'crow-detector-vpce-sg-${Environment}'
