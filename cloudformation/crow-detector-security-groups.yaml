@@ -58,19 +58,15 @@ Resources:
             - 0.0.0.0/0
       SecurityGroupEgress:
         - IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
-          DestinationSecurityGroupId: !If 
-            - IsDev
-            - !ImportValue crow-detector-vpce-sg-dev
-            - !ImportValue crow-detector-vpce-sg-prod
-        - IpProtocol: tcp
           FromPort: 5432
           ToPort: 5432
           DestinationSecurityGroupId: !If 
             - IsDev
             - !ImportValue crow-detector-db-sg-dev
             - !ImportValue crow-detector-db-sg-prod
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: Allow all outbound traffic (will route through NAT instance)
 
 Outputs:
   DatabaseSecurityGroupId:
