@@ -109,8 +109,8 @@ Resources:
       LoadBalancers:
         - TargetGroupArn: !If 
             - IsDev
-            - !ImportValue crow-detector-tg-dev
-            - !ImportValue crow-detector-tg-prod
+            - !ImportValue crow-detector-tg-dev-Arn
+            - !ImportValue crow-detector-tg-prod-Arn
           ContainerName: crow-detector-app
           ContainerPort: 3000
       NetworkConfiguration:
