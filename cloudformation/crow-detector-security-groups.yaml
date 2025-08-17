@@ -45,7 +45,17 @@ Resources:
         - IpProtocol: tcp
           FromPort: 3000
           ToPort: 3000
-          CidrIp: 0.0.0.0/0
+          SourceSecurityGroupId: !If 
+            - IsDev
+            - !ImportValue crow-detector-alb-sg-dev
+            - !ImportValue crow-detector-alb-sg-prod
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          CidrIp: !If 
+            - IsDev
+            - 76.115.125.73/32
+            - 0.0.0.0/1
       SecurityGroupEgress:
         - IpProtocol: -1
           CidrIp: 0.0.0.0/0
