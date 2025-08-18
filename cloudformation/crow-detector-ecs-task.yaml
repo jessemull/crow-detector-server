@@ -19,6 +19,7 @@ Mappings:
       Subnets:
         - subnet-02ce757a
         - subnet-2655df7b
+        - subnet-e22085a8
         - subnet-badfdd91
       SecurityGroupExport: crow-detector-ecs-sg-dev
       LogLevel: 'info'
@@ -28,6 +29,7 @@ Mappings:
       Subnets:
         - subnet-02ce757a
         - subnet-2655df7b
+        - subnet-e22085a8
         - subnet-badfdd91
       SecurityGroupExport: crow-detector-ecs-sg-prod
       LogLevel: 'warn'
@@ -113,7 +115,7 @@ Resources:
           ContainerPort: 3000
       NetworkConfiguration:
         AwsvpcConfiguration:
-          AssignPublicIp: DISABLED
+          AssignPublicIp: ENABLED
           SecurityGroups:
             - !If 
               - IsDev
