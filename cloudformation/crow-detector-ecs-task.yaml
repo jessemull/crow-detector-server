@@ -17,21 +17,19 @@ Mappings:
   EnvConfig:
     dev:
       Subnets:
-        - subnet-02ce757a
-        - subnet-2655df7b
-        - subnet-e22085a8
-        - subnet-badfdd91
-      SecurityGroupExport: crow-detector-ecs-sg-dev
+        - !ImportValue 'aws-infra-private-subnet-1-id'
+        - !ImportValue 'aws-infra-private-subnet-2-id'
+        - !ImportValue 'aws-infra-private-subnet-3-id'
+      SecurityGroupExport: aws-infra-ecs-sg-id
       LogLevel: 'info'
       Cpu: '256'
       Memory: '512'
     prod:
       Subnets:
-        - subnet-02ce757a
-        - subnet-2655df7b
-        - subnet-e22085a8
-        - subnet-badfdd91
-      SecurityGroupExport: crow-detector-ecs-sg-prod
+        - !ImportValue 'aws-infra-private-subnet-1-id'
+        - !ImportValue 'aws-infra-private-subnet-2-id'
+        - !ImportValue 'aws-infra-private-subnet-3-id'
+      SecurityGroupExport: aws-infra-ecs-sg-id
       LogLevel: 'warn'
       Cpu: '512'
       Memory: '1024'
@@ -69,15 +67,9 @@ Resources:
             - Name: PORT
               Value: '3000'
             - Name: RDS_HOST
-              Value: !If 
-                - IsDev
-                - !ImportValue crow-detector-rds-dev-DatabaseEndpoint
-                - !ImportValue crow-detector-rds-prod-DatabaseEndpoint
+              Value: !ImportValue 'crow-detector-db-dev-endpoint'
             - Name: RDS_DATABASE
-              Value: !If 
-                - IsDev
-                - !ImportValue crow-detector-rds-dev-DatabaseName
-                - !ImportValue crow-detector-rds-prod-DatabaseName
+              Value: !ImportValue 'crow-detector-db-dev-name'
           Secrets:
             - Name: RDS_USERNAME
               ValueFrom: !Sub 'arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:crow-detector-db-${Environment}:username::'
@@ -115,12 +107,9 @@ Resources:
           ContainerPort: 3000
       NetworkConfiguration:
         AwsvpcConfiguration:
-          AssignPublicIp: ENABLED
+          AssignPublicIp: DISABLED
           SecurityGroups:
-            - !If 
-              - IsDev
-              - !ImportValue crow-detector-ecs-sg-dev
-              - !ImportValue crow-detector-ecs-sg-prod
+            - !ImportValue 'aws-infra-ecs-sg-id'
           Subnets: !FindInMap [EnvConfig, !Ref Environment, Subnets]
 
 Outputs:

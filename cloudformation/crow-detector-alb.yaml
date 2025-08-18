@@ -7,9 +7,7 @@ Parameters:
     Default: 'dev'
     AllowedValues: ['dev', 'prod']
   
-  VpcId:
-    Type: AWS::EC2::VPC::Id
-    Description: The ID of the VPC where the resources will be deployed.
+  # VPC ID is imported from aws-infra VPC
   
   CertificateArn:
     Type: String
@@ -24,31 +22,12 @@ Resources:
       Type: application
       IpAddressType: ipv4
       Subnets:
-        - subnet-02ce757a  # Your public subnets
-        - subnet-2655df7b
-        - subnet-e22085a8
-        - subnet-badfdd91
+        - !ImportValue 'aws-infra-public-subnet-id'  # Public subnet from aws-infra
+        - !ImportValue 'aws-infra-private-subnet-1-id'  # Second subnet for ALB requirement
       SecurityGroups:
-        - !Ref ALBSecurityGroup
+        - !ImportValue 'aws-infra-alb-sg-id'  # Use aws-infra ALB security group
 
-  ALBSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupName: !Sub 'crow-detector-alb-sg-${Environment}'
-      GroupDescription: Security group for ALB
-      VpcId: !Ref VpcId
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 80
-          ToPort: 80
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
-          CidrIp: 0.0.0.0/0
-      SecurityGroupEgress:
-        - IpProtocol: -1
-          CidrIp: 0.0.0.0/0
+  # ALB Security Group is imported from aws-infra
 
   TargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
@@ -57,7 +36,7 @@ Resources:
       Port: 3000
       Protocol: HTTP
       TargetType: ip
-      VpcId: !Ref VpcId
+      VpcId: !ImportValue 'aws-infra-vpc-id'
       HealthCheckPath: /health
       HealthCheckPort: 3000
       HealthCheckProtocol: HTTP
@@ -113,8 +92,4 @@ Outputs:
     Export:
       Name: !Sub 'crow-detector-alb-${Environment}-Arn'
 
-  ALBSecurityGroupId:
-    Description: ID of the ALB security group
-    Value: !Ref ALBSecurityGroup
-    Export:
-      Name: !Sub 'crow-detector-alb-sg-${Environment}'
+
