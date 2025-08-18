@@ -92,7 +92,7 @@ Resources:
           HealthCheck:
             Command:
               - CMD-SHELL
-              - curl -f http://localhost:3000/health || exit 1
+              - 'node -e "require(\"http\").get(\"http://localhost:3000/health\", (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"'
             Interval: 30
             Timeout: 5
             Retries: 3
