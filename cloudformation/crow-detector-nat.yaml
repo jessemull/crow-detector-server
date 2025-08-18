@@ -10,10 +10,6 @@ Parameters:
     Type: AWS::EC2::Subnet::Id
     Description: The ID of the public subnet where the NAT instance will be deployed.
 
-  RouteTableId:
-    Type: String
-    Description: The ID of the route table for the private subnets that will be updated to route through the NAT instance.
-
   BastionIP:
     Type: String
     Default: '76.115.125.73/32'
@@ -128,18 +124,6 @@ Resources:
           Value: 'crow-detector-nat'
         - Key: Purpose
           Value: 'NAT and Bastion Host'
-
-  NATRouteReplacement:
-    Type: AWS::EC2::Route
-    DependsOn: NATInstance
-    DeletionPolicy: Delete
-    UpdateReplacePolicy: Delete
-    Properties:
-      RouteTableId: !Ref RouteTableId
-      DestinationCidrBlock: 0.0.0.0/0
-      InstanceId: !Ref NATInstance
-      # This will replace the existing route to the internet gateway
-      # Note: You may need to manually delete the existing route first if this fails
 
 Outputs:
   NATInstanceId:
