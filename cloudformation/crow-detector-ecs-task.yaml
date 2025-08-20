@@ -17,18 +17,16 @@ Mappings:
   EnvConfig:
     dev:
       Subnets:
-        - !ImportValue 'aws-infra-private-subnet-1-id'
-        - !ImportValue 'aws-infra-private-subnet-2-id'
-        - !ImportValue 'aws-infra-private-subnet-3-id'
+        - !ImportValue 'aws-infra-private-subnet-1-id'  # us-west-2c
+        - !ImportValue 'aws-infra-private-subnet-2-id'  # us-west-2d
       SecurityGroupExport: aws-infra-ecs-sg-id
       LogLevel: 'info'
       Cpu: 256
       Memory: 512
     prod:
       Subnets:
-        - !ImportValue 'aws-infra-private-subnet-1-id'
-        - !ImportValue 'aws-infra-private-subnet-2-id'
-        - !ImportValue 'aws-infra-private-subnet-3-id'
+        - !ImportValue 'aws-infra-private-subnet-1-id'  # us-west-2c
+        - !ImportValue 'aws-infra-private-subnet-2-id'  # us-west-2d
       SecurityGroupExport: aws-infra-ecs-sg-id
       LogLevel: 'warn'
       Cpu: 512
@@ -111,9 +109,8 @@ Resources:
           SecurityGroups:
             - !ImportValue 'aws-infra-ecs-sg-id'
           Subnets:
-            - !ImportValue 'aws-infra-private-subnet-1-id'
-            - !ImportValue 'aws-infra-private-subnet-2-id'
-            - !ImportValue 'aws-infra-private-subnet-3-id'
+            - !ImportValue 'aws-infra-private-subnet-1-id'  # us-west-2c
+            - !ImportValue 'aws-infra-private-subnet-2-id'  # us-west-2d
 
 Outputs:
   TaskDefinitionArn:
