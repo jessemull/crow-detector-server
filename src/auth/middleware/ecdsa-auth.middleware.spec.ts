@@ -1,12 +1,12 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-require-imports */
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { UnauthorizedException } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import { EcdsaAuthMiddleware } from './ecdsa-auth.middleware';
+import * as crypto from 'crypto';
 
 // Mock the entire crypto module
 jest.mock('crypto', () => ({
@@ -51,8 +51,7 @@ describe('EcdsaAuthMiddleware', () => {
     jest.spyOn(console, 'error').mockImplementation();
 
     // Get the mocked crypto.createVerify function
-    const crypto = require('crypto');
-    mockCreateVerify = crypto.createVerify;
+    mockCreateVerify = crypto.createVerify as jest.MockedFunction<any>;
     mockCreateVerify.mockReset();
   });
 
