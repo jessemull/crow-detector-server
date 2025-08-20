@@ -17,14 +17,8 @@ export class EcdsaAuthMiddleware implements NestMiddleware {
   };
 
   use(req: Request, res: Response, next: NextFunction) {
-    // Debug logging
-    console.log('Auth middleware - NODE_ENV:', process.env.NODE_ENV);
-    console.log(
-      'Auth middleware - x-dev-mode header:',
-      req.headers['x-dev-mode'],
-    );
+    // Development mode bypass...
 
-    // Development mode bypass
     if (
       process.env.NODE_ENV === 'development' &&
       req.headers['x-dev-mode'] === 'true'
@@ -55,13 +49,9 @@ export class EcdsaAuthMiddleware implements NestMiddleware {
       throw new UnauthorizedException('Unknown device');
     }
 
-    // Check if public key is loaded...
+    // Get the public key for signature verification...
 
     const publicKey = this.devicePublicKeys[deviceId] as string;
-
-    if (!publicKey) {
-      throw new UnauthorizedException('Device public key not configured');
-    }
 
     // Verify timestamp (prevent replay attacks)...
 
