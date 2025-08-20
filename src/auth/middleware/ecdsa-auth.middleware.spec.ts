@@ -1,13 +1,24 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-require-imports */
+
 import { Test, TestingModule } from '@nestjs/testing';
 import { UnauthorizedException } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import { EcdsaAuthMiddleware } from './ecdsa-auth.middleware';
+
+// Mock the entire crypto module
+jest.mock('crypto', () => ({
+  createVerify: jest.fn(),
+}));
 
 describe('EcdsaAuthMiddleware', () => {
   let middleware: EcdsaAuthMiddleware;
   let mockRequest: Partial<Request> & { headers: Record<string, any> };
   let mockResponse: Partial<Response>;
   let mockNext: NextFunction;
+  let mockCreateVerify: jest.MockedFunction<any>;
 
   beforeEach(async () => {
     // Reset environment variables
@@ -38,6 +49,11 @@ describe('EcdsaAuthMiddleware', () => {
     // Clear console.log mocks
     jest.spyOn(console, 'log').mockImplementation();
     jest.spyOn(console, 'error').mockImplementation();
+
+    // Get the mocked crypto.createVerify function
+    const crypto = require('crypto');
+    mockCreateVerify = crypto.createVerify;
+    mockCreateVerify.mockReset();
   });
 
   afterEach(() => {
@@ -205,6 +221,237 @@ describe('EcdsaAuthMiddleware', () => {
           mockNext,
         );
       }).toThrow(new UnauthorizedException('Request timestamp expired'));
+    });
+
+    it('should accept timestamp within the valid time window', () => {
+      const validTimestamp = Date.now() - 2 * 60 * 1000; // 2 minutes ago
+      mockRequest.headers['x-timestamp'] = validTimestamp.toString();
+
+      // Mock successful signature verification
+      const mockVerifier = {
+        update: jest.fn().mockReturnThis(),
+        verify: jest.fn().mockReturnValue(true),
+      };
+      mockCreateVerify.mockReturnValue(mockVerifier as any);
+
+      middleware.use(
+        mockRequest as Request,
+        mockResponse as Response,
+        mockNext,
+      );
+
+      expect(mockRequest['deviceId']).toBe('pi-user');
+      expect(mockRequest['requestTime']).toBe(validTimestamp);
+      expect(mockNext).toHaveBeenCalled();
+    });
+  });
+
+  describe('Signature verification', () => {
+    beforeEach(() => {
+      mockRequest.headers['x-device-id'] = 'pi-user';
+      mockRequest.headers['x-timestamp'] = Date.now().toString();
+    });
+
+    it('should throw UnauthorizedException when signature verification fails', () => {
+      mockRequest.headers['x-signature'] = 'invalid-signature';
+
+      const mockVerifier = {
+        update: jest.fn().mockReturnThis(),
+        verify: jest.fn().mockReturnValue(false),
+      };
+      mockCreateVerify.mockReturnValue(mockVerifier as any);
+
+      expect(() => {
+        middleware.use(
+          mockRequest as Request,
+          mockResponse as Response,
+          mockNext,
+        );
+      }).toThrow(new UnauthorizedException('Invalid signature'));
+    });
+
+    it('should proceed when signature verification succeeds', () => {
+      mockRequest.headers['x-signature'] = 'valid-signature';
+
+      const mockVerifier = {
+        update: jest.fn().mockReturnThis(),
+        verify: jest.fn().mockReturnValue(true),
+      };
+      mockCreateVerify.mockReturnValue(mockVerifier as any);
+
+      middleware.use(
+        mockRequest as Request,
+        mockResponse as Response,
+        mockNext,
+      );
+
+      expect(mockRequest['deviceId']).toBe('pi-user');
+      expect(mockRequest['requestTime']).toBeDefined();
+      expect(mockNext).toHaveBeenCalled();
+    });
+
+    it('should handle crypto verification errors gracefully', () => {
+      mockRequest.headers['x-signature'] = 'test-signature';
+
+      mockCreateVerify.mockImplementation(() => {
+        throw new Error('Crypto error');
+      });
+
+      expect(() => {
+        middleware.use(
+          mockRequest as Request,
+          mockResponse as Response,
+          mockNext,
+        );
+      }).toThrow(new UnauthorizedException('Invalid signature'));
+    });
+  });
+
+  describe('Data verification string construction', () => {
+    beforeEach(() => {
+      mockRequest.headers['x-device-id'] = 'pi-user';
+      mockRequest.headers['x-signature'] = 'test-signature';
+      mockRequest.headers['x-timestamp'] = Date.now().toString();
+    });
+
+    it('should construct verification string correctly', () => {
+      const mockVerifier = {
+        update: jest.fn().mockReturnThis(),
+        verify: jest.fn().mockReturnValue(true),
+      };
+
+      mockCreateVerify.mockReturnValue(mockVerifier as any);
+
+      middleware.use(
+        mockRequest as Request,
+        mockResponse as Response,
+        mockNext,
+      );
+
+      const expectedData = `POST/detection{"confidence":0.85,"imageUrl":"test.jpg"}${mockRequest.headers['x-timestamp']}`;
+      expect(mockVerifier.update).toHaveBeenCalledWith(expectedData);
+    });
+
+    it('should handle empty body correctly', () => {
+      mockRequest.body = {};
+      const mockVerifier = {
+        update: jest.fn().mockReturnThis(),
+        verify: jest.fn().mockReturnValue(true),
+      };
+
+      mockCreateVerify.mockReturnValue(mockVerifier as any);
+
+      middleware.use(
+        mockRequest as Request,
+        mockResponse as Response,
+        mockNext,
+      );
+
+      const expectedData = `POST/detection{}${mockRequest.headers['x-timestamp']}`;
+      expect(mockVerifier.update).toHaveBeenCalledWith(expectedData);
+    });
+
+    it('should handle different HTTP methods', () => {
+      const mockRequestWithDifferentMethod = {
+        ...mockRequest,
+        method: 'PATCH',
+        path: '/feed',
+      };
+      const mockVerifier = {
+        update: jest.fn().mockReturnThis(),
+        verify: jest.fn().mockReturnValue(true),
+      };
+
+      mockCreateVerify.mockReturnValue(mockVerifier as any);
+
+      middleware.use(
+        mockRequestWithDifferentMethod as Request,
+        mockResponse as Response,
+        mockNext,
+      );
+
+      const expectedData = `PATCH/feed{"confidence":0.85,"imageUrl":"test.jpg"}${mockRequestWithDifferentMethod.headers['x-timestamp']}`;
+      expect(mockVerifier.update).toHaveBeenCalledWith(expectedData);
+    });
+  });
+
+  describe('Request augmentation', () => {
+    beforeEach(() => {
+      mockRequest.headers['x-device-id'] = 'pi-user';
+      mockRequest.headers['x-signature'] = 'test-signature';
+      mockRequest.headers['x-timestamp'] = Date.now().toString();
+    });
+
+    it('should add deviceId to request object', () => {
+      const mockVerifier = {
+        update: jest.fn().mockReturnThis(),
+        verify: jest.fn().mockReturnValue(true),
+      };
+
+      mockCreateVerify.mockReturnValue(mockVerifier as any);
+
+      middleware.use(
+        mockRequest as Request,
+        mockResponse as Response,
+        mockNext,
+      );
+
+      expect(mockRequest['deviceId']).toBe('pi-user');
+    });
+
+    it('should add requestTime to request object', () => {
+      const mockVerifier = {
+        update: jest.fn().mockReturnThis(),
+        verify: jest.fn().mockReturnValue(true),
+      };
+
+      mockCreateVerify.mockReturnValue(mockVerifier as any);
+
+      middleware.use(
+        mockRequest as Request,
+        mockResponse as Response,
+        mockNext,
+      );
+
+      expect(mockRequest['requestTime']).toBeDefined();
+      expect(typeof mockRequest['requestTime']).toBe('number');
+    });
+
+    it('should call next() function', () => {
+      const mockVerifier = {
+        update: jest.fn().mockReturnThis(),
+        verify: jest.fn().mockReturnValue(true),
+      };
+
+      mockCreateVerify.mockReturnValue(mockVerifier as any);
+
+      middleware.use(
+        mockRequest as Request,
+        mockResponse as Response,
+        mockNext,
+      );
+
+      expect(mockNext).toHaveBeenCalled();
+    });
+
+    it('should set requestTime to the parsed timestamp value', () => {
+      const timestamp = Date.now() - 2 * 60 * 1000; // 2 minutes ago (within valid window)
+      mockRequest.headers['x-timestamp'] = timestamp.toString();
+
+      const mockVerifier = {
+        update: jest.fn().mockReturnThis(),
+        verify: jest.fn().mockReturnValue(true),
+      };
+
+      mockCreateVerify.mockReturnValue(mockVerifier as any);
+
+      middleware.use(
+        mockRequest as Request,
+        mockResponse as Response,
+        mockNext,
+      );
+
+      expect(mockRequest['requestTime']).toBe(timestamp);
     });
   });
 });
