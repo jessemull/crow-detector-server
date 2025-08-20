@@ -18,8 +18,10 @@
     "prepare": "husky",
     "start": "nest start",
     "start:debug": "nest start --debug --watch",
-    "start:dev": "nest start --watch",
+    "start:dev": "NODE_ENV=development concurrently \"npm run start:tunnel\" \"npm run start:watch\"",
     "start:prod": "node dist/main",
+    "start:tunnel": "node scripts/tunnel.js -l 5432 -r 5432 -d crow-detector-db-dev.c32e8eak8kj0.us-west-2.rds.amazonaws.com",
+    "start:watch": "nest start --watch",
     "test": "jest",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
@@ -33,8 +35,10 @@
     "@nestjs/platform-fastify": "^11.1.5",
     "@nestjs/terminus": "^11.0.0",
     "@nestjs/typeorm": "^11.0.0",
+    "@types/crypto-js": "^4.2.2",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
+    "crypto-js": "^4.2.0",
     "dotenv": "^17.2.1",
     "pg": "^8.16.3",
     "reflect-metadata": "^0.2.2",
@@ -52,7 +56,9 @@
     "@types/jest": "^30.0.0",
     "@types/node": "^22.10.7",
     "@types/supertest": "^6.0.2",
+    "commander": "^14.0.0",
     "commitizen": "^4.3.1",
+    "concurrently": "^9.2.0",
     "cz-conventional-changelog": "^3.3.0",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",
@@ -71,7 +77,6 @@
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0"
   },
-
   "config": {
     "commitizen": {
       "path": "cz-conventional-changelog"
