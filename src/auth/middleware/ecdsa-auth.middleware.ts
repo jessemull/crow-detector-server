@@ -17,6 +17,24 @@ export class EcdsaAuthMiddleware implements NestMiddleware {
   };
 
   use(req: Request, res: Response, next: NextFunction) {
+    // Debug logging
+    console.log('Auth middleware - NODE_ENV:', process.env.NODE_ENV);
+    console.log(
+      'Auth middleware - x-dev-mode header:',
+      req.headers['x-dev-mode'],
+    );
+
+    // Development mode bypass
+    if (
+      process.env.NODE_ENV === 'development' &&
+      req.headers['x-dev-mode'] === 'true'
+    ) {
+      req['deviceId'] = 'dev-mode';
+      req['requestTime'] = Date.now();
+      console.log('Development mode: Skipping ECDSA authentication');
+      return next();
+    }
+
     // Extract required headers...
 
     const deviceId = req.headers['x-device-id'] as string;
