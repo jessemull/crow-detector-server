@@ -8,7 +8,6 @@ import { Request, Response, NextFunction } from 'express';
 import { EcdsaAuthMiddleware } from './ecdsa-auth.middleware';
 import * as crypto from 'crypto';
 
-// Mock the entire crypto module
 jest.mock('crypto', () => ({
   createVerify: jest.fn(),
 }));
@@ -21,12 +20,10 @@ describe('EcdsaAuthMiddleware', () => {
   let mockCreateVerify: jest.MockedFunction<any>;
 
   beforeEach(async () => {
-    // Reset environment variables
     delete process.env.NODE_ENV;
     delete process.env.PI_MOTION_PUBLIC_KEY;
     delete process.env.PI_FEEDER_PUBLIC_KEY;
 
-    // Set the environment variable BEFORE creating the middleware
     process.env.PI_USER_PUBLIC_KEY = 'test-public-key';
 
     const module: TestingModule = await Test.createTestingModule({
@@ -35,7 +32,6 @@ describe('EcdsaAuthMiddleware', () => {
 
     middleware = module.get<EcdsaAuthMiddleware>(EcdsaAuthMiddleware);
 
-    // Setup mock request
     mockRequest = {
       method: 'POST',
       path: '/detection',
@@ -46,11 +42,9 @@ describe('EcdsaAuthMiddleware', () => {
     mockResponse = {};
     mockNext = jest.fn();
 
-    // Clear console.log mocks
     jest.spyOn(console, 'log').mockImplementation();
     jest.spyOn(console, 'error').mockImplementation();
 
-    // Get the mocked crypto.createVerify function
     mockCreateVerify = crypto.createVerify as jest.MockedFunction<any>;
     mockCreateVerify.mockReset();
   });
@@ -103,7 +97,6 @@ describe('EcdsaAuthMiddleware', () => {
 
     it('should not skip authentication when x-dev-mode header is missing', () => {
       process.env.NODE_ENV = 'development';
-      // No x-dev-mode header
 
       expect(() => {
         middleware.use(
@@ -197,7 +190,7 @@ describe('EcdsaAuthMiddleware', () => {
     });
 
     it('should throw UnauthorizedException when timestamp is too old', () => {
-      const oldTimestamp = Date.now() - 6 * 60 * 1000; // 6 minutes ago
+      const oldTimestamp = Date.now() - 6 * 60 * 1000;
       mockRequest.headers['x-timestamp'] = oldTimestamp.toString();
 
       expect(() => {
@@ -210,7 +203,7 @@ describe('EcdsaAuthMiddleware', () => {
     });
 
     it('should throw UnauthorizedException when timestamp is too far in the future', () => {
-      const futureTimestamp = Date.now() + 6 * 60 * 1000; // 6 minutes in future
+      const futureTimestamp = Date.now() + 6 * 60 * 1000;
       mockRequest.headers['x-timestamp'] = futureTimestamp.toString();
 
       expect(() => {
@@ -223,10 +216,9 @@ describe('EcdsaAuthMiddleware', () => {
     });
 
     it('should accept timestamp within the valid time window', () => {
-      const validTimestamp = Date.now() - 2 * 60 * 1000; // 2 minutes ago
+      const validTimestamp = Date.now() - 2 * 60 * 1000;
       mockRequest.headers['x-timestamp'] = validTimestamp.toString();
 
-      // Mock successful signature verification
       const mockVerifier = {
         update: jest.fn().mockReturnThis(),
         verify: jest.fn().mockReturnValue(true),
@@ -434,7 +426,7 @@ describe('EcdsaAuthMiddleware', () => {
     });
 
     it('should set requestTime to the parsed timestamp value', () => {
-      const timestamp = Date.now() - 2 * 60 * 1000; // 2 minutes ago (within valid window)
+      const timestamp = Date.now() - 2 * 60 * 1000;
       mockRequest.headers['x-timestamp'] = timestamp.toString();
 
       const mockVerifier = {
