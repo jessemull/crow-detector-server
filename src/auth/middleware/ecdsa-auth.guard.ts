@@ -1,3 +1,4 @@
+import * as crypto from 'crypto';
 import {
   Injectable,
   CanActivate,
@@ -5,52 +6,22 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Request } from 'express';
-import * as crypto from 'crypto';
 import { logger } from 'src/common/logger/logger.config';
-import {
-  SecretsManagerClient,
-  GetSecretValueCommand,
-} from '@aws-sdk/client-secrets-manager';
 
 @Injectable()
 export class EcdsaAuthGuard implements CanActivate {
-  // Load public keys from Secrets Manager...
+  private readonly devicePublicKeys: Record<string, string | undefined>;
 
-  private readonly secretsClient = new SecretsManagerClient({
-    region: process.env.AWS_REGION || 'us-west-2',
-  });
+  constructor() {
+    this.devicePublicKeys = {
+      'pi-user': this.decodePublicKey(process.env.PI_USER_PUBLIC_KEY),
+      'pi-motion': this.decodePublicKey(process.env.PI_MOTION_PUBLIC_KEY),
+      'pi-feeder': this.decodePublicKey(process.env.PI_FEEDER_PUBLIC_KEY),
+    };
+  }
 
-  private devicePublicKeys: Record<string, string | undefined> = {};
-
-  async canActivate(context: ExecutionContext): Promise<boolean> {
+  canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<Request>();
-
-    // Load public keys if not already loaded...
-
-    if (Object.keys(this.devicePublicKeys).length === 0) {
-      logger.info(
-        { secretName: process.env.DEVICE_PUBLIC_KEYS_SECRET_NAME },
-        'Fetching public keys from Secrets Manager',
-      );
-
-      this.devicePublicKeys['pi-user'] =
-        await this.getSecretValue('pi-user-public-key');
-      this.devicePublicKeys['pi-motion'] = await this.getSecretValue(
-        'pi-motion-public-key',
-      );
-      this.devicePublicKeys['pi-feeder'] = await this.getSecretValue(
-        'pi-feeder-public-key',
-      );
-
-      logger.info(
-        {
-          piUser: this.devicePublicKeys['pi-user'] ? 'loaded' : 'missing',
-          piMotion: this.devicePublicKeys['pi-motion'] ? 'loaded' : 'missing',
-          piFeeder: this.devicePublicKeys['pi-feeder'] ? 'loaded' : 'missing',
-        },
-        'Public keys loaded status',
-      );
-    }
 
     // Development mode bypass...
 
@@ -126,45 +97,6 @@ export class EcdsaAuthGuard implements CanActivate {
     request['requestTime'] = requestTime;
 
     return true;
-  }
-
-  private async getSecretValue(secretKey: string): Promise<string | undefined> {
-    try {
-      const secretName = process.env.DEVICE_PUBLIC_KEYS_SECRET_NAME;
-
-      if (!secretName) {
-        logger.warn(
-          'DEVICE_PUBLIC_KEYS_SECRET_NAME not set, using environment variable',
-        );
-        return process.env[secretKey];
-      }
-
-      const command = new GetSecretValueCommand({
-        SecretId: secretName,
-      });
-
-      const response = await this.secretsClient.send(command);
-
-      if (!response.SecretString) {
-        logger.error('No secret string found in Secrets Manager');
-        return process.env[secretKey];
-      }
-
-      const secrets = JSON.parse(response.SecretString) as Record<
-        string,
-        string
-      >;
-      const rawKey = secrets[secretKey];
-      const decodedKey = this.decodePublicKey(rawKey);
-
-      return decodedKey;
-    } catch (error) {
-      logger.error(
-        { error: error instanceof Error ? error.message : String(error) },
-        'Error fetching secret from Secrets Manager, falling back to environment variable',
-      );
-      return process.env[secretKey];
-    }
   }
 
   private decodePublicKey(base64Key: string | undefined): string | undefined {
