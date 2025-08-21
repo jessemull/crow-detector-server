@@ -73,11 +73,15 @@ Resources:
             - Name: RDS_DATABASE
               Value: !ImportValue 'crow-detector-db-dev-name'
             - Name: PI_USER_PUBLIC_KEY
-              Value: !Sub '{{resolve:secretsmanager:crow-detector-keys:SecretString:pi-user-public-key}}'
+              Value: '{{resolve:secretsmanager:crow-detector-keys:SecretString:pi-user-public-key}}'
             - Name: PI_MOTION_PUBLIC_KEY
-              Value: !Sub '{{resolve:secretsmanager:crow-detector-keys:SecretString:pi-motion-public-key}}'
+              Value: '{{resolve:secretsmanager:crow-detector-keys:SecretString:pi-motion-public-key}}'
             - Name: PI_FEEDER_PUBLIC_KEY
-              Value: !Sub '{{resolve:secretsmanager:crow-detector-keys:SecretString:pi-feeder-public-key}}'
+              Value: '{{resolve:secretsmanager:crow-detector-keys:SecretString:pi-feeder-public-key}}'
+            - Name: S3_BUCKET_NAME
+              Value: !Sub 'crow-detector-images-${Environment}'
+            - Name: AWS_REGION
+              Value: !Ref AWS::Region
           Secrets:
             - Name: RDS_USERNAME
               ValueFrom: !Sub 'arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:crow-detector-db-${Environment}:username::'
