@@ -30,8 +30,9 @@ interface ApiCallResult {
 
 const API_BASE_URL =
   process.env.API_BASE_URL || 'https://api-dev.crittercanteen.com';
-const API_ENDPOINT =
-  process.env.API_ENDPOINT || '/detection/crow-detected-event';
+const DETECTION_ENDPOINT =
+  process.env.DETECTION_ENDPOINT || '/detection/process-image';
+const FEED_ENDPOINT = process.env.FEED_ENDPOINT || '/feed/process-image';
 
 export const handler = async (
   event: SQSEvent,
@@ -51,6 +52,7 @@ export const handler = async (
     console.log('Processing results:', JSON.stringify(results, null, 2));
 
     const allSuccessful = results.every((result) => result.success);
+
     if (allSuccessful) {
       callback(null, {
         statusCode: 200,
@@ -79,6 +81,7 @@ export const handler = async (
 async function processSQSRecord(record: SQSRecord): Promise<ApiCallResult> {
   try {
     const s3Info = extractS3Info(record);
+
     console.log('Processing S3 object:', JSON.stringify(s3Info, null, 2));
 
     if (!isImageFile(s3Info.key)) {
@@ -97,7 +100,7 @@ async function processSQSRecord(record: SQSRecord): Promise<ApiCallResult> {
       };
     }
 
-    await callDetectionAPI(s3Info);
+    await callAPI(s3Info);
 
     return {
       success: true,
@@ -115,7 +118,8 @@ async function processSQSRecord(record: SQSRecord): Promise<ApiCallResult> {
 }
 
 function extractS3Info(record: SQSRecord): S3ObjectInfo {
-  // Parse the S3 event data from the SQS message body
+  // Parse the S3 event data from the SQS message body...
+
   const s3Event = JSON.parse(record.body) as S3EventFromSQS;
   const s3Record = s3Event.Records[0];
   const s3 = s3Record.s3;
@@ -140,27 +144,44 @@ function isRelevantEvent(eventName: string): boolean {
   );
 }
 
-async function callDetectionAPI(s3Info: S3ObjectInfo): Promise<void> {
+function getImageType(key: string): 'feed' | 'detection' {
+  if (key.startsWith('feed/')) {
+    return 'feed';
+  } else if (key.startsWith('detection/')) {
+    return 'detection';
+  } else {
+    // Default to detection for unknown paths
+    return 'detection';
+  }
+}
+
+async function callAPI(s3Info: S3ObjectInfo): Promise<void> {
+  const imageType = getImageType(s3Info.key);
+  const endpoint = imageType === 'feed' ? FEED_ENDPOINT : DETECTION_ENDPOINT;
+
   const payload = {
     imageUrl: `https://${s3Info.bucket}.s3.amazonaws.com/${s3Info.key}`,
-    confidence: 0.85,
-    timestamp: Date.now(),
     source: 's3-lambda',
+    timestamp: Date.now(),
     metadata: {
       bucket: s3Info.bucket,
       key: s3Info.key,
       size: s3Info.size,
       eventName: s3Info.eventName,
+      imageType,
     },
   };
 
-  console.log('Calling API with payload:', JSON.stringify(payload, null, 2));
+  console.log(
+    `Calling ${imageType} API with payload:`,
+    JSON.stringify(payload, null, 2),
+  );
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000);
 
   try {
-    const response = await fetch(`${API_BASE_URL}${API_ENDPOINT}`, {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -177,7 +198,8 @@ async function callDetectionAPI(s3Info: S3ObjectInfo): Promise<void> {
     }
 
     const responseData = await response.json();
-    console.log('API response:', response.status, responseData);
+
+    console.log(`${imageType} API response:`, response.status, responseData);
   } catch (error) {
     clearTimeout(timeoutId);
     throw error;

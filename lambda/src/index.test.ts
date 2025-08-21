@@ -48,7 +48,7 @@ describe('S3 Event Lambda Handler', () => {
         ) as string,
       });
       expect(mockedFetch).toHaveBeenCalledWith(
-        'https://api-dev.crittercanteen.com/detection/crow-detected-event',
+        'https://api-dev.crittercanteen.com/detection/process-image',
         expect.objectContaining({
           method: 'POST',
           headers: expect.objectContaining({
@@ -79,6 +79,37 @@ describe('S3 Event Lambda Handler', () => {
         ) as string,
       });
       expect(mockedFetch).not.toHaveBeenCalled();
+    });
+
+    it('should route feed images to feed endpoint', async () => {
+      const mockEvent: SQSEvent = {
+        Records: [
+          createMockSQSRecord(
+            'test-bucket',
+            'feed/1234567890-image.jpg',
+            'ObjectCreated:Put',
+          ),
+        ],
+      };
+
+      mockedFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ success: true }),
+      } as Response);
+
+      await handler(mockEvent, mockContext, mockCallback);
+
+      expect(mockedFetch).toHaveBeenCalledWith(
+        'https://api-dev.crittercanteen.com/feed/process-image',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json',
+          }) as Record<string, string>,
+          body: expect.stringContaining('feed/1234567890-image.jpg') as string,
+        }) as RequestInit,
+      );
     });
 
     it('should skip non-upload events', async () => {
@@ -215,7 +246,7 @@ describe('S3 Event Lambda Handler', () => {
       await handler(mockEvent, mockContext, mockCallback);
 
       expect(mockedFetch).toHaveBeenCalledWith(
-        'https://api-dev.crittercanteen.com/detection/crow-detected-event',
+        'https://api-dev.crittercanteen.com/detection/process-image',
         expect.objectContaining({
           method: 'POST',
           headers: expect.objectContaining({
