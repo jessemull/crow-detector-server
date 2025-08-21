@@ -1,14 +1,16 @@
-import dotenv from 'dotenv';
+import { ConfigModule } from '@nestjs/config';
 import { DetectionModule } from './detection/detection.module';
 import { FeedModule } from './feed/feed.module';
 import { HealthModule } from './health/health.module';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-
-dotenv.config();
+import { UrlsModule } from './urls/urls.module';
 
 @Module({
   imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+    }),
     TypeOrmModule.forRoot({
       database: process.env.RDS_DATABASE,
       entities: [__dirname + '/**/*.entity{.ts,.js}'],
@@ -25,6 +27,7 @@ dotenv.config();
     DetectionModule,
     FeedModule,
     HealthModule,
+    UrlsModule,
   ],
 })
 export class AppModule {}
