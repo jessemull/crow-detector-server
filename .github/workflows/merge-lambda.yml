@@ -1,16 +1,12 @@
-name: Deploy Lambda
+name: Merge Lambda
 
 on:
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Choose environment (dev/prod)'
-        required: true
-        default: 'dev'
-        type: choice
-        options:
-          - dev
-          - prod
+  push:
+    branches:
+      - main
+    paths:
+      - 'lambda/**'
+      - '.github/workflows/merge-lambda.yml'
 
 jobs:
   deploy-lambda:
@@ -64,7 +60,7 @@ jobs:
       - name: Build Lambda Package
         working-directory: lambda
         run: |
-          export NODE_ENV="${{ github.event.inputs.environment }}"
+          export NODE_ENV=dev
           npm run build
           npm run package
 
@@ -77,17 +73,17 @@ jobs:
           ARTIFACT_NAME="crow-detector-s3-lambda-${VERSION}-${COMMIT_HASH}-${TIMESTAMP}.zip"
           echo "Artifact: $ARTIFACT_NAME"
           echo "ARTIFACT_NAME=$ARTIFACT_NAME" >> $GITHUB_ENV
-
+          
       - name: Upload Lambda to S3
         run: |
-          S3_BUCKET="crow-detector-lambda-${{ github.event.inputs.environment }}"
+          S3_BUCKET="crow-detector-lambda-dev"
           aws s3 cp "lambda/dist/crow-detector-s3-lambda.zip" s3://${S3_BUCKET}/crow-detector-s3-lambda/${ARTIFACT_NAME} --region us-west-2
 
       - name: Check Change Set Update/Create 
         id: change_set_type
         run: |
-          ENVIRONMENT="${{ github.event.inputs.environment }}"
-          STACK_NAME="crow-detector-s3-lambda-stack-${{ github.event.inputs.environment }}"
+          ENVIRONMENT="dev"
+          STACK_NAME="crow-detector-s3-lambda-stack-dev"
           if aws cloudformation describe-stacks --stack-name "$STACK_NAME" --region us-west-2 >/dev/null 2>&1; then
             echo "Updating change set..."
             echo "change_set_type=UPDATE" >> $GITHUB_ENV
@@ -100,7 +96,7 @@ jobs:
         id: stack_status
         if: env.change_set_type == 'UPDATE'
         run: |
-          STACK_NAME="crow-detector-s3-lambda-stack-${{ github.event.inputs.environment }}"
+          STACK_NAME="crow-detector-s3-lambda-stack-dev"
           STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "NOT_FOUND")
           echo "Status: $STATUS"
           FAILED_STATES=("CREATE_FAILED" "ROLLBACK_FAILED" "UPDATE_FAILED" "DELETE_FAILED" "UPDATE_ROLLBACK_FAILED" "UPDATE_ROLLBACK_COMPLETE" "ROLLBACK_COMPLETE")
@@ -115,10 +111,10 @@ jobs:
 
       - name: Create CloudFormation Change Set
         run: |
-          ENVIRONMENT=${{ github.event.inputs.environment }}
-          STACK_NAME="crow-detector-s3-lambda-stack-${{ github.event.inputs.environment }}"
+          ENVIRONMENT=dev
+          STACK_NAME="crow-detector-s3-lambda-stack-dev"
           TEMPLATE_FILE="lambda/cloudformation/crow-detector-s3-lambda.yaml"
-          CHANGE_SET_NAME="crow-detector-s3-lambda-change-set-${{ github.event.inputs.environment }}"
+          CHANGE_SET_NAME="crow-detector-s3-lambda-change-set-dev"
           CHANGE_SET_TYPE=${{ env.change_set_type }}
           aws cloudformation create-change-set \
             --stack-name $STACK_NAME \
@@ -138,8 +134,8 @@ jobs:
 
       - name: Check for Applied Changes
         run: |
-          STACK_NAME="crow-detector-s3-lambda-stack-${{ github.event.inputs.environment }}"
-          CHANGE_SET_NAME="crow-detector-s3-lambda-change-set-${{ github.event.inputs.environment }}"
+          STACK_NAME="crow-detector-s3-lambda-stack-dev"
+          CHANGE_SET_NAME="crow-detector-s3-lambda-change-set-dev"
           CHANGES=$(aws cloudformation describe-change-set \
                     --stack-name $STACK_NAME \
                     --change-set-name $CHANGE_SET_NAME \
@@ -156,8 +152,8 @@ jobs:
       - name: Execute CloudFormation Change Set
         if: env.no_changes == 'false'
         run: |
-          STACK_NAME="crow-detector-s3-lambda-stack-${{ github.event.inputs.environment }}"
-          CHANGE_SET_NAME="crow-detector-s3-lambda-change-set-${{ github.event.inputs.environment }}"
+          STACK_NAME="crow-detector-s3-lambda-stack-dev"
+          CHANGE_SET_NAME="crow-detector-s3-lambda-change-set-dev"
           aws cloudformation execute-change-set \
             --stack-name $STACK_NAME \
             --change-set-name $CHANGE_SET_NAME \
@@ -168,7 +164,7 @@ jobs:
         run: |
           DONE_STATUSES=("CREATE_COMPLETE" "UPDATE_COMPLETE" "ROLLBACK_COMPLETE" "UPDATE_ROLLBACK_COMPLETE" "DELETE_COMPLETE")
           FAILED_STATUSES=("CREATE_FAILED" "UPDATE_FAILED" "ROLLBACK_FAILED" "DELETE_FAILED" "UPDATE_ROLLBACK_FAILED" "ROLLBACK_IN_PROGRESS" "DELETE_IN_PROGRESS")
-          STACK_NAME="crow-detector-s3-lambda-stack-${{ github.event.inputs.environment }}"
+          STACK_NAME="crow-detector-s3-lambda-stack-dev"
           MAX_RETRIES=30
           RETRY_COUNT=0
           while true; do
@@ -193,10 +189,10 @@ jobs:
             echo "Checking status..."
             sleep 10
           done
-
+      
       - name: Prune Backups
         run: |
-          S3_BUCKET="crow-detector-lambda-${{ github.event.inputs.environment }}"
+          S3_BUCKET="crow-detector-lambda-dev"
           OBJECTS=$(aws s3 ls s3://${S3_BUCKET}/crow-detector-s3-lambda/ | sort | awk '{print $4}')
           TOTAL_OBJECTS=$(echo "$OBJECTS" | wc -l)
           if [ "$TOTAL_OBJECTS" -gt 5 ]; then
