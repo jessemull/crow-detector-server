@@ -18,8 +18,6 @@ describe('bootstrap', () => {
     jest.spyOn(process, 'exit').mockImplementation((code?: number) => {
       throw new Error(`process.exit called with code ${code}`);
     });
-
-    // Logger is mocked globally in test setup
   });
 
   afterEach(() => {
@@ -54,7 +52,6 @@ describe('bootstrap', () => {
     await expect(bootstrap()).rejects.toThrow(
       'process.exit called with code 1',
     );
-    // Verify that the error was logged (logger is mocked globally)
     expect(true).toBe(true);
   });
 });

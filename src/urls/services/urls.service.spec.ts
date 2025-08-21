@@ -54,8 +54,6 @@ describe('UrlsService', () => {
     mockGetSignedUrl.mockResolvedValue(
       'https://test-bucket.s3.amazonaws.com/test-url?signature=...',
     );
-
-    // Logger is mocked globally in test setup
   });
 
   afterEach(() => {

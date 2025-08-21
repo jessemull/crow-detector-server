@@ -2,7 +2,6 @@ jest.mock('dotenv', () => ({
   config: jest.fn().mockReturnValue({}),
 }));
 
-// Mock the logger globally for all tests
 jest.mock('../src/common/logger/logger.config', () => ({
   createLogger: jest.fn(() => ({
     info: jest.fn(),

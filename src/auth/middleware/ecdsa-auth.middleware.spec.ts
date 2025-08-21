@@ -38,8 +38,6 @@ describe('EcdsaAuthMiddleware', () => {
     mockResponse = {};
     mockNext = jest.fn();
 
-    // Logger is mocked globally in test setup
-
     mockCreateVerify = crypto.createVerify as jest.MockedFunction<any>;
     mockCreateVerify.mockReset();
   });
