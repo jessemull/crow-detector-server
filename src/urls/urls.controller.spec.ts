@@ -1,8 +1,8 @@
+import { CreateFeedImageUrlDto, CreateDetectionImageUrlDto } from './dto';
+import { ImageFormat } from '../common/types';
 import { Test, TestingModule } from '@nestjs/testing';
 import { UrlsController } from './urls.controller';
 import { UrlsService } from './services/urls.service';
-import { CreateFeedImageUrlDto, CreateDetectionImageUrlDto } from './dto';
-import { ImageFormat } from '../common/types';
 
 describe('UrlsController', () => {
   let controller: UrlsController;

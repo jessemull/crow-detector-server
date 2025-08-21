@@ -1,6 +1,6 @@
 import { Controller, Post, Body } from '@nestjs/common';
-import { UrlsService } from './services/urls.service';
 import { CreateFeedImageUrlDto, CreateDetectionImageUrlDto } from './dto';
+import { UrlsService } from './services/urls.service';
 
 @Controller('urls')
 export class UrlsController {
