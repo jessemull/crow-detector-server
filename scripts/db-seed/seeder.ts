@@ -2,9 +2,11 @@ import { DataSource } from 'typeorm';
 import { DetectionEvent } from '../../src/detection/entity/detection-event.entity';
 import { FeedEvent } from '../../src/feed/entity/feed-event.entity';
 import { FeedEventSeeder, DetectionEventSeeder } from './seeders';
+import { createLogger } from '../../src/common/logger/logger.config';
 
 export class DatabaseSeeder {
   private dataSource: DataSource;
+  private logger = createLogger('DatabaseSeeder');
 
   constructor() {
     this.dataSource = new DataSource({
@@ -26,9 +28,9 @@ export class DatabaseSeeder {
   async connect(): Promise<void> {
     try {
       await this.dataSource.initialize();
-      console.log('Connected to database');
+      this.logger.info('Connected to database');
     } catch (error) {
-      console.error('Failed to connect to database:', error);
+      this.logger.error({ error }, 'Failed to connect to database');
       throw error;
     }
   }
@@ -36,61 +38,62 @@ export class DatabaseSeeder {
   async disconnect(): Promise<void> {
     if (this.dataSource.isInitialized) {
       await this.dataSource.destroy();
-      console.log('Disconnected from database');
+      this.logger.info('Disconnected from database');
     }
   }
 
   async seed(): Promise<void> {
     try {
-      console.log('Starting database seeding...');
-      
+      this.logger.info('Starting database seeding...');
+
       const feedEventSeeder = new FeedEventSeeder(this.dataSource);
       await feedEventSeeder.seed();
 
       const detectionEventSeeder = new DetectionEventSeeder(this.dataSource);
       await detectionEventSeeder.seed();
 
-      console.log('Database seeding completed successfully!');
+      this.logger.info('Database seeding completed successfully!');
     } catch (error) {
-      console.error('Seeding failed:', error);
+      this.logger.error({ error }, 'Seeding failed');
       throw error;
     }
   }
 
   async reset(): Promise<void> {
     try {
-      console.log('Starting database reset...');
-      
+      this.logger.info('Starting database reset...');
+
       const detectionEventSeeder = new DetectionEventSeeder(this.dataSource);
       await detectionEventSeeder.clear();
 
       const feedEventSeeder = new FeedEventSeeder(this.dataSource);
       await feedEventSeeder.clear();
 
-      console.log('Database reset completed successfully!');
+      this.logger.info('Database reset completed successfully!');
     } catch (error) {
-      console.error('Reset failed:', error);
+      this.logger.error({ error }, 'Reset failed');
       throw error;
     }
   }
 
   async synchronize(): Promise<void> {
     try {
-      console.log('Starting database synchronization...');
-      
+      this.logger.info('Starting database synchronization...');
+
       const detectionEventSeeder = new DetectionEventSeeder(this.dataSource);
       await detectionEventSeeder.drop();
 
       const feedEventSeeder = new FeedEventSeeder(this.dataSource);
       await feedEventSeeder.drop();
 
-      console.log('Tables dropped successfully');
-      console.log('Now restart your NestJS app to recreate tables with new schema');
-      console.log('Then run: npm run db:seed');
-      
+      this.logger.info('Tables dropped successfully');
+      this.logger.info(
+        'Now restart your NestJS app to recreate tables with new schema',
+      );
+      this.logger.info('Then run: npm run db:seed');
     } catch (error) {
-      console.error('Synchronization failed:', error);
+      this.logger.error({ error }, 'Synchronization failed');
       throw error;
     }
   }
-} 
+}

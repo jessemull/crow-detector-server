@@ -4,10 +4,13 @@ import { DataSource } from 'typeorm';
 import { DetectionEvent } from '../../src/detection/entity/detection-event.entity';
 import { FeedEvent } from '../../src/feed/entity/feed-event.entity';
 import { config } from 'dotenv';
+import { createLogger } from '../../src/common/logger/logger.config';
 
 config();
 
 async function testConnection() {
+  const logger = createLogger('TestConnection');
+
   const dataSource = new DataSource({
     type: 'postgres',
     host: process.env.RDS_HOST,
@@ -24,39 +27,53 @@ async function testConnection() {
   });
 
   try {
-    console.log('Testing database connection...');
-    console.log('Host:', process.env.RDS_HOST);
-    console.log('Database:', process.env.RDS_DATABASE);
-    console.log('Username:', process.env.RDS_USERNAME);
-    console.log('SSL Reject Unauthorized:', process.env.SSL_REJECT_UNAUTHORIZED);
-    
+    logger.info('Testing database connection...');
+    logger.info(
+      {
+        host: process.env.RDS_HOST,
+        database: process.env.RDS_DATABASE,
+        username: process.env.RDS_USERNAME,
+        sslRejectUnauthorized: process.env.SSL_REJECT_UNAUTHORIZED,
+      },
+      'Connection parameters',
+    );
+
     await dataSource.initialize();
-          console.log('Database connection successful!');
-    
+    logger.info('Database connection successful!');
+
     const result = await dataSource.query('SELECT NOW() as current_time');
-    console.log('Current database time:', result[0].current_time);
-    
+    logger.info(
+      { currentTime: result[0].current_time },
+      'Current database time',
+    );
+
     const feedEventCount = await dataSource.getRepository(FeedEvent).count();
-    const detectionEventCount = await dataSource.getRepository(DetectionEvent).count();
-    
-    console.log('Current table counts:');
-    console.log('  - Feed Events:', feedEventCount);
-    console.log('  - Detection Events:', detectionEventCount);
-    
+    const detectionEventCount = await dataSource
+      .getRepository(DetectionEvent)
+      .count();
+
+    logger.info(
+      {
+        feedEvents: feedEventCount,
+        detectionEvents: detectionEventCount,
+      },
+      'Current table counts',
+    );
   } catch (error) {
-          console.error('Database connection failed:', error);
+    logger.error({ error }, 'Database connection failed');
     process.exit(1);
   } finally {
     if (dataSource.isInitialized) {
       await dataSource.destroy();
-      console.log('Connection closed');
+      logger.info('Connection closed');
     }
   }
 }
 
 if (require.main === module) {
   testConnection().catch((error) => {
-    console.error('Unexpected error:', error);
+    const logger = createLogger('TestConnection');
+    logger.error({ error }, 'Unexpected error');
     process.exit(1);
   });
-} 
+}

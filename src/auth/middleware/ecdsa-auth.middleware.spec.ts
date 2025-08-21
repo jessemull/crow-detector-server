@@ -38,8 +38,7 @@ describe('EcdsaAuthMiddleware', () => {
     mockResponse = {};
     mockNext = jest.fn();
 
-    jest.spyOn(console, 'log').mockImplementation();
-    jest.spyOn(console, 'error').mockImplementation();
+    // Logger is mocked globally in test setup
 
     mockCreateVerify = crypto.createVerify as jest.MockedFunction<any>;
     mockCreateVerify.mockReset();

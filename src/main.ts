@@ -5,6 +5,7 @@ import {
   FastifyAdapter,
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
+import { logger } from './common/logger/logger.config';
 
 export async function bootstrap() {
   try {
@@ -14,9 +15,13 @@ export async function bootstrap() {
     );
     const port = parseInt(process.env.PORT ?? '', 10) || 3000;
     await app.listen(port, '0.0.0.0');
+    logger.info({ port }, 'Application started successfully');
     return app;
   } catch (error) {
-    console.error('Failed to start application:', error);
+    logger.error(
+      { error: error instanceof Error ? error.message : String(error) },
+      'Failed to start application',
+    );
     process.exit(1);
   }
 }
@@ -24,7 +29,10 @@ export async function bootstrap() {
 /* c8 ignore start */
 if (require.main === module) {
   bootstrap().catch((error) => {
-    console.error('Failed to start application:', error);
+    logger.error(
+      { error: error instanceof Error ? error.message : String(error) },
+      'Failed to start application',
+    );
     process.exit(1);
   });
 }

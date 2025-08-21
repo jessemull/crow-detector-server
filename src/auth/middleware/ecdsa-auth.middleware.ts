@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import * as crypto from 'crypto';
+import { logger } from 'src/common/logger/logger.config';
 
 @Injectable()
 export class EcdsaAuthMiddleware implements NestMiddleware {
@@ -25,7 +26,10 @@ export class EcdsaAuthMiddleware implements NestMiddleware {
     ) {
       req['deviceId'] = 'dev-mode';
       req['requestTime'] = Date.now();
-      console.log('Development mode: Skipping ECDSA authentication');
+      logger.info(
+        { deviceId: 'dev-mode' },
+        'Development mode: Skipping ECDSA authentication',
+      );
       return next();
     }
 
@@ -92,7 +96,10 @@ export class EcdsaAuthMiddleware implements NestMiddleware {
       const decoded = Buffer.from(base64Key, 'base64').toString('utf-8');
       return decoded;
     } catch (error) {
-      console.error('Error decoding public key:', error);
+      logger.error(
+        { error: error instanceof Error ? error.message : String(error) },
+        'Error decoding public key',
+      );
       return undefined;
     }
   }
@@ -107,7 +114,10 @@ export class EcdsaAuthMiddleware implements NestMiddleware {
       verifier.update(data);
       return verifier.verify(publicKey, signature, 'base64');
     } catch (error) {
-      console.error('Error verifying signature:', error);
+      logger.error(
+        { error: error instanceof Error ? error.message : String(error) },
+        'Error verifying signature',
+      );
       return false;
     }
   }

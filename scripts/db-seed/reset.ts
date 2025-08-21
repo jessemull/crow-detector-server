@@ -2,17 +2,19 @@
 
 import { config } from 'dotenv';
 import { DatabaseSeeder } from './seeder';
+import { createLogger } from '../../src/common/logger/logger.config';
 
 config();
 
 async function main() {
+  const logger = createLogger('Reset');
   const seeder = new DatabaseSeeder();
-  
+
   try {
     await seeder.connect();
     await seeder.reset();
   } catch (error) {
-    console.error('Reset failed:', error);
+    logger.error({ error }, 'Reset failed');
     process.exit(1);
   } finally {
     await seeder.disconnect();
@@ -21,7 +23,8 @@ async function main() {
 
 if (require.main === module) {
   main().catch((error) => {
-    console.error('Unexpected error:', error);
+    const logger = createLogger('Reset');
+    logger.error({ error }, 'Unexpected error');
     process.exit(1);
   });
-} 
+}
