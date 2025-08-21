@@ -27,7 +27,7 @@ describe('S3 Event Lambda Handler', () => {
         Records: [
           createMockSQSRecord(
             'test-bucket',
-            'test-image.jpg',
+            'detection/test-image.jpg',
             'ObjectCreated:Put',
           ),
         ],
@@ -137,10 +137,14 @@ describe('S3 Event Lambda Handler', () => {
     it('should handle multiple records', async () => {
       const mockEvent: SQSEvent = {
         Records: [
-          createMockSQSRecord('test-bucket', 'image1.jpg', 'ObjectCreated:Put'),
           createMockSQSRecord(
             'test-bucket',
-            'image2.png',
+            'detection/image1.jpg',
+            'ObjectCreated:Put',
+          ),
+          createMockSQSRecord(
+            'test-bucket',
+            'detection/image2.png',
             'ObjectCreated:Post',
           ),
         ],
@@ -174,7 +178,7 @@ describe('S3 Event Lambda Handler', () => {
         Records: [
           createMockSQSRecord(
             'test-bucket',
-            'test-image.jpg',
+            'detection/test-image.jpg',
             'ObjectCreated:Put',
           ),
         ],
@@ -200,7 +204,7 @@ describe('S3 Event Lambda Handler', () => {
         Records: [
           createMockSQSRecord(
             'test-bucket',
-            'test-image.jpg',
+            'detection/test-image.jpg',
             'ObjectCreated:Put',
           ),
         ],
@@ -231,7 +235,7 @@ describe('S3 Event Lambda Handler', () => {
         Records: [
           createMockSQSRecord(
             'test-bucket',
-            'test-image.jpg',
+            'detection/test-image.jpg',
             'ObjectCreated:Put',
           ),
         ],
@@ -261,12 +265,36 @@ describe('S3 Event Lambda Handler', () => {
     it('should recognize various image extensions', () => {
       const mockEvent: SQSEvent = {
         Records: [
-          createMockSQSRecord('test-bucket', 'image.jpg', 'ObjectCreated:Put'),
-          createMockSQSRecord('test-bucket', 'image.jpeg', 'ObjectCreated:Put'),
-          createMockSQSRecord('test-bucket', 'image.png', 'ObjectCreated:Put'),
-          createMockSQSRecord('test-bucket', 'image.gif', 'ObjectCreated:Put'),
-          createMockSQSRecord('test-bucket', 'image.bmp', 'ObjectCreated:Put'),
-          createMockSQSRecord('test-bucket', 'image.webp', 'ObjectCreated:Put'),
+          createMockSQSRecord(
+            'test-bucket',
+            'detection/image.jpg',
+            'ObjectCreated:Put',
+          ),
+          createMockSQSRecord(
+            'test-bucket',
+            'detection/image.jpeg',
+            'ObjectCreated:Put',
+          ),
+          createMockSQSRecord(
+            'test-bucket',
+            'detection/image.png',
+            'ObjectCreated:Put',
+          ),
+          createMockSQSRecord(
+            'test-bucket',
+            'detection/image.gif',
+            'ObjectCreated:Put',
+          ),
+          createMockSQSRecord(
+            'test-bucket',
+            'detection/image.bmp',
+            'ObjectCreated:Put',
+          ),
+          createMockSQSRecord(
+            'test-bucket',
+            'detection/image.webp',
+            'ObjectCreated:Put',
+          ),
         ],
       };
 
@@ -284,8 +312,16 @@ describe('S3 Event Lambda Handler', () => {
     it('should handle case-insensitive extensions', () => {
       const mockEvent: SQSEvent = {
         Records: [
-          createMockSQSRecord('test-bucket', 'image.JPG', 'ObjectCreated:Put'),
-          createMockSQSRecord('test-bucket', 'image.PNG', 'ObjectCreated:Put'),
+          createMockSQSRecord(
+            'test-bucket',
+            'detection/image.JPG',
+            'ObjectCreated:Put',
+          ),
+          createMockSQSRecord(
+            'test-bucket',
+            'detection/image.PNG',
+            'ObjectCreated:Put',
+          ),
         ],
       };
 
@@ -307,7 +343,7 @@ describe('S3 Event Lambda Handler', () => {
         Records: [
           createMockSQSRecord(
             'test-bucket',
-            'test-image.jpg',
+            'detection/test-image.jpg',
             'ObjectCreated:Put',
           ),
         ],
@@ -329,7 +365,7 @@ describe('S3 Event Lambda Handler', () => {
         Records: [
           createMockSQSRecord(
             'test-bucket',
-            'test-image.jpg',
+            'detection/test-image.jpg',
             'ObjectCreated:Post',
           ),
         ],
@@ -351,7 +387,7 @@ describe('S3 Event Lambda Handler', () => {
         Records: [
           createMockSQSRecord(
             'test-bucket',
-            'test-image.jpg',
+            'detection/test-image.jpg',
             'ObjectRemoved:Delete',
           ),
         ],
@@ -360,6 +396,31 @@ describe('S3 Event Lambda Handler', () => {
       return handler(mockEvent, mockContext, mockCallback).then(() => {
         expect(mockedFetch).not.toHaveBeenCalled();
       });
+    });
+
+    it('should handle unknown image paths with error', async () => {
+      const mockEvent: SQSEvent = {
+        Records: [
+          createMockSQSRecord(
+            'test-bucket',
+            'unknown-path/image.jpg',
+            'ObjectCreated:Put',
+          ),
+        ],
+      };
+
+      await handler(mockEvent, mockContext, mockCallback);
+
+      expect(mockCallback).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          statusCode: 500,
+          body: expect.stringContaining(
+            'Some SQS events failed to process',
+          ) as string,
+        }) as { statusCode: number; body: string },
+      );
+      expect(mockedFetch).not.toHaveBeenCalled();
     });
   });
 });

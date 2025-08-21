@@ -99,7 +99,7 @@ async function processSQSRecord(record: SQSRecord): Promise<ApiCallResult> {
       };
     }
 
-    await callAPI(s3Info);
+    const apiResult = await callAPI(s3Info);
 
     return {
       success: true,
@@ -149,8 +149,9 @@ function getImageType(key: string): 'feed' | 'detection' {
   } else if (key.startsWith('detection/')) {
     return 'detection';
   } else {
-    // Default to detection for unknown paths
-    return 'detection';
+    throw new Error(
+      `Cannot determine image type from S3 key path: ${key}. Expected path to start with 'feed/' or 'detection/'`,
+    );
   }
 }
 
