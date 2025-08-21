@@ -6,7 +6,7 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "auth:token": "node scripts/generate-auth-token.js",
+    "auth:token": "ts-node -r tsconfig-paths/register scripts/generate-auth-token.ts",
     "build": "nest build",
     "commit": "cz",
     "coverage:open": "open ./coverage/lcov-report/index.html",
