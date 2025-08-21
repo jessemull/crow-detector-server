@@ -5,15 +5,16 @@ import {
 } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import * as crypto from 'crypto';
+import { logger } from 'src/common/logger/logger.config';
 
 @Injectable()
 export class EcdsaAuthMiddleware implements NestMiddleware {
   // Load public keys from environment variables...
 
   private readonly devicePublicKeys = {
-    'pi-user': process.env.PI_USER_PUBLIC_KEY,
-    'pi-motion': process.env.PI_MOTION_PUBLIC_KEY,
-    'pi-feeder': process.env.PI_FEEDER_PUBLIC_KEY,
+    'pi-user': this.decodePublicKey(process.env.PI_USER_PUBLIC_KEY),
+    'pi-motion': this.decodePublicKey(process.env.PI_MOTION_PUBLIC_KEY),
+    'pi-feeder': this.decodePublicKey(process.env.PI_FEEDER_PUBLIC_KEY),
   };
 
   use(req: Request, res: Response, next: NextFunction) {
@@ -25,7 +26,10 @@ export class EcdsaAuthMiddleware implements NestMiddleware {
     ) {
       req['deviceId'] = 'dev-mode';
       req['requestTime'] = Date.now();
-      console.log('Development mode: Skipping ECDSA authentication');
+      logger.info(
+        { deviceId: 'dev-mode' },
+        'Development mode: Skipping ECDSA authentication',
+      );
       return next();
     }
 
@@ -83,6 +87,23 @@ export class EcdsaAuthMiddleware implements NestMiddleware {
     next();
   }
 
+  private decodePublicKey(base64Key: string | undefined): string | undefined {
+    if (!base64Key) {
+      return undefined;
+    }
+
+    try {
+      const decoded = Buffer.from(base64Key, 'base64').toString('utf-8');
+      return decoded;
+    } catch (error) {
+      logger.error(
+        { error: error instanceof Error ? error.message : String(error) },
+        'Error decoding public key',
+      );
+      return undefined;
+    }
+  }
+
   private verifySignature(
     data: string,
     signature: string,
@@ -93,7 +114,10 @@ export class EcdsaAuthMiddleware implements NestMiddleware {
       verifier.update(data);
       return verifier.verify(publicKey, signature, 'base64');
     } catch (error) {
-      console.error('Error verifying signature:', error);
+      logger.error(
+        { error: error instanceof Error ? error.message : String(error) },
+        'Error verifying signature',
+      );
       return false;
     }
   }

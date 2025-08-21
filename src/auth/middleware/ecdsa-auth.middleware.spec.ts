@@ -38,9 +38,6 @@ describe('EcdsaAuthMiddleware', () => {
     mockResponse = {};
     mockNext = jest.fn();
 
-    jest.spyOn(console, 'log').mockImplementation();
-    jest.spyOn(console, 'error').mockImplementation();
-
     mockCreateVerify = crypto.createVerify as jest.MockedFunction<any>;
     mockCreateVerify.mockReset();
   });

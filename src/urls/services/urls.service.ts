@@ -3,6 +3,7 @@ import { CreateFeedImageUrlDto, CreateDetectionImageUrlDto } from '../dto';
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { logger } from 'src/common/logger/logger.config';
 
 @Injectable()
 export class UrlsService {
@@ -63,7 +64,10 @@ export class UrlsService {
         },
       };
     } catch (error) {
-      console.error('Failed to generate feed image signed URL:', error);
+      logger.error(
+        { error: error instanceof Error ? error.message : String(error) },
+        'Failed to generate feed image signed URL',
+      );
       throw new BadRequestException('Failed to generate feed image signed URL');
     }
   }
@@ -111,7 +115,10 @@ export class UrlsService {
         },
       };
     } catch (error) {
-      console.error('Failed to generate detection image signed URL:', error);
+      logger.error(
+        { error: error instanceof Error ? error.message : String(error) },
+        'Failed to generate detection image signed URL',
+      );
       throw new BadRequestException(
         'Failed to generate detection image signed URL',
       );

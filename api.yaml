@@ -1,0 +1,626 @@
+openapi: 3.0.3
+info:
+  title: Crow Detector Server API
+  description: API for managing crow detection events and feed events for the Critter Canteen system
+  version: 1.0.0
+  contact:
+    name: Critter Canteen
+servers:
+  - url: https://api-dev.crittercanteen.com
+    description: Development environment
+  - url: https://api.crittercanteen.com
+    description: Production environment
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      description: Check the health status of the API and database
+      tags:
+        - Health
+      responses:
+        '200':
+          description: API and database are healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
+                  info:
+                    type: object
+                    properties:
+                      database:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "up"
+        '503':
+          description: Service unavailable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "error"
+                  error:
+                    type: string
+                    example: "Database connection failed"
+
+  /detection:
+    post:
+      summary: Create detection event
+      description: Record a new crow detection event
+      tags:
+        - Detection
+      security:
+        - ECDSA: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDetectionDTO'
+      responses:
+        '201':
+          description: Detection event created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetectionResponse'
+        '400':
+          description: Bad request - invalid input data
+        '401':
+          description: Unauthorized - invalid authentication
+        '500':
+          description: Internal server error
+
+    get:
+      summary: Get detection events
+      description: Retrieve detection events with optional filtering
+      tags:
+        - Detection
+      security:
+        - ECDSA: []
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of events to return
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: from
+          in: query
+          description: Start date for filtering (ISO 8601 format)
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          description: End date for filtering (ISO 8601 format)
+          required: false
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: List of detection events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DetectionEvent'
+        '401':
+          description: Unauthorized - invalid authentication
+        '500':
+          description: Internal server error
+
+    patch:
+      summary: Update detection event
+      description: Update an existing detection event with confidence and crow count
+      tags:
+        - Detection
+      security:
+        - ECDSA: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchDetectionDTO'
+      responses:
+        '200':
+          description: Detection event updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetectionResponse'
+        '400':
+          description: Bad request - invalid input data
+        '401':
+          description: Unauthorized - invalid authentication
+        '404':
+          description: Detection event not found
+        '500':
+          description: Internal server error
+
+  /feed:
+    post:
+      summary: Create feed event
+      description: Record a new feed event
+      tags:
+        - Feed
+      security:
+        - ECDSA: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFeedDTO'
+      responses:
+        '201':
+          description: Feed event created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedResponse'
+        '400':
+          description: Bad request - invalid input data
+        '401':
+          description: Unauthorized - invalid authentication
+        '500':
+          description: Internal server error
+
+    get:
+      summary: Get feed events
+      description: Retrieve feed events with optional filtering
+      tags:
+        - Feed
+      security:
+        - ECDSA: []
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of events to return
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: from
+          in: query
+          description: Start date for filtering (ISO 8601 format)
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          description: End date for filtering (ISO 8601 format)
+          required: false
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: List of feed events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FeedEvent'
+        '401':
+          description: Unauthorized - invalid authentication
+        '500':
+          description: Internal server error
+
+    patch:
+      summary: Update feed event
+      description: Update an existing feed event with confidence, cropped image, and status
+      tags:
+        - Feed
+      security:
+        - ECDSA: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchFeedDTO'
+      responses:
+        '200':
+          description: Feed event updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedResponse'
+        '400':
+          description: Bad request - invalid input data
+        '401':
+          description: Unauthorized - invalid authentication
+        '404':
+          description: Feed event not found
+        '500':
+          description: Internal server error
+
+  /urls/feed:
+    post:
+      summary: Create signed URL for feed image upload
+      description: Generate a pre-signed URL for uploading feed event images
+      tags:
+        - URLs
+      security:
+        - ECDSA: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFeedImageUrlDTO'
+      responses:
+        '200':
+          description: Signed URL created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  signedUrl:
+                    type: string
+                    format: uri
+                    description: Pre-signed URL for image upload
+                  expiresAt:
+                    type: string
+                    format: date-time
+                    description: When the signed URL expires
+        '400':
+          description: Bad request - invalid input data
+        '401':
+          description: Unauthorized - invalid authentication
+        '500':
+          description: Internal server error
+
+  /urls/detection:
+    post:
+      summary: Create signed URL for detection image upload
+      description: Generate a pre-signed URL for uploading detection event images
+      tags:
+        - URLs
+      security:
+        - ECDSA: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDetectionImageUrlDTO'
+      responses:
+        '200':
+          description: Signed URL created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  signedUrl:
+                    type: string
+                    format: uri
+                    description: Pre-signed URL for image upload
+                  expiresAt:
+                    type: string
+                    format: date-time
+                    description: When the signed URL expires
+        '400':
+          description: Bad request - invalid input data
+        '401':
+          description: Unauthorized - invalid authentication
+        '500':
+          description: Internal server error
+
+components:
+  securitySchemes:
+    ECDSA:
+      type: apiKey
+      name: x-signature
+      in: header
+      description: |
+        ECDSA signature for request authentication.
+        Required headers:
+        - x-device-id: Device identifier (pi-user, pi-motion, pi-feeder)
+        - x-signature: Base64-encoded ECDSA signature
+        - x-timestamp: Request timestamp in milliseconds
+
+  schemas:
+    CreateDetectionDTO:
+      type: object
+      required:
+        - feedEvent
+        - imageUrl
+      properties:
+        feedEvent:
+          type: string
+          format: uuid
+          description: UUID of the associated feed event
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        imageUrl:
+          type: string
+          format: uri
+          description: URL of the detection image
+          example: "https://example.com/images/detection.jpg"
+
+    PatchDetectionDTO:
+      type: object
+      required:
+        - id
+        - confidence
+        - crowCount
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: UUID of the detection event to update
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Confidence score of the detection (0.0 to 1.0)
+          example: 0.95
+        crowCount:
+          type: integer
+          minimum: 0
+          description: Number of crows detected in the image
+          example: 3
+
+    CreateFeedDTO:
+      type: object
+      required:
+        - imageUrl
+        - source
+      properties:
+        imageUrl:
+          type: string
+          format: uri
+          description: URL of the feed event image
+          example: "https://example.com/images/feed.jpg"
+        source:
+          $ref: '#/components/schemas/Source'
+
+    PatchFeedDTO:
+      type: object
+      required:
+        - id
+        - confidence
+        - croppedImageUrl
+        - status
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: UUID of the feed event to update
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Confidence score of the feed detection (0.0 to 1.0)
+          example: 0.87
+        croppedImageUrl:
+          type: string
+          format: uri
+          description: URL of the cropped feed image
+          example: "https://example.com/images/feed-cropped.jpg"
+        status:
+          $ref: '#/components/schemas/Status'
+
+    CreateFeedImageUrlDTO:
+      type: object
+      required:
+        - fileName
+        - format
+        - source
+      properties:
+        fileName:
+          type: string
+          description: Name of the file to upload
+          example: "feed-event-2024-01-15.jpg"
+        format:
+          $ref: '#/components/schemas/ImageFormat'
+        source:
+          type: string
+          description: Source identifier for the image
+          example: "pi-feeder-01"
+        contentType:
+          type: string
+          description: MIME type of the image (optional)
+          example: "image/jpeg"
+
+    CreateDetectionImageUrlDTO:
+      type: object
+      required:
+        - fileName
+        - format
+        - feedEventId
+      properties:
+        fileName:
+          type: string
+          description: Name of the file to upload
+          example: "detection-2024-01-15.jpg"
+        format:
+          $ref: '#/components/schemas/ImageFormat'
+        feedEventId:
+          type: string
+          format: uuid
+          description: UUID of the associated feed event
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        contentType:
+          type: string
+          description: MIME type of the image (optional)
+          example: "image/jpeg"
+
+    DetectionEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the detection event
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Confidence score of the detection
+          example: 0.95
+        crowCount:
+          type: integer
+          minimum: 0
+          description: Number of crows detected
+          example: 3
+        imageUrl:
+          type: string
+          format: uri
+          description: URL of the detection image
+          example: "https://example.com/images/detection.jpg"
+        createdAt:
+          type: string
+          format: date-time
+          description: When the detection event was created
+          example: "2024-01-15T10:30:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: When the detection event was last updated
+          example: "2024-01-15T10:35:00Z"
+        feedEvent:
+          $ref: '#/components/schemas/FeedEvent'
+
+    FeedEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the feed event
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Confidence score of the feed detection
+          example: 0.87
+        imageUrl:
+          type: string
+          format: uri
+          description: URL of the feed event image
+          example: "https://example.com/images/feed.jpg"
+        croppedImageUrl:
+          type: string
+          format: uri
+          description: URL of the cropped feed image
+          example: "https://example.com/images/feed-cropped.jpg"
+        isAppropriate:
+          type: boolean
+          description: Whether the feed image is appropriate
+          example: true
+        source:
+          $ref: '#/components/schemas/Source'
+        status:
+          $ref: '#/components/schemas/Status'
+        createdAt:
+          type: string
+          format: date-time
+          description: When the feed event was created
+          example: "2024-01-15T10:30:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: When the feed event was last updated
+          example: "2024-01-15T10:35:00Z"
+        detectionEvents:
+          type: array
+          items:
+            $ref: '#/components/schemas/DetectionEvent'
+          description: Associated detection events
+
+    DetectionResponse:
+      type: object
+      properties:
+        data:
+          oneOf:
+            - $ref: '#/components/schemas/DetectionEvent'
+            - type: string
+              nullable: true
+          description: The detection event data or null if not found
+        message:
+          type: string
+          description: Response message
+          example: "Detection event created successfully!"
+
+    FeedResponse:
+      type: object
+      properties:
+        data:
+          oneOf:
+            - $ref: '#/components/schemas/FeedEvent'
+            - type: string
+              nullable: true
+          description: The feed event data or null if not found
+        message:
+          type: string
+          description: Response message
+          example: "Feeder event created successfully!"
+
+    Source:
+      type: string
+      enum:
+        - API
+        - BUTTON
+        - SCRIPT
+        - TEST
+      description: Source of the feed event
+      example: "BUTTON"
+
+    Status:
+      type: string
+      enum:
+        - ACCEPTED
+        - REJECTED
+      description: Status of the feed event
+      example: "ACCEPTED"
+
+    ImageFormat:
+      type: string
+      enum:
+        - jpg
+        - jpeg
+        - png
+      description: Supported image formats
+      example: "jpg"
+
+tags:
+  - name: Health
+    description: Health check endpoints
+  - name: Detection
+    description: Crow detection event management
+  - name: Feed
+    description: Feed event management
+  - name: URLs
+    description: Pre-signed URL generation for image uploads

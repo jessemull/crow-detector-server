@@ -1,10 +1,13 @@
 import { BaseSeeder } from './base-seeder';
 import { FeedEvent } from '../../../src/feed/entity/feed-event.entity';
 import { Source, Status } from '../../../src/common/types/feed';
+import { createLogger } from '../../../src/common/logger/logger.config';
 
 export class FeedEventSeeder extends BaseSeeder {
+  private logger = createLogger('FeedEventSeeder');
+
   async seed(): Promise<void> {
-    console.log('Seeding feed events...');
+    this.logger.info('Seeding feed events...');
 
     const feedEvents: Partial<FeedEvent>[] = [];
 
@@ -15,10 +18,14 @@ export class FeedEventSeeder extends BaseSeeder {
         createdAt: this.getRandomDate(),
         updatedAt: new Date(),
         imageUrl: this.getRandomImageUrl(),
-        croppedImageUrl: this.getRandomBoolean() ? this.getRandomImageUrl() : undefined,
+        croppedImageUrl: this.getRandomBoolean()
+          ? this.getRandomImageUrl()
+          : undefined,
         isAppropriate: this.getRandomBoolean(),
         source: this.getRandomEnumValue(Source),
-        status: this.getRandomBoolean() ? this.getRandomEnumValue(Status) : undefined,
+        status: this.getRandomBoolean()
+          ? this.getRandomEnumValue(Status)
+          : undefined,
       };
 
       feedEvents.push(feedEvent);
@@ -27,18 +34,18 @@ export class FeedEventSeeder extends BaseSeeder {
     const feedEventRepository = this.dataSource.getRepository(FeedEvent);
     await feedEventRepository.save(feedEvents);
 
-    console.log(`Seeded ${feedEvents.length} feed events`);
+    this.logger.info({ count: feedEvents.length }, 'Seeded feed events');
   }
 
   async clear(): Promise<void> {
-    console.log('Clearing feed events...');
+    this.logger.info('Clearing feed events...');
     await this.clearTable('feed_event');
-    console.log('Cleared feed events');
+    this.logger.info('Cleared feed events');
   }
 
   async drop(): Promise<void> {
-    console.log('Dropping feed_event table...');
+    this.logger.info('Dropping feed_event table...');
     await this.dropTable('feed_event');
-    console.log('Dropped feed_event table');
+    this.logger.info('Dropped feed_event table');
   }
-} 
+}
