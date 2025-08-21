@@ -1,18 +1,17 @@
 import * as crypto from 'crypto';
-import { EcdsaAuthMiddleware } from './ecdsa-auth.middleware';
-import { Request, Response, NextFunction } from 'express';
+import { EcdsaAuthGuard } from './ecdsa-auth.guard';
+import { Request } from 'express';
 import { Test, TestingModule } from '@nestjs/testing';
-import { UnauthorizedException } from '@nestjs/common';
+import { UnauthorizedException, ExecutionContext } from '@nestjs/common';
 
 jest.mock('crypto', () => ({
   createVerify: jest.fn(),
 }));
 
-describe('EcdsaAuthMiddleware', () => {
-  let middleware: EcdsaAuthMiddleware;
+describe('EcdsaAuthGuard', () => {
+  let guard: EcdsaAuthGuard;
   let mockRequest: Partial<Request> & { headers: Record<string, any> };
-  let mockResponse: Partial<Response>;
-  let mockNext: NextFunction;
+  let mockContext: ExecutionContext;
   let mockCreateVerify: jest.MockedFunction<any>;
 
   beforeEach(async () => {
@@ -23,20 +22,23 @@ describe('EcdsaAuthMiddleware', () => {
     process.env.PI_USER_PUBLIC_KEY = 'test-public-key';
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [EcdsaAuthMiddleware],
+      providers: [EcdsaAuthGuard],
     }).compile();
 
-    middleware = module.get<EcdsaAuthMiddleware>(EcdsaAuthMiddleware);
+    guard = module.get<EcdsaAuthGuard>(EcdsaAuthGuard);
 
     mockRequest = {
       method: 'POST',
-      path: '/detection',
+      url: '/detection',
       body: { confidence: 0.85, imageUrl: 'test.jpg' },
       headers: {} as Record<string, any>,
     };
 
-    mockResponse = {};
-    mockNext = jest.fn();
+    mockContext = {
+      switchToHttp: () => ({
+        getRequest: () => mockRequest,
+      }),
+    } as ExecutionContext;
 
     mockCreateVerify = crypto.createVerify as jest.MockedFunction<any>;
     mockCreateVerify.mockReset();
@@ -51,15 +53,11 @@ describe('EcdsaAuthMiddleware', () => {
       process.env.NODE_ENV = 'development';
       mockRequest.headers['x-dev-mode'] = 'true';
 
-      middleware.use(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext,
-      );
+      const result = guard.canActivate(mockContext);
 
       expect(mockRequest['deviceId']).toBe('dev-mode');
       expect(mockRequest['requestTime']).toBeDefined();
-      expect(mockNext).toHaveBeenCalled();
+      expect(result).toBe(true);
     });
 
     it('should not skip authentication when NODE_ENV is not development', () => {
@@ -67,11 +65,7 @@ describe('EcdsaAuthMiddleware', () => {
       mockRequest.headers['x-dev-mode'] = 'true';
 
       expect(() => {
-        middleware.use(
-          mockRequest as Request,
-          mockResponse as Response,
-          mockNext,
-        );
+        guard.canActivate(mockContext);
       }).toThrow(UnauthorizedException);
     });
 
@@ -80,11 +74,7 @@ describe('EcdsaAuthMiddleware', () => {
       mockRequest.headers['x-dev-mode'] = 'false';
 
       expect(() => {
-        middleware.use(
-          mockRequest as Request,
-          mockResponse as Response,
-          mockNext,
-        );
+        guard.canActivate(mockContext);
       }).toThrow(UnauthorizedException);
     });
 
@@ -92,11 +82,7 @@ describe('EcdsaAuthMiddleware', () => {
       process.env.NODE_ENV = 'development';
 
       expect(() => {
-        middleware.use(
-          mockRequest as Request,
-          mockResponse as Response,
-          mockNext,
-        );
+        guard.canActivate(mockContext);
       }).toThrow(UnauthorizedException);
     });
   });
@@ -107,11 +93,7 @@ describe('EcdsaAuthMiddleware', () => {
       mockRequest.headers['x-timestamp'] = Date.now().toString();
 
       expect(() => {
-        middleware.use(
-          mockRequest as Request,
-          mockResponse as Response,
-          mockNext,
-        );
+        guard.canActivate(mockContext);
       }).toThrow(
         new UnauthorizedException('Missing required authentication headers'),
       );
@@ -122,11 +104,7 @@ describe('EcdsaAuthMiddleware', () => {
       mockRequest.headers['x-timestamp'] = Date.now().toString();
 
       expect(() => {
-        middleware.use(
-          mockRequest as Request,
-          mockResponse as Response,
-          mockNext,
-        );
+        guard.canActivate(mockContext);
       }).toThrow(
         new UnauthorizedException('Missing required authentication headers'),
       );
@@ -137,11 +115,7 @@ describe('EcdsaAuthMiddleware', () => {
       mockRequest.headers['x-signature'] = 'test-signature';
 
       expect(() => {
-        middleware.use(
-          mockRequest as Request,
-          mockResponse as Response,
-          mockNext,
-        );
+        guard.canActivate(mockContext);
       }).toThrow(
         new UnauthorizedException('Missing required authentication headers'),
       );
@@ -149,11 +123,7 @@ describe('EcdsaAuthMiddleware', () => {
 
     it('should throw UnauthorizedException when all required headers are missing', () => {
       expect(() => {
-        middleware.use(
-          mockRequest as Request,
-          mockResponse as Response,
-          mockNext,
-        );
+        guard.canActivate(mockContext);
       }).toThrow(
         new UnauthorizedException('Missing required authentication headers'),
       );
@@ -167,11 +137,7 @@ describe('EcdsaAuthMiddleware', () => {
       mockRequest.headers['x-timestamp'] = Date.now().toString();
 
       expect(() => {
-        middleware.use(
-          mockRequest as Request,
-          mockResponse as Response,
-          mockNext,
-        );
+        guard.canActivate(mockContext);
       }).toThrow(new UnauthorizedException('Unknown device'));
     });
   });
@@ -187,11 +153,7 @@ describe('EcdsaAuthMiddleware', () => {
       mockRequest.headers['x-timestamp'] = oldTimestamp.toString();
 
       expect(() => {
-        middleware.use(
-          mockRequest as Request,
-          mockResponse as Response,
-          mockNext,
-        );
+        guard.canActivate(mockContext);
       }).toThrow(new UnauthorizedException('Request timestamp expired'));
     });
 
@@ -200,11 +162,7 @@ describe('EcdsaAuthMiddleware', () => {
       mockRequest.headers['x-timestamp'] = futureTimestamp.toString();
 
       expect(() => {
-        middleware.use(
-          mockRequest as Request,
-          mockResponse as Response,
-          mockNext,
-        );
+        guard.canActivate(mockContext);
       }).toThrow(new UnauthorizedException('Request timestamp expired'));
     });
 
@@ -218,15 +176,11 @@ describe('EcdsaAuthMiddleware', () => {
       };
       mockCreateVerify.mockReturnValue(mockVerifier as any);
 
-      middleware.use(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext,
-      );
+      const result = guard.canActivate(mockContext);
 
       expect(mockRequest['deviceId']).toBe('pi-user');
       expect(mockRequest['requestTime']).toBe(validTimestamp);
-      expect(mockNext).toHaveBeenCalled();
+      expect(result).toBe(true);
     });
   });
 
@@ -246,11 +200,7 @@ describe('EcdsaAuthMiddleware', () => {
       mockCreateVerify.mockReturnValue(mockVerifier as any);
 
       expect(() => {
-        middleware.use(
-          mockRequest as Request,
-          mockResponse as Response,
-          mockNext,
-        );
+        guard.canActivate(mockContext);
       }).toThrow(new UnauthorizedException('Invalid signature'));
     });
 
@@ -263,15 +213,11 @@ describe('EcdsaAuthMiddleware', () => {
       };
       mockCreateVerify.mockReturnValue(mockVerifier as any);
 
-      middleware.use(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext,
-      );
+      const result = guard.canActivate(mockContext);
 
       expect(mockRequest['deviceId']).toBe('pi-user');
       expect(mockRequest['requestTime']).toBeDefined();
-      expect(mockNext).toHaveBeenCalled();
+      expect(result).toBe(true);
     });
 
     it('should handle crypto verification errors gracefully', () => {
@@ -282,11 +228,7 @@ describe('EcdsaAuthMiddleware', () => {
       });
 
       expect(() => {
-        middleware.use(
-          mockRequest as Request,
-          mockResponse as Response,
-          mockNext,
-        );
+        guard.canActivate(mockContext);
       }).toThrow(new UnauthorizedException('Invalid signature'));
     });
   });
@@ -306,14 +248,11 @@ describe('EcdsaAuthMiddleware', () => {
 
       mockCreateVerify.mockReturnValue(mockVerifier as any);
 
-      middleware.use(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext,
-      );
+      const result = guard.canActivate(mockContext);
 
       const expectedData = `POST/detection{"confidence":0.85,"imageUrl":"test.jpg"}${mockRequest.headers['x-timestamp']}`;
       expect(mockVerifier.update).toHaveBeenCalledWith(expectedData);
+      expect(result).toBe(true);
     });
 
     it('should handle empty body correctly', () => {
@@ -325,21 +264,18 @@ describe('EcdsaAuthMiddleware', () => {
 
       mockCreateVerify.mockReturnValue(mockVerifier as any);
 
-      middleware.use(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext,
-      );
+      const result = guard.canActivate(mockContext);
 
       const expectedData = `POST/detection{}${mockRequest.headers['x-timestamp']}`;
       expect(mockVerifier.update).toHaveBeenCalledWith(expectedData);
+      expect(result).toBe(true);
     });
 
     it('should handle different HTTP methods', () => {
       const mockRequestWithDifferentMethod = {
         ...mockRequest,
         method: 'PATCH',
-        path: '/feed',
+        url: '/feed',
       };
       const mockVerifier = {
         update: jest.fn().mockReturnThis(),
@@ -348,14 +284,15 @@ describe('EcdsaAuthMiddleware', () => {
 
       mockCreateVerify.mockReturnValue(mockVerifier as any);
 
-      middleware.use(
-        mockRequestWithDifferentMethod as Request,
-        mockResponse as Response,
-        mockNext,
-      );
+      const result = guard.canActivate({
+        switchToHttp: () => ({
+          getRequest: () => mockRequestWithDifferentMethod,
+        }),
+      } as ExecutionContext);
 
       const expectedData = `PATCH/feed{"confidence":0.85,"imageUrl":"test.jpg"}${mockRequestWithDifferentMethod.headers['x-timestamp']}`;
       expect(mockVerifier.update).toHaveBeenCalledWith(expectedData);
+      expect(result).toBe(true);
     });
   });
 
@@ -374,13 +311,10 @@ describe('EcdsaAuthMiddleware', () => {
 
       mockCreateVerify.mockReturnValue(mockVerifier as any);
 
-      middleware.use(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext,
-      );
+      const result = guard.canActivate(mockContext);
 
       expect(mockRequest['deviceId']).toBe('pi-user');
+      expect(result).toBe(true);
     });
 
     it('should add requestTime to request object', () => {
@@ -391,17 +325,14 @@ describe('EcdsaAuthMiddleware', () => {
 
       mockCreateVerify.mockReturnValue(mockVerifier as any);
 
-      middleware.use(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext,
-      );
+      const result = guard.canActivate(mockContext);
 
       expect(mockRequest['requestTime']).toBeDefined();
       expect(typeof mockRequest['requestTime']).toBe('number');
+      expect(result).toBe(true);
     });
 
-    it('should call next() function', () => {
+    it('should return true when authentication succeeds', () => {
       const mockVerifier = {
         update: jest.fn().mockReturnThis(),
         verify: jest.fn().mockReturnValue(true),
@@ -409,13 +340,9 @@ describe('EcdsaAuthMiddleware', () => {
 
       mockCreateVerify.mockReturnValue(mockVerifier as any);
 
-      middleware.use(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext,
-      );
+      const result = guard.canActivate(mockContext);
 
-      expect(mockNext).toHaveBeenCalled();
+      expect(result).toBe(true);
     });
 
     it('should set requestTime to the parsed timestamp value', () => {
@@ -429,13 +356,10 @@ describe('EcdsaAuthMiddleware', () => {
 
       mockCreateVerify.mockReturnValue(mockVerifier as any);
 
-      middleware.use(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext,
-      );
+      const result = guard.canActivate(mockContext);
 
       expect(mockRequest['requestTime']).toBe(timestamp);
+      expect(result).toBe(true);
     });
   });
 });

@@ -7,7 +7,6 @@ import {
 } from '@nestjs/common';
 import { Request } from 'express';
 import { logger } from 'src/common/logger/logger.config';
-
 @Injectable()
 export class EcdsaAuthGuard implements CanActivate {
   private readonly devicePublicKeys: Record<string, string | undefined>;
