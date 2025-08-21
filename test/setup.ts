@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-return */
-
 jest.mock('dotenv', () => ({
   config: jest.fn().mockReturnValue({}),
 }));

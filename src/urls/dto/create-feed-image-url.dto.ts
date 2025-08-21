@@ -1,5 +1,5 @@
-import { IsString, IsNotEmpty, IsEnum, IsOptional } from 'class-validator';
 import { ImageFormat } from '../../common/types';
+import { IsString, IsNotEmpty, IsEnum, IsOptional } from 'class-validator';
 
 export class CreateFeedImageUrlDto {
   @IsString()
@@ -12,7 +12,7 @@ export class CreateFeedImageUrlDto {
 
   @IsString()
   @IsNotEmpty()
-  source: string; // e.g., 'pi-feeder', 'pi-motion'
+  source: string;
 
   @IsString()
   @IsOptional()

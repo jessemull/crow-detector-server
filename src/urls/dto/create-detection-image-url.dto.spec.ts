@@ -1,6 +1,6 @@
-import { validate } from 'class-validator';
 import { CreateDetectionImageUrlDto } from './create-detection-image-url.dto';
 import { ImageFormat } from '../../common/types';
+import { validate } from 'class-validator';
 
 describe('CreateDetectionImageUrlDto', () => {
   describe('validation', () => {
@@ -59,7 +59,6 @@ describe('CreateDetectionImageUrlDto', () => {
     it('should fail validation when format is invalid', async () => {
       const dto = new CreateDetectionImageUrlDto();
       dto.fileName = 'motion-detected';
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       dto.format = 'invalid-format' as any;
       dto.feedEventId = 'feed-123';
 

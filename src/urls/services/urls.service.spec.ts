@@ -1,13 +1,12 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { ConfigService } from '@nestjs/config';
 import { BadRequestException } from '@nestjs/common';
-import { UrlsService } from './urls.service';
+import { ConfigService } from '@nestjs/config';
 import { CreateFeedImageUrlDto, CreateDetectionImageUrlDto } from '../dto';
 import { ImageFormat } from '../../common/types';
 import { S3Client } from '@aws-sdk/client-s3';
+import { Test, TestingModule } from '@nestjs/testing';
+import { UrlsService } from './urls.service';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
-// Mock AWS SDK
 jest.mock('@aws-sdk/client-s3');
 jest.mock('@aws-sdk/s3-request-presigner');
 
@@ -24,11 +23,9 @@ describe('UrlsService', () => {
   };
 
   beforeEach(async () => {
-    // Reset environment variables
     delete process.env.S3_BUCKET_NAME;
     delete process.env.AWS_REGION;
 
-    // Setup default mocks BEFORE creating the module
     mockConfigService.get.mockImplementation((key: string) => {
       switch (key) {
         case 'S3_BUCKET_NAME':
@@ -52,19 +49,13 @@ describe('UrlsService', () => {
 
     service = module.get<UrlsService>(UrlsService);
 
-    // Mock S3Client constructor
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     mockS3Client.mockImplementation(() => ({}) as any);
 
-    // Mock getSignedUrl
     mockGetSignedUrl.mockResolvedValue(
       'https://test-bucket.s3.amazonaws.com/test-url?signature=...',
     );
 
-    // Mock console.error to silence expected error logs in tests
-    jest.spyOn(console, 'error').mockImplementation(() => {
-      // Intentionally empty for test silencing
-    });
+    jest.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -79,19 +70,16 @@ describe('UrlsService', () => {
     });
 
     it('should use default region when AWS_REGION is not set', () => {
-      // Reset the mock for this specific test
       mockConfigService.get.mockImplementation((key: string) => {
         if (key === 'S3_BUCKET_NAME') {
           return 'test-bucket';
         }
         if (key === 'AWS_REGION') {
-          return undefined; // This will trigger the default
+          return undefined;
         }
         return undefined;
       });
 
-      // Recreate service to trigger constructor
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       new UrlsService(mockConfigService as any);
 
       expect(mockS3Client).toHaveBeenCalledWith({
@@ -102,7 +90,6 @@ describe('UrlsService', () => {
     it('should throw error when S3_BUCKET_NAME is not set', () => {
       mockConfigService.get.mockReturnValue(undefined);
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       expect(() => new UrlsService(mockConfigService as any)).toThrow(
         'S3_BUCKET_NAME environment variable is required',
       );
@@ -229,25 +216,21 @@ describe('UrlsService', () => {
 
   describe('getContentType', () => {
     it('should return correct content type for JPG', () => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const result = (service as any).getContentType(ImageFormat.JPG);
       expect(result).toBe('image/jpeg');
     });
 
     it('should return correct content type for JPEG', () => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const result = (service as any).getContentType(ImageFormat.JPEG);
       expect(result).toBe('image/jpeg');
     });
 
     it('should return correct content type for PNG', () => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const result = (service as any).getContentType(ImageFormat.PNG);
       expect(result).toBe('image/png');
     });
 
     it('should return default content type for unknown format', () => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const result = (service as any).getContentType('unknown' as any);
       expect(result).toBe('application/octet-stream');
     });

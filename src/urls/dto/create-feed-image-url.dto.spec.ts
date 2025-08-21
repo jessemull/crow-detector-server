@@ -1,6 +1,6 @@
-import { validate } from 'class-validator';
 import { CreateFeedImageUrlDto } from './create-feed-image-url.dto';
 import { ImageFormat } from '../../common/types';
+import { validate } from 'class-validator';
 
 describe('CreateFeedImageUrlDto', () => {
   describe('validation', () => {
@@ -59,7 +59,6 @@ describe('CreateFeedImageUrlDto', () => {
     it('should fail validation when format is invalid', async () => {
       const dto = new CreateFeedImageUrlDto();
       dto.fileName = 'test-image';
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       dto.format = 'invalid-format' as any;
       dto.source = 'pi-feeder-001';
 

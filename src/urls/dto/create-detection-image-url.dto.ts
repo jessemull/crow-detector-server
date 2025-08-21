@@ -1,5 +1,5 @@
-import { IsString, IsNotEmpty, IsEnum, IsOptional } from 'class-validator';
 import { ImageFormat } from '../../common/types';
+import { IsString, IsNotEmpty, IsEnum, IsOptional } from 'class-validator';
 
 export class CreateDetectionImageUrlDto {
   @IsString()

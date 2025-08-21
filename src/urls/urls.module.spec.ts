@@ -1,7 +1,7 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigModule } from '@nestjs/config';
-import { UrlsModule } from './urls.module';
+import { Test, TestingModule } from '@nestjs/testing';
 import { UrlsController } from './urls.controller';
+import { UrlsModule } from './urls.module';
 import { UrlsService } from './services/urls.service';
 
 describe('UrlsModule', () => {
@@ -39,10 +39,6 @@ describe('UrlsModule', () => {
   });
 
   it('should have EcdsaAuthMiddleware', () => {
-    // Note: Testing middleware configuration in NestJS modules can be complex
-    // as it involves the framework's internal routing system.
-    // The middleware configuration is verified by checking that the module
-    // compiles successfully with the middleware configured.
     expect(module).toBeDefined();
   });
 });
