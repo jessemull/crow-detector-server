@@ -13,6 +13,8 @@ Parameters:
 Resources:
   CrowDetectorSQSQueue:
     Type: AWS::SQS::Queue
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
     Properties:
       QueueName: !Sub "crow-detector-s3-events-${Environment}"
       VisibilityTimeout: 30
@@ -28,6 +30,8 @@ Resources:
 
   CrowDetectorSQSDLQ:
     Type: AWS::SQS::Queue
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
     Properties:
       QueueName: !Sub "crow-detector-s3-events-dlq-${Environment}"
       MessageRetentionPeriod: 1209600
@@ -36,6 +40,23 @@ Resources:
           Value: !Ref Environment
         - Key: Project
           Value: "crow-detector"
+
+  CrowDetectorSQSQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref CrowDetectorSQSQueue
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: s3.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt CrowDetectorSQSQueue.Arn
+            Condition:
+              ArnLike:
+                aws:SourceArn: !Sub "arn:${AWS::Partition}:s3:::crow-detector-images-${Environment}"
 
 Outputs:
   CrowDetectorSQSQueueUrl:

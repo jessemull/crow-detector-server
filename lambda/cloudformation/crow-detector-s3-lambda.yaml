@@ -14,7 +14,6 @@ Parameters:
     Description: The S3 key for the lambda function zip file.
 
 Resources:
-
   CrowDetectorS3LambdaFunction:
     Type: AWS::Lambda::Function
     Properties:

@@ -18,8 +18,8 @@ The system uses a queue-based architecture for robust event processing:
 
 ```
 S3 Bucket → SQS Queue → Lambda Function → Crow Detector API
-                ↓
-            Dead Letter Queue (DLQ)
+   (with       ↓              ↑
+ notifications) Dead Letter Queue (DLQ)
 ```
 
 ### Benefits of SQS Architecture
@@ -139,25 +139,25 @@ npm run test:coverage
    ```bash
    # Deploy SQS infrastructure first
    aws cloudformation deploy \
-     --template-file cloudformation/crow-detector-sqs.yaml \
+     --template-file lambda/cloudformation/crow-detector-sqs.yaml \
      --stack-name crow-detector-sqs-stack-dev \
+     --parameter-overrides Environment=dev \
+     --capabilities CAPABILITY_NAMED_IAM
+   
+   # Deploy/Update S3 bucket with SQS notifications
+   aws cloudformation deploy \
+     --template-file cloudformation/crow-detector-s3.yaml \
+     --stack-name crow-detector-s3-stack-dev \
      --parameter-overrides Environment=dev \
      --capabilities CAPABILITY_NAMED_IAM
    
    # Deploy Lambda function
    aws cloudformation deploy \
-     --template-file cloudformation/crow-detector-s3-lambda.yaml \
+     --template-file lambda/cloudformation/crow-detector-s3-lambda.yaml \
      --stack-name crow-detector-s3-lambda-stack-dev \
      --parameter-overrides Environment=dev S3Key=lambda/crow-detector-s3-lambda.zip \
      --capabilities CAPABILITY_NAMED_IAM
    ```
-
-4. **Configure S3 Bucket Notifications (Manual Step):**
-   
-   You'll need to configure the S3 bucket to send notifications to the SQS queue. This can be done via:
-   - AWS Console: S3 → Bucket → Properties → Event notifications
-   - AWS CLI: `aws s3api put-bucket-notification-configuration`
-   - Update the existing S3 bucket CloudFormation template to include notification configuration
 
 ### GitHub Actions
 
@@ -183,10 +183,10 @@ The system uses multiple CloudFormation templates:
 - **Dead Letter Queue** - For failed message processing
 - **Retry Policy** - Configurable retry count and visibility timeout
 
-### S3 Bucket Configuration (Manual Setup Required)
-- **S3 Bucket Notification** - Configure S3 bucket to send events to SQS queue
-- **Event Filtering** - Only image file uploads trigger notifications
-- Note: This must be configured on the existing S3 bucket resource
+### S3 Bucket Configuration (`cloudformation/crow-detector-s3.yaml`)
+- **S3 Bucket Notification** - Automatically sends events to SQS queue
+- **Event Filtering** - Only image file uploads trigger notifications (jpg, jpeg, png, gif, bmp, webp)
+- **SQS Queue Policy** - Allows S3 bucket to send messages to SQS queue
 
 ## Monitoring
 

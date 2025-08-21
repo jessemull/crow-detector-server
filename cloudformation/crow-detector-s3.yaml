@@ -41,6 +41,44 @@ Resources:
             AllowedMethods: [GET, PUT, POST, DELETE]
             AllowedOrigins: ['*']
             MaxAge: 3000
+      NotificationConfiguration:
+        QueueConfigurations:
+          - Event: s3:ObjectCreated:Put
+            Queue: !ImportValue 
+              Fn::Sub: "CrowDetectorSQSQueueArn-${Environment}"
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: suffix
+                    Value: .jpg
+                  - Name: suffix
+                    Value: .jpeg
+                  - Name: suffix
+                    Value: .png
+                  - Name: suffix
+                    Value: .gif
+                  - Name: suffix
+                    Value: .bmp
+                  - Name: suffix
+                    Value: .webp
+          - Event: s3:ObjectCreated:Post
+            Queue: !ImportValue 
+              Fn::Sub: "CrowDetectorSQSQueueArn-${Environment}"
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: suffix
+                    Value: .jpg
+                  - Name: suffix
+                    Value: .jpeg
+                  - Name: suffix
+                    Value: .png
+                  - Name: suffix
+                    Value: .gif
+                  - Name: suffix
+                    Value: .bmp
+                  - Name: suffix
+                    Value: .webp
 
   CrowDetectorImagesBucketPolicy:
     Type: AWS::S3::BucketPolicy
