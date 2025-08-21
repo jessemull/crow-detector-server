@@ -8,6 +8,15 @@ jest.mock('crypto', () => ({
   createVerify: jest.fn(),
 }));
 
+jest.mock('src/common/logger/logger.config', () => ({
+  logger: {
+    info: jest.fn(),
+    error: jest.fn(),
+  },
+}));
+
+import { logger } from 'src/common/logger/logger.config';
+
 describe('EcdsaAuthGuard', () => {
   let guard: EcdsaAuthGuard;
   let mockRequest: Partial<Request> & { headers: Record<string, any> };
@@ -42,6 +51,7 @@ describe('EcdsaAuthGuard', () => {
 
     mockCreateVerify = crypto.createVerify as jest.MockedFunction<any>;
     mockCreateVerify.mockReset();
+    jest.clearAllMocks();
   });
 
   afterEach(() => {
@@ -220,16 +230,39 @@ describe('EcdsaAuthGuard', () => {
       expect(result).toBe(true);
     });
 
-    it('should handle crypto verification errors gracefully', () => {
+    it('should handle crypto verification errors gracefully (error is object)', () => {
       mockRequest.headers['x-signature'] = 'test-signature';
 
-      mockCreateVerify.mockImplementation(() => {
-        throw new Error('Crypto error');
+      const mockVerifier = {
+        update: jest.fn().mockReturnThis(),
+        verify: jest.fn().mockImplementation(() => {
+          throw new Error('Crypto verification error');
+        }),
+      };
+      mockCreateVerify.mockReturnValue(mockVerifier as any);
+
+      const result = guard['verifySignature']('data', 'sig', 'key');
+      expect(result).toBe(false);
+      expect(logger.error).toHaveBeenCalledWith(
+        { error: 'Crypto verification error' },
+        'Error verifying signature',
+      );
+    });
+
+    it('should handle crypto verification errors gracefully (error is string)', () => {
+      mockRequest.headers['x-signature'] = 'test-signature';
+
+      (mockCreateVerify as jest.Mock).mockImplementation(() => {
+        // eslint-disable-next-line @typescript-eslint/only-throw-error
+        throw 'string error';
       });
 
-      expect(() => {
-        guard.canActivate(mockContext);
-      }).toThrow(new UnauthorizedException('Invalid signature'));
+      const result = guard['verifySignature']('data', 'sig', 'key');
+      expect(result).toBe(false);
+      expect(logger.error).toHaveBeenCalledWith(
+        { error: 'string error' },
+        'Error verifying signature',
+      );
     });
   });
 
@@ -360,6 +393,72 @@ describe('EcdsaAuthGuard', () => {
 
       expect(mockRequest['requestTime']).toBe(timestamp);
       expect(result).toBe(true);
+    });
+  });
+
+  describe('Edge cases and error handling', () => {
+    beforeEach(() => {
+      mockRequest.headers['x-device-id'] = 'pi-user';
+      mockRequest.headers['x-signature'] = 'test-signature';
+      mockRequest.headers['x-timestamp'] = Date.now().toString();
+    });
+
+    it('should handle request with undefined body by defaulting to empty object', () => {
+      mockRequest.body = undefined;
+
+      const mockVerifier = {
+        update: jest.fn().mockReturnThis(),
+        verify: jest.fn().mockReturnValue(true),
+      };
+      mockCreateVerify.mockReturnValue(mockVerifier as any);
+
+      const result = guard.canActivate(mockContext);
+
+      expect(result).toBe(true);
+      expect(mockVerifier.update).toHaveBeenCalledWith(
+        expect.stringContaining('{}'),
+      );
+    });
+
+    it('should handle request with null body by defaulting to empty object', () => {
+      mockRequest.body = null;
+
+      const mockVerifier = {
+        update: jest.fn().mockReturnThis(),
+        verify: jest.fn().mockReturnValue(true),
+      };
+      mockCreateVerify.mockReturnValue(mockVerifier as any);
+
+      const result = guard.canActivate(mockContext);
+
+      expect(result).toBe(true);
+      expect(mockVerifier.update).toHaveBeenCalledWith(
+        expect.stringContaining('{}'),
+      );
+    });
+
+    it('should handle verifySignature errors gracefully', () => {
+      const mockVerifier = {
+        update: jest.fn().mockReturnThis(),
+        verify: jest.fn().mockImplementation(() => {
+          throw new Error('Crypto verification error');
+        }),
+      };
+      mockCreateVerify.mockReturnValue(mockVerifier as any);
+
+      expect(() => {
+        guard.canActivate(mockContext);
+      }).toThrow(new UnauthorizedException('Invalid signature'));
+    });
+
+    it('should handle signature verification errors gracefully', () => {
+      mockCreateVerify.mockImplementation(() => {
+        throw new Error('Crypto module error');
+      });
+
+      expect(() => {
+        guard.canActivate(mockContext);
+      }).toThrow(new UnauthorizedException('Invalid signature'));
     });
   });
 });

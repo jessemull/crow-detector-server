@@ -60,9 +60,6 @@ export class EcdsaAuthGuard implements CanActivate {
     // Get the public key for signature verification...
 
     const publicKey = this.devicePublicKeys[deviceId];
-    if (!publicKey) {
-      throw new UnauthorizedException('Public key not found for device');
-    }
 
     // Verify timestamp (prevent replay attacks)...
 
@@ -103,17 +100,10 @@ export class EcdsaAuthGuard implements CanActivate {
       return undefined;
     }
 
-    try {
-      const decoded = Buffer.from(base64Key, 'base64').toString('utf-8');
-      const normalizedKey = decoded.replace(/\\n/g, '\n');
-      return normalizedKey;
-    } catch (error) {
-      logger.error(
-        { error: error instanceof Error ? error.message : String(error) },
-        'Error decoding public key',
-      );
-      return undefined;
-    }
+    const decoded = Buffer.from(base64Key, 'base64').toString('utf-8');
+    const normalizedKey = decoded.replace(/\\n/g, '\n');
+
+    return normalizedKey;
   }
 
   private verifySignature(
