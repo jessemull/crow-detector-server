@@ -13,6 +13,9 @@ Parameters:
     Type: String
     Description: The S3 key for the lambda function zip file.
 
+Conditions:
+  IsDev: !Equals [!Ref Environment, "dev"]
+
 Resources:
   CrowDetectorS3LambdaFunction:
     Type: AWS::Lambda::Function
@@ -29,9 +32,12 @@ Resources:
       MemorySize: 256
       Environment:
         Variables:
-          API_BASE_URL: !Sub "https://api-${Environment}.crittercanteen.com"
-          DETECTION_ENDPOINT: "/detection/process-image"
-          FEED_ENDPOINT: "/feed/process-image"
+          API_BASE_URL: !If 
+            - IsDev
+            - "https://api-dev.crittercanteen.com"
+            - "https://api.crittercanteen.com"
+          DETECTION_ENDPOINT: "/detection"
+          FEED_ENDPOINT: "/feed"
           NODE_ENV: !Ref Environment
       Tags:
         - Key: Environment

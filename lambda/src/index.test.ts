@@ -48,7 +48,7 @@ describe('S3 Event Lambda Handler', () => {
         ) as string,
       });
       expect(mockedFetch).toHaveBeenCalledWith(
-        'https://api-dev.crittercanteen.com/detection/process-image',
+        'https://api-dev.crittercanteen.com/detection',
         expect.objectContaining({
           method: 'POST',
           headers: expect.objectContaining({
@@ -101,7 +101,7 @@ describe('S3 Event Lambda Handler', () => {
       await handler(mockEvent, mockContext, mockCallback);
 
       expect(mockedFetch).toHaveBeenCalledWith(
-        'https://api-dev.crittercanteen.com/feed/process-image',
+        'https://api-dev.crittercanteen.com/feed',
         expect.objectContaining({
           method: 'POST',
           headers: expect.objectContaining({
@@ -246,7 +246,7 @@ describe('S3 Event Lambda Handler', () => {
       await handler(mockEvent, mockContext, mockCallback);
 
       expect(mockedFetch).toHaveBeenCalledWith(
-        'https://api-dev.crittercanteen.com/detection/process-image',
+        'https://api-dev.crittercanteen.com/detection',
         expect.objectContaining({
           method: 'POST',
           headers: expect.objectContaining({

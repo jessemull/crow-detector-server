@@ -30,9 +30,8 @@ interface ApiCallResult {
 
 const API_BASE_URL =
   process.env.API_BASE_URL || 'https://api-dev.crittercanteen.com';
-const DETECTION_ENDPOINT =
-  process.env.DETECTION_ENDPOINT || '/detection/process-image';
-const FEED_ENDPOINT = process.env.FEED_ENDPOINT || '/feed/process-image';
+const DETECTION_ENDPOINT = process.env.DETECTION_ENDPOINT || '/detection';
+const FEED_ENDPOINT = process.env.FEED_ENDPOINT || '/feed';
 
 export const handler = async (
   event: SQSEvent,
@@ -161,15 +160,6 @@ async function callAPI(s3Info: S3ObjectInfo): Promise<void> {
 
   const payload = {
     imageUrl: `https://${s3Info.bucket}.s3.amazonaws.com/${s3Info.key}`,
-    source: 's3-lambda',
-    timestamp: Date.now(),
-    metadata: {
-      bucket: s3Info.bucket,
-      key: s3Info.key,
-      size: s3Info.size,
-      eventName: s3Info.eventName,
-      imageType,
-    },
   };
 
   console.log(
