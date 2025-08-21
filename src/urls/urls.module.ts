@@ -1,5 +1,4 @@
-import { EcdsaAuthMiddleware } from '../auth/middleware/ecdsa-auth.middleware';
-import { Module, MiddlewareConsumer, RequestMethod } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { UrlsController } from './urls.controller';
 import { UrlsService } from './services/urls.service';
 
@@ -8,13 +7,4 @@ import { UrlsService } from './services/urls.service';
   providers: [UrlsService],
   exports: [UrlsService],
 })
-export class UrlsModule {
-  configure(consumer: MiddlewareConsumer) {
-    consumer
-      .apply(EcdsaAuthMiddleware)
-      .forRoutes(
-        { path: 'urls/feed', method: RequestMethod.POST },
-        { path: 'urls/detection', method: RequestMethod.POST },
-      );
-  }
-}
+export class UrlsModule {}
