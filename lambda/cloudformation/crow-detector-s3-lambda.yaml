@@ -14,6 +14,7 @@ Parameters:
     Description: The S3 key for the lambda function zip file.
 
 Resources:
+
   CrowDetectorS3LambdaFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -52,7 +53,7 @@ Resources:
               Service: lambda.amazonaws.com
             Action: sts:AssumeRole
       ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
       Policies:
         - PolicyName: !Sub "crow-detector-s3-lambda-policy-${Environment}"
           PolicyDocument:
@@ -63,12 +64,19 @@ Resources:
                   - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
-                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/crow-detector-s3-lambda-${Environment}:*"
+                Resource: !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/crow-detector-s3-lambda-${Environment}:*"
               - Effect: Allow
                 Action:
                   - s3:GetObject
                   - s3:GetObjectVersion
-                Resource: !Sub "arn:aws:s3:::crow-detector-images-${Environment}/*"
+                Resource: !Sub "arn:${AWS::Partition}:s3:::crow-detector-images-${Environment}/*"
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource: !ImportValue 
+                  Fn::Sub: "CrowDetectorSQSQueueArn-${Environment}"
       Tags:
         - Key: Environment
           Value: !Ref Environment
@@ -85,8 +93,19 @@ Resources:
     Properties:
       FunctionName: !Ref CrowDetectorS3LambdaVersion
       Action: lambda:InvokeFunction
-      Principal: s3.amazonaws.com
-      SourceArn: !Sub "arn:aws:s3:::crow-detector-images-${Environment}"
+      Principal: sqs.amazonaws.com
+      SourceArn: !ImportValue 
+        Fn::Sub: "CrowDetectorSQSQueueArn-${Environment}"
+
+  CrowDetectorSQSEventSourceMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      FunctionName: !Ref CrowDetectorS3LambdaVersion
+      EventSourceArn: !ImportValue 
+        Fn::Sub: "CrowDetectorSQSQueueArn-${Environment}"
+      BatchSize: 10
+      MaximumBatchingWindowInSeconds: 5
+      Enabled: true
 
 Outputs:
   CrowDetectorS3LambdaFunctionArn:

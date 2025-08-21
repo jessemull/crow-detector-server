@@ -1,4 +1,4 @@
-import { S3Event, S3EventRecord, Context, Callback } from 'aws-lambda';
+import { SQSEvent, SQSRecord, Context, Callback } from 'aws-lambda';
 import { handler } from './index';
 
 global.fetch = jest.fn();
@@ -22,10 +22,10 @@ describe('S3 Event Lambda Handler', () => {
   });
 
   describe('handler', () => {
-    it('should process S3 event successfully', async () => {
-      const mockEvent: S3Event = {
+    it('should process SQS event with S3 data successfully', async () => {
+      const mockEvent: SQSEvent = {
         Records: [
-          createMockS3Record(
+          createMockSQSRecord(
             'test-bucket',
             'test-image.jpg',
             'ObjectCreated:Put',
@@ -44,7 +44,7 @@ describe('S3 Event Lambda Handler', () => {
       expect(mockCallback).toHaveBeenCalledWith(null, {
         statusCode: 200,
         body: expect.stringContaining(
-          'All S3 events processed successfully',
+          'All SQS events processed successfully',
         ) as string,
       });
       expect(mockedFetch).toHaveBeenCalledWith(
@@ -60,9 +60,9 @@ describe('S3 Event Lambda Handler', () => {
     });
 
     it('should skip non-image files', async () => {
-      const mockEvent: S3Event = {
+      const mockEvent: SQSEvent = {
         Records: [
-          createMockS3Record(
+          createMockSQSRecord(
             'test-bucket',
             'test-document.pdf',
             'ObjectCreated:Put',
@@ -75,16 +75,16 @@ describe('S3 Event Lambda Handler', () => {
       expect(mockCallback).toHaveBeenCalledWith(null, {
         statusCode: 200,
         body: expect.stringContaining(
-          'All S3 events processed successfully',
+          'All SQS events processed successfully',
         ) as string,
       });
       expect(mockedFetch).not.toHaveBeenCalled();
     });
 
     it('should skip non-upload events', async () => {
-      const mockEvent: S3Event = {
+      const mockEvent: SQSEvent = {
         Records: [
-          createMockS3Record(
+          createMockSQSRecord(
             'test-bucket',
             'test-image.jpg',
             'ObjectRemoved:Delete',
@@ -97,17 +97,21 @@ describe('S3 Event Lambda Handler', () => {
       expect(mockCallback).toHaveBeenCalledWith(null, {
         statusCode: 200,
         body: expect.stringContaining(
-          'All S3 events processed successfully',
+          'All SQS events processed successfully',
         ) as string,
       });
       expect(mockedFetch).not.toHaveBeenCalled();
     });
 
     it('should handle multiple records', async () => {
-      const mockEvent: S3Event = {
+      const mockEvent: SQSEvent = {
         Records: [
-          createMockS3Record('test-bucket', 'image1.jpg', 'ObjectCreated:Put'),
-          createMockS3Record('test-bucket', 'image2.png', 'ObjectCreated:Post'),
+          createMockSQSRecord('test-bucket', 'image1.jpg', 'ObjectCreated:Put'),
+          createMockSQSRecord(
+            'test-bucket',
+            'image2.png',
+            'ObjectCreated:Post',
+          ),
         ],
       };
 
@@ -128,16 +132,16 @@ describe('S3 Event Lambda Handler', () => {
       expect(mockCallback).toHaveBeenCalledWith(null, {
         statusCode: 200,
         body: expect.stringContaining(
-          'All S3 events processed successfully',
+          'All SQS events processed successfully',
         ) as string,
       });
       expect(mockedFetch).toHaveBeenCalledTimes(2);
     });
 
     it('should handle API call failures', async () => {
-      const mockEvent: S3Event = {
+      const mockEvent: SQSEvent = {
         Records: [
-          createMockS3Record(
+          createMockSQSRecord(
             'test-bucket',
             'test-image.jpg',
             'ObjectCreated:Put',
@@ -154,16 +158,16 @@ describe('S3 Event Lambda Handler', () => {
         expect.objectContaining({
           statusCode: 500,
           body: expect.stringContaining(
-            'Some S3 events failed to process',
+            'Some SQS events failed to process',
           ) as string,
         }) as { statusCode: number; body: string },
       );
     });
 
     it('should handle general errors', async () => {
-      const mockEvent: S3Event = {
+      const mockEvent: SQSEvent = {
         Records: [
-          createMockS3Record(
+          createMockSQSRecord(
             'test-bucket',
             'test-image.jpg',
             'ObjectCreated:Put',
@@ -182,7 +186,7 @@ describe('S3 Event Lambda Handler', () => {
         expect.objectContaining({
           statusCode: 500,
           body: expect.stringContaining(
-            'Some S3 events failed to process',
+            'Some SQS events failed to process',
           ) as string,
         }) as { statusCode: number; body: string },
       );
@@ -192,9 +196,9 @@ describe('S3 Event Lambda Handler', () => {
       delete process.env.API_BASE_URL;
       delete process.env.API_ENDPOINT;
 
-      const mockEvent: S3Event = {
+      const mockEvent: SQSEvent = {
         Records: [
-          createMockS3Record(
+          createMockSQSRecord(
             'test-bucket',
             'test-image.jpg',
             'ObjectCreated:Put',
@@ -224,14 +228,14 @@ describe('S3 Event Lambda Handler', () => {
 
   describe('image file detection', () => {
     it('should recognize various image extensions', () => {
-      const mockEvent: S3Event = {
+      const mockEvent: SQSEvent = {
         Records: [
-          createMockS3Record('test-bucket', 'image.jpg', 'ObjectCreated:Put'),
-          createMockS3Record('test-bucket', 'image.jpeg', 'ObjectCreated:Put'),
-          createMockS3Record('test-bucket', 'image.png', 'ObjectCreated:Put'),
-          createMockS3Record('test-bucket', 'image.gif', 'ObjectCreated:Put'),
-          createMockS3Record('test-bucket', 'image.bmp', 'ObjectCreated:Put'),
-          createMockS3Record('test-bucket', 'image.webp', 'ObjectCreated:Put'),
+          createMockSQSRecord('test-bucket', 'image.jpg', 'ObjectCreated:Put'),
+          createMockSQSRecord('test-bucket', 'image.jpeg', 'ObjectCreated:Put'),
+          createMockSQSRecord('test-bucket', 'image.png', 'ObjectCreated:Put'),
+          createMockSQSRecord('test-bucket', 'image.gif', 'ObjectCreated:Put'),
+          createMockSQSRecord('test-bucket', 'image.bmp', 'ObjectCreated:Put'),
+          createMockSQSRecord('test-bucket', 'image.webp', 'ObjectCreated:Put'),
         ],
       };
 
@@ -247,10 +251,10 @@ describe('S3 Event Lambda Handler', () => {
     });
 
     it('should handle case-insensitive extensions', () => {
-      const mockEvent: S3Event = {
+      const mockEvent: SQSEvent = {
         Records: [
-          createMockS3Record('test-bucket', 'image.JPG', 'ObjectCreated:Put'),
-          createMockS3Record('test-bucket', 'image.PNG', 'ObjectCreated:Put'),
+          createMockSQSRecord('test-bucket', 'image.JPG', 'ObjectCreated:Put'),
+          createMockSQSRecord('test-bucket', 'image.PNG', 'ObjectCreated:Put'),
         ],
       };
 
@@ -268,9 +272,9 @@ describe('S3 Event Lambda Handler', () => {
 
   describe('event filtering', () => {
     it('should process ObjectCreated:Put events', () => {
-      const mockEvent: S3Event = {
+      const mockEvent: SQSEvent = {
         Records: [
-          createMockS3Record(
+          createMockSQSRecord(
             'test-bucket',
             'test-image.jpg',
             'ObjectCreated:Put',
@@ -290,9 +294,9 @@ describe('S3 Event Lambda Handler', () => {
     });
 
     it('should process ObjectCreated:Post events', () => {
-      const mockEvent: S3Event = {
+      const mockEvent: SQSEvent = {
         Records: [
-          createMockS3Record(
+          createMockSQSRecord(
             'test-bucket',
             'test-image.jpg',
             'ObjectCreated:Post',
@@ -312,9 +316,9 @@ describe('S3 Event Lambda Handler', () => {
     });
 
     it('should skip ObjectRemoved events', () => {
-      const mockEvent: S3Event = {
+      const mockEvent: SQSEvent = {
         Records: [
-          createMockS3Record(
+          createMockSQSRecord(
             'test-bucket',
             'test-image.jpg',
             'ObjectRemoved:Delete',
@@ -329,43 +333,60 @@ describe('S3 Event Lambda Handler', () => {
   });
 });
 
-function createMockS3Record(
+function createMockSQSRecord(
   bucket: string,
   key: string,
   eventName: string,
-): S3EventRecord {
-  return {
-    eventVersion: '2.1',
-    eventSource: 'aws:s3',
-    awsRegion: 'us-east-1',
-    eventTime: new Date().toISOString(),
-    eventName,
-    userIdentity: {
-      principalId: 'test-user',
-    },
-    requestParameters: {
-      sourceIPAddress: '127.0.0.1',
-    },
-    responseElements: {
-      'x-amz-request-id': 'test-request-id',
-      'x-amz-id-2': 'test-id-2',
-    },
-    s3: {
-      s3SchemaVersion: '1.0',
-      configurationId: 'test-config',
-      bucket: {
-        name: bucket,
-        ownerIdentity: {
-          principalId: 'test-owner',
+): SQSRecord {
+  // Create a mock S3 event that would be in the SQS message body
+  const s3Event = {
+    Records: [
+      {
+        eventVersion: '2.1',
+        eventSource: 'aws:s3',
+        awsRegion: 'us-east-1',
+        eventTime: new Date().toISOString(),
+        eventName,
+        userIdentity: {
+          principalId: 'test-user',
         },
-        arn: `arn:aws:s3:::${bucket}`,
+        requestParameters: {
+          sourceIPAddress: '127.0.0.1',
+        },
+        responseElements: {
+          'x-amz-request-id': 'test-request-id',
+          'x-amz-id-2': 'test-id-2',
+        },
+        s3: {
+          s3SchemaVersion: '1.0',
+          configurationId: 'test-config',
+          bucket: {
+            name: bucket,
+            ownerIdentity: {
+              principalId: 'test-owner',
+            },
+            arn: `arn:aws:s3:::${bucket}`,
+          },
+          object: {
+            key,
+            size: 1024,
+            eTag: 'test-etag',
+            sequencer: 'test-sequencer',
+          },
+        },
       },
-      object: {
-        key,
-        size: 1024,
-        eTag: 'test-etag',
-        sequencer: 'test-sequencer',
-      },
-    },
-  } as S3EventRecord;
+    ],
+  };
+
+  return {
+    messageId: 'test-message-id',
+    receiptHandle: 'test-receipt-handle',
+    body: JSON.stringify(s3Event),
+    attributes: {},
+    messageAttributes: {},
+    md5OfBody: 'test-md5',
+    eventSource: 'aws:sqs',
+    eventSourceARN: 'arn:aws:sqs:us-east-1:123456789012:test-queue',
+    awsRegion: 'us-east-1',
+  } as SQSRecord;
 }

@@ -1,10 +1,25 @@
-import { S3Event, S3EventRecord, Context, Callback } from 'aws-lambda';
+import { SQSEvent, SQSRecord, Context, Callback } from 'aws-lambda';
 
 interface S3ObjectInfo {
   bucket: string;
   key: string;
   size: number;
   eventName: string;
+}
+
+interface S3EventFromSQS {
+  Records: Array<{
+    eventName: string;
+    s3: {
+      bucket: {
+        name: string;
+      };
+      object: {
+        key: string;
+        size?: number;
+      };
+    };
+  }>;
 }
 
 interface ApiCallResult {
@@ -19,17 +34,17 @@ const API_ENDPOINT =
   process.env.API_ENDPOINT || '/detection/crow-detected-event';
 
 export const handler = async (
-  event: S3Event,
+  event: SQSEvent,
   context: Context,
   callback: Callback,
 ): Promise<void> => {
-  console.log('S3 Event received:', JSON.stringify(event, null, 2));
+  console.log('SQS Event received:', JSON.stringify(event, null, 2));
 
   try {
     const results: ApiCallResult[] = [];
 
     for (const record of event.Records) {
-      const result = await processS3Record(record);
+      const result = await processSQSRecord(record);
       results.push(result);
     }
 
@@ -40,28 +55,28 @@ export const handler = async (
       callback(null, {
         statusCode: 200,
         body: JSON.stringify({
-          message: 'All S3 events processed successfully',
+          message: 'All SQS events processed successfully',
           results,
         }),
       });
     } else {
-      callback(new Error('Some S3 events failed to process'), {
+      callback(new Error('Some SQS events failed to process'), {
         statusCode: 500,
         body: JSON.stringify({
-          message: 'Some S3 events failed to process',
+          message: 'Some SQS events failed to process',
           results,
         }),
       });
     }
   } catch (error) {
-    console.error('Error processing S3 event:', error);
+    console.error('Error processing SQS event:', error);
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error occurred';
     callback(new Error(errorMessage));
   }
 };
 
-async function processS3Record(record: S3EventRecord): Promise<ApiCallResult> {
+async function processSQSRecord(record: SQSRecord): Promise<ApiCallResult> {
   try {
     const s3Info = extractS3Info(record);
     console.log('Processing S3 object:', JSON.stringify(s3Info, null, 2));
@@ -99,13 +114,17 @@ async function processS3Record(record: S3EventRecord): Promise<ApiCallResult> {
   }
 }
 
-function extractS3Info(record: S3EventRecord): S3ObjectInfo {
-  const s3 = record.s3;
+function extractS3Info(record: SQSRecord): S3ObjectInfo {
+  // Parse the S3 event data from the SQS message body
+  const s3Event = JSON.parse(record.body) as S3EventFromSQS;
+  const s3Record = s3Event.Records[0];
+  const s3 = s3Record.s3;
+
   return {
     bucket: s3.bucket.name,
     key: decodeURIComponent(s3.object.key.replace(/\+/g, ' ')),
     size: s3.object.size || 0,
-    eventName: record.eventName,
+    eventName: s3Record.eventName,
   };
 }
 
