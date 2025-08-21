@@ -30,7 +30,8 @@ Resources:
       Environment:
         Variables:
           API_BASE_URL: !Sub "https://api-${Environment}.crittercanteen.com"
-          API_ENDPOINT: "/detection/crow-detected-event"
+          DETECTION_ENDPOINT: "/detection/process-image"
+          FEED_ENDPOINT: "/feed/process-image"
           NODE_ENV: !Ref Environment
       Tags:
         - Key: Environment
