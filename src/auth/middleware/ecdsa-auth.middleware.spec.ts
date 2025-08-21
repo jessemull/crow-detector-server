@@ -1,12 +1,8 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-
+import * as crypto from 'crypto';
+import { EcdsaAuthMiddleware } from './ecdsa-auth.middleware';
+import { Request, Response, NextFunction } from 'express';
 import { Test, TestingModule } from '@nestjs/testing';
 import { UnauthorizedException } from '@nestjs/common';
-import { Request, Response, NextFunction } from 'express';
-import { EcdsaAuthMiddleware } from './ecdsa-auth.middleware';
-import * as crypto from 'crypto';
 
 jest.mock('crypto', () => ({
   createVerify: jest.fn(),
