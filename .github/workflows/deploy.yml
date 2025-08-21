@@ -33,6 +33,13 @@ jobs:
         run: npm run lint
 
       - name: Run Unit Tests
+        env:
+          AWS_REGION: us-west-2
+          NODE_ENV: test
+          PI_FEEDER_PUBLIC_KEY: test-feeder-key
+          PI_MOTION_PUBLIC_KEY: test-motion-key
+          PI_USER_PUBLIC_KEY: test-public-key
+          S3_BUCKET_NAME: crow-detector-images-test
         run: npm run test:cov
 
       - name: Upload Coverage Report
