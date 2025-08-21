@@ -1,43 +1,47 @@
+import * as crypto from 'crypto';
 import {
   Injectable,
-  NestMiddleware,
+  CanActivate,
+  ExecutionContext,
   UnauthorizedException,
 } from '@nestjs/common';
-import { Request, Response, NextFunction } from 'express';
-import * as crypto from 'crypto';
+import { Request } from 'express';
 import { logger } from 'src/common/logger/logger.config';
-
 @Injectable()
-export class EcdsaAuthMiddleware implements NestMiddleware {
-  // Load public keys from environment variables...
+export class EcdsaAuthGuard implements CanActivate {
+  private readonly devicePublicKeys: Record<string, string | undefined>;
 
-  private readonly devicePublicKeys = {
-    'pi-user': this.decodePublicKey(process.env.PI_USER_PUBLIC_KEY),
-    'pi-motion': this.decodePublicKey(process.env.PI_MOTION_PUBLIC_KEY),
-    'pi-feeder': this.decodePublicKey(process.env.PI_FEEDER_PUBLIC_KEY),
-  };
+  constructor() {
+    this.devicePublicKeys = {
+      'pi-user': this.decodePublicKey(process.env.PI_USER_PUBLIC_KEY),
+      'pi-motion': this.decodePublicKey(process.env.PI_MOTION_PUBLIC_KEY),
+      'pi-feeder': this.decodePublicKey(process.env.PI_FEEDER_PUBLIC_KEY),
+    };
+  }
 
-  use(req: Request, res: Response, next: NextFunction) {
+  canActivate(context: ExecutionContext): boolean {
+    const request = context.switchToHttp().getRequest<Request>();
+
     // Development mode bypass...
 
     if (
       process.env.NODE_ENV === 'development' &&
-      req.headers['x-dev-mode'] === 'true'
+      request.headers['x-dev-mode'] === 'true'
     ) {
-      req['deviceId'] = 'dev-mode';
-      req['requestTime'] = Date.now();
+      request['deviceId'] = 'dev-mode';
+      request['requestTime'] = Date.now();
       logger.info(
         { deviceId: 'dev-mode' },
         'Development mode: Skipping ECDSA authentication',
       );
-      return next();
+      return true;
     }
 
     // Extract required headers...
 
-    const deviceId = req.headers['x-device-id'] as string;
-    const signature = req.headers['x-signature'] as string;
-    const timestamp = req.headers['x-timestamp'] as string;
+    const deviceId = request.headers['x-device-id'] as string;
+    const signature = request.headers['x-signature'] as string;
+    const timestamp = request.headers['x-timestamp'] as string;
 
     // Validate required headers...
 
@@ -55,7 +59,7 @@ export class EcdsaAuthMiddleware implements NestMiddleware {
 
     // Get the public key for signature verification...
 
-    const publicKey = this.devicePublicKeys[deviceId] as string;
+    const publicKey = this.devicePublicKeys[deviceId];
 
     // Verify timestamp (prevent replay attacks)...
 
@@ -69,7 +73,11 @@ export class EcdsaAuthMiddleware implements NestMiddleware {
 
     // Create the data to verify (method + path + body + timestamp)...
 
-    const dataToVerify = `${req.method}${req.path}${JSON.stringify(req.body)}${timestamp}`;
+    const method = request.method;
+    const path = request.url;
+    const body = (request.body as Record<string, unknown>) || {};
+
+    const dataToVerify = `${method}${path}${JSON.stringify(body)}${timestamp}`;
 
     // Verify the signature...
 
@@ -81,10 +89,10 @@ export class EcdsaAuthMiddleware implements NestMiddleware {
 
     // Add device info to request for controllers to use...
 
-    req['deviceId'] = deviceId;
-    req['requestTime'] = requestTime;
+    request['deviceId'] = deviceId;
+    request['requestTime'] = requestTime;
 
-    next();
+    return true;
   }
 
   private decodePublicKey(base64Key: string | undefined): string | undefined {
@@ -92,16 +100,10 @@ export class EcdsaAuthMiddleware implements NestMiddleware {
       return undefined;
     }
 
-    try {
-      const decoded = Buffer.from(base64Key, 'base64').toString('utf-8');
-      return decoded;
-    } catch (error) {
-      logger.error(
-        { error: error instanceof Error ? error.message : String(error) },
-        'Error decoding public key',
-      );
-      return undefined;
-    }
+    const decoded = Buffer.from(base64Key, 'base64').toString('utf-8');
+    const normalizedKey = decoded.replace(/\\n/g, '\n');
+
+    return normalizedKey;
   }
 
   private verifySignature(
