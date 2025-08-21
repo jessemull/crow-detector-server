@@ -11,9 +11,9 @@ export class EcdsaAuthMiddleware implements NestMiddleware {
   // Load public keys from environment variables...
 
   private readonly devicePublicKeys = {
-    'pi-user': process.env.PI_USER_PUBLIC_KEY,
-    'pi-motion': process.env.PI_MOTION_PUBLIC_KEY,
-    'pi-feeder': process.env.PI_FEEDER_PUBLIC_KEY,
+    'pi-user': this.decodePublicKey(process.env.PI_USER_PUBLIC_KEY),
+    'pi-motion': this.decodePublicKey(process.env.PI_MOTION_PUBLIC_KEY),
+    'pi-feeder': this.decodePublicKey(process.env.PI_FEEDER_PUBLIC_KEY),
   };
 
   use(req: Request, res: Response, next: NextFunction) {
@@ -81,6 +81,20 @@ export class EcdsaAuthMiddleware implements NestMiddleware {
     req['requestTime'] = requestTime;
 
     next();
+  }
+
+  private decodePublicKey(base64Key: string | undefined): string | undefined {
+    if (!base64Key) {
+      return undefined;
+    }
+
+    try {
+      const decoded = Buffer.from(base64Key, 'base64').toString('utf-8');
+      return decoded;
+    } catch (error) {
+      console.error('Error decoding public key:', error);
+      return undefined;
+    }
   }
 
   private verifySignature(

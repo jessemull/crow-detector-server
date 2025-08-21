@@ -6,6 +6,7 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
+    "auth:token": "node scripts/generate-auth-token.js",
     "build": "nest build",
     "commit": "cz",
     "coverage:open": "open ./coverage/lcov-report/index.html",
