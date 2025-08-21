@@ -38,7 +38,9 @@ export const handler = async (
   context: Context,
   callback: Callback,
 ): Promise<void> => {
-  console.log('SQS Event received:', JSON.stringify(event, null, 2));
+  if (process.env.NODE_ENV !== 'test') {
+    console.log('SQS Event received:', JSON.stringify(event, null, 2));
+  }
 
   try {
     const results: ApiCallResult[] = [];
@@ -48,7 +50,9 @@ export const handler = async (
       results.push(result);
     }
 
-    console.log('Processing results:', JSON.stringify(results, null, 2));
+    if (process.env.NODE_ENV !== 'test') {
+      console.log('Processing results:', JSON.stringify(results, null, 2));
+    }
 
     const allSuccessful = results.every((result) => result.success);
 
@@ -70,7 +74,10 @@ export const handler = async (
       });
     }
   } catch (error) {
-    console.error('Error processing SQS event:', error);
+    console.error(
+      'Error processing SQS event:',
+      error instanceof Error ? error.message : String(error),
+    );
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error occurred';
     callback(new Error(errorMessage));
@@ -81,7 +88,9 @@ async function processSQSRecord(record: SQSRecord): Promise<ApiCallResult> {
   try {
     const s3Info = extractS3Info(record);
 
-    console.log('Processing S3 object:', JSON.stringify(s3Info, null, 2));
+    if (process.env.NODE_ENV !== 'test') {
+      console.log('Processing S3 object:', JSON.stringify(s3Info, null, 2));
+    }
 
     if (!isImageFile(s3Info.key)) {
       return {
@@ -99,7 +108,7 @@ async function processSQSRecord(record: SQSRecord): Promise<ApiCallResult> {
       };
     }
 
-    const apiResult = await callAPI(s3Info);
+    await callAPI(s3Info);
 
     return {
       success: true,
@@ -107,7 +116,10 @@ async function processSQSRecord(record: SQSRecord): Promise<ApiCallResult> {
       timestamp: new Date().toISOString(),
     };
   } catch (error) {
-    console.error('Error processing S3 record:', error);
+    console.error(
+      'Error processing S3 record:',
+      error instanceof Error ? error.message : String(error),
+    );
     return {
       success: false,
       message: `Failed to process: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -163,10 +175,12 @@ async function callAPI(s3Info: S3ObjectInfo): Promise<void> {
     imageUrl: `https://${s3Info.bucket}.s3.amazonaws.com/${s3Info.key}`,
   };
 
-  console.log(
-    `Calling ${imageType} API with payload:`,
-    JSON.stringify(payload, null, 2),
-  );
+  if (process.env.NODE_ENV !== 'test') {
+    console.log(
+      `Calling ${imageType} API with payload:`,
+      JSON.stringify(payload, null, 2),
+    );
+  }
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000);
@@ -190,7 +204,9 @@ async function callAPI(s3Info: S3ObjectInfo): Promise<void> {
 
     const responseData = await response.json();
 
-    console.log(`${imageType} API response:`, response.status, responseData);
+    if (process.env.NODE_ENV !== 'test') {
+      console.log(`${imageType} API response:`, response.status, responseData);
+    }
   } catch (error) {
     clearTimeout(timeoutId);
     throw error;

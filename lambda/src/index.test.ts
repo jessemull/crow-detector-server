@@ -12,11 +12,21 @@ describe('S3 Event Lambda Handler', () => {
     mockContext = {} as Context;
     mockCallback = jest.fn();
     jest.clearAllMocks();
+
+    // Mock console methods to silence output during tests
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    process.env.NODE_ENV = 'test';
     process.env.API_BASE_URL = 'https://test-api.com';
     process.env.API_ENDPOINT = '/test-endpoint';
   });
 
   afterEach(() => {
+    // Restore console methods
+    jest.restoreAllMocks();
+
+    delete process.env.NODE_ENV;
     delete process.env.API_BASE_URL;
     delete process.env.API_ENDPOINT;
   });
