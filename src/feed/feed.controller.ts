@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Param,
   Patch,
   Post,
   Query,
@@ -46,6 +47,16 @@ export class FeedController {
     return {
       data: event,
       message: 'Feeder event updated successfully!',
+    };
+  }
+
+  @Post('reprocess/:id')
+  @UseGuards(EcdsaAuthGuard)
+  async reprocessImage(@Param('id') id: string): Promise<FeedResponse> {
+    await this.feedEventService.reprocessImage(id);
+    return {
+      data: null,
+      message: 'Image reprocessing started successfully!',
     };
   }
 }

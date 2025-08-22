@@ -14,6 +14,13 @@ enum Status {
   REJECTED = 'REJECTED',
 }
 
+enum ProcessingStatus {
+  PENDING = 'PENDING',
+  PROCESSING = 'PROCESSING',
+  COMPLETED = 'COMPLETED',
+  FAILED = 'FAILED',
+}
+
 @Entity('feed_event')
 export class FeedEvent {
   @PrimaryGeneratedColumn('uuid')
@@ -68,4 +75,39 @@ export class FeedEvent {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  // New fields for image processing
+  @Column({ nullable: true })
+  s3Bucket?: string;
+
+  @Column({ nullable: true })
+  s3Key?: string;
+
+  @Column({
+    enum: ProcessingStatus,
+    default: ProcessingStatus.PENDING,
+    type: 'enum',
+  })
+  processingStatus: ProcessingStatus;
+
+  @Column({ nullable: true })
+  processingError?: string;
+
+  @Column({ nullable: true })
+  moderationLabels?: string; // JSON string of AWS Rekognition labels
+
+  @Column({ nullable: true })
+  faceDetected: boolean;
+
+  @Column({ nullable: true })
+  faceBoundingBox?: string; // JSON string of face coordinates
+
+  @Column({ nullable: true })
+  originalImageSize?: number;
+
+  @Column({ nullable: true })
+  processedImageSize?: number;
+
+  @Column({ nullable: true })
+  processingDuration?: number; // in milliseconds
 }
