@@ -113,36 +113,6 @@ jobs:
             echo "change_set_type=CREATE" >> $GITHUB_ENV
           fi
 
-      - name: Deploy S3 Bucket Template First
-        run: |
-          ENVIRONMENT=${{ github.event.inputs.environment }}
-          S3_BUCKET_STACK_NAME="crow-detector-lambda-bucket-stack-${{ github.event.inputs.environment }}"
-          S3_BUCKET_TEMPLATE="lambda/cloudformation/crow-detector-lambda-s3.yaml"
-          
-          # Check if S3 bucket stack exists
-          if ! aws cloudformation describe-stacks --stack-name "$S3_BUCKET_STACK_NAME" --region us-west-2 >/dev/null 2>&1; then
-            echo "Creating S3 bucket stack..."
-            aws cloudformation create-stack \
-              --stack-name "$S3_BUCKET_STACK_NAME" \
-              --template-body file://$S3_BUCKET_TEMPLATE \
-              --parameters ParameterKey=Environment,ParameterValue="$ENVIRONMENT" \
-              --capabilities CAPABILITY_NAMED_IAM \
-              --region us-west-2
-            
-            echo "Waiting for S3 bucket stack creation..."
-            aws cloudformation wait stack-create-complete \
-              --stack-name "$S3_BUCKET_STACK_NAME" \
-              --region us-west-2
-          else
-            echo "S3 bucket stack already exists, updating if needed..."
-            aws cloudformation update-stack \
-              --stack-name "$S3_BUCKET_STACK_NAME" \
-              --template-body file://$S3_BUCKET_TEMPLATE \
-              --parameters ParameterKey=Environment,ParameterValue="$ENVIRONMENT" \
-              --capabilities CAPABILITY_NAMED_IAM \
-              --region us-west-2 || echo "No updates needed for S3 bucket stack"
-          fi
-
       - name: Create CloudFormation Change Set
         run: |
           ENVIRONMENT=${{ github.event.inputs.environment }}
