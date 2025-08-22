@@ -43,12 +43,8 @@ export const handler = async (
       });
     }
   } catch (error) {
-    console.error(
-      'Error processing SQS event:',
-      error instanceof Error ? error.message : String(error),
-    );
-    const errorMessage =
-      error instanceof Error ? error.message : 'Unknown error occurred';
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('Error processing SQS event:', errorMessage);
     callback(new Error(errorMessage));
   }
 };
