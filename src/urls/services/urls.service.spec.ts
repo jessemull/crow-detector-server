@@ -228,6 +228,21 @@ describe('UrlsService', () => {
       expect(result).toBe('image/png');
     });
 
+    it('should return correct content type for GIF', () => {
+      const result = (service as any).getContentType(ImageFormat.GIF);
+      expect(result).toBe('image/gif');
+    });
+
+    it('should return correct content type for BMP', () => {
+      const result = (service as any).getContentType(ImageFormat.BMP);
+      expect(result).toBe('image/bmp');
+    });
+
+    it('should return correct content type for WEBP', () => {
+      const result = (service as any).getContentType(ImageFormat.WEBP);
+      expect(result).toBe('image/webp');
+    });
+
     it('should return default content type for unknown format', () => {
       const result = (service as any).getContentType('unknown' as any);
       expect(result).toBe('application/octet-stream');

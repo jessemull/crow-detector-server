@@ -1,0 +1,46 @@
+{
+  "name": "crow-detector-s3-lambda",
+  "version": "1.0.0",
+  "description": "Lambda function to handle S3 events and call the Crow Detector API",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "webpack --config webpack.config.js",
+    "clean": "rm -rf dist",
+    "prebuild": "npm run clean",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint --ext .ts src/",
+    "lint:fix": "eslint --ext .ts --fix src/",
+    "package": "cd dist && zip -rq crow-detector-s3-lambda.zip ./*",
+    "build:package": "npm run build && npm run package"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@eslint/js": "^9.21.0",
+    "@types/aws-lambda": "^8.10.147",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.13.9",
+    "@typescript-eslint/eslint-plugin": "^8.26.0",
+    "@typescript-eslint/parser": "^8.26.0",
+    "dotenv": "^16.4.7",
+    "eslint": "^9.21.0",
+    "jest": "^29.7.0",
+    "terser-webpack-plugin": "^5.3.14",
+    "ts-jest": "^29.3.1",
+    "ts-loader": "^9.5.2",
+    "typescript": "^5.8.2",
+    "typescript-eslint": "^8.26.0",
+    "webpack": "^5.98.0",
+    "webpack-cli": "^6.0.1"
+  },
+  "keywords": [
+    "aws",
+    "lambda",
+    "s3",
+    "crow-detector",
+    "typescript"
+  ],
+  "author": "Jesse Mull",
+  "license": "MIT"
+}

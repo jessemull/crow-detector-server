@@ -1,17 +1,39 @@
-name: Pull Request
+name: Pull Request - Lambda
 
 on:
   pull_request:
     branches:
       - main
-    paths-ignore:
+    paths:
       - 'lambda/**'
       - '.github/workflows/pull-request-lambda.yml'
-      - '.github/workflows/deploy-lambda.yml'
-      - '.github/workflows/merge-lambda.yml'
-      - '.github/workflows/rollback-lambda.yml'
 
 jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'lambda/package-lock.json'
+
+      - name: Install Dependencies
+        working-directory: lambda
+        run: npm ci
+
+      - name: Build & Package Lambda
+        working-directory: lambda
+        run: |
+          export NODE_ENV=dev
+          npm run build
+          npm run package
+
   lint:
     name: Lint Code
     runs-on: ubuntu-latest
@@ -22,13 +44,16 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '20'
           cache: 'npm'
+          cache-dependency-path: 'lambda/package-lock.json'
 
       - name: Install Dependencies
+        working-directory: lambda
         run: npm ci
 
       - name: Run Linting
+        working-directory: lambda
         run: npm run lint
 
   test:
@@ -42,59 +67,29 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '20'
           cache: 'npm'
+          cache-dependency-path: 'lambda/package-lock.json'
 
       - name: Install Dependencies
+        working-directory: lambda
         run: npm ci
 
       - name: Run Jest Tests
-        env:
-          AWS_REGION: us-west-2
-          NODE_ENV: test
-          PI_FEEDER_PUBLIC_KEY: test-feeder-key
-          PI_MOTION_PUBLIC_KEY: test-motion-key
-          PI_USER_PUBLIC_KEY: test-public-key
-          S3_BUCKET_NAME: crow-detector-images-test
-        run: npm run test:cov
+        working-directory: lambda
+        run: npm run test:coverage
 
       - name: Upload Coverage Report
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
-          path: coverage
+          path: lambda/coverage
           retention-days: 7
 
       - name: Coverage Threshold Check
+        working-directory: lambda
         run: |
           if [[ $(grep "Statements" coverage/lcov-report/index.html | awk '{print $4}' | tr -d '%') -lt 80 ]]; then
             echo "Code coverage is below threshold. Please update test coverage and try again."
             exit 1
           fi
-
-  build:
-    name: Build Application
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-
-      - name: Install Dependencies
-        run: npm ci
-
-      - name: Build Application
-        run: npm run build
-
-      - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-artifacts
-          path: dist
-          retention-days: 7

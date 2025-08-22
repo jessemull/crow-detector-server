@@ -1,0 +1,127 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Parameters:
+  Environment:
+    Type: String
+    Description: "The environment for the deployment (dev or prod)"
+    AllowedValues:
+      - dev
+      - prod
+    Default: dev
+    ConstraintDescription: "Must be either 'dev' or 'prod'."
+  S3Key:
+    Type: String
+    Description: The S3 key for the lambda function zip file.
+
+Conditions:
+  IsDev: !Equals [!Ref Environment, "dev"]
+
+Resources:
+  CrowDetectorS3LambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "crow-detector-s3-lambda-${Environment}"
+      Runtime: nodejs20.x
+      Role: !GetAtt CrowDetectorS3LambdaRole.Arn
+      Handler: index.handler
+      Code:
+        S3Bucket:
+          Fn::ImportValue: !Sub "CrowDetectorLambdaBucketName-${Environment}"
+        S3Key: !Ref S3Key
+      Timeout: 30
+      MemorySize: 256
+      Environment:
+        Variables:
+          API_BASE_URL: !If 
+            - IsDev
+            - "https://api-dev.crittercanteen.com"
+            - "https://api.crittercanteen.com"
+          DETECTION_ENDPOINT: "/detection"
+          FEED_ENDPOINT: "/feed"
+          NODE_ENV: !Ref Environment
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: "crow-detector"
+        - Key: Service
+          Value: "s3-lambda"
+
+  CrowDetectorS3LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "crow-detector-s3-lambda-role-${Environment}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      Policies:
+        - PolicyName: !Sub "crow-detector-s3-lambda-policy-${Environment}"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/crow-detector-s3-lambda-${Environment}:*"
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                Resource: !Sub "arn:${AWS::Partition}:s3:::crow-detector-images-${Environment}/*"
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource: !ImportValue 
+                  Fn::Sub: "CrowDetectorSQSQueueArn-${Environment}"
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: "crow-detector"
+
+  CrowDetectorS3LambdaVersion:
+    Type: AWS::Lambda::Version
+    Properties:
+      FunctionName: !Ref CrowDetectorS3LambdaFunction
+
+  CrowDetectorS3LambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref CrowDetectorS3LambdaVersion
+      Action: lambda:InvokeFunction
+      Principal: sqs.amazonaws.com
+      SourceArn: !ImportValue 
+        Fn::Sub: "CrowDetectorSQSQueueArn-${Environment}"
+
+  CrowDetectorSQSEventSourceMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      FunctionName: !Ref CrowDetectorS3LambdaVersion
+      EventSourceArn: !ImportValue 
+        Fn::Sub: "CrowDetectorSQSQueueArn-${Environment}"
+      BatchSize: 10
+      MaximumBatchingWindowInSeconds: 5
+      Enabled: true
+
+Outputs:
+  CrowDetectorS3LambdaFunctionArn:
+    Description: "ARN of the S3 Event Lambda function"
+    Value: !Ref CrowDetectorS3LambdaVersion
+    Export:
+      Name: !Sub "CrowDetectorS3LambdaFunctionArn-${Environment}"
+
+  CrowDetectorS3LambdaRoleArn:
+    Description: "ARN of the S3 Event Lambda execution role"
+    Value: !GetAtt CrowDetectorS3LambdaRole.Arn
+    Export:
+      Name: !Sub "CrowDetectorS3LambdaRoleArn-${Environment}"

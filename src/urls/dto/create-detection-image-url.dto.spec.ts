@@ -89,7 +89,14 @@ describe('CreateDetectionImageUrlDto', () => {
     });
 
     it('should accept valid ImageFormat values', async () => {
-      const validFormats = [ImageFormat.JPG, ImageFormat.JPEG, ImageFormat.PNG];
+      const validFormats = [
+        ImageFormat.JPG,
+        ImageFormat.JPEG,
+        ImageFormat.PNG,
+        ImageFormat.GIF,
+        ImageFormat.BMP,
+        ImageFormat.WEBP,
+      ];
 
       for (const format of validFormats) {
         const dto = new CreateDetectionImageUrlDto();

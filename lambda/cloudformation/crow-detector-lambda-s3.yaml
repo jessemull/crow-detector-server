@@ -1,0 +1,38 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: "dev"
+    Description: "The environment for the deployment (dev or prod)"
+    AllowedValues:
+      - dev
+      - prod
+    ConstraintDescription: "Must be either 'dev' or 'prod'."
+  CrowDetectorLambdaBucketName:
+    Type: String
+    Default: "crow-detector-lambda"
+    Description: "S3 bucket for storing crow-detector lambda deployment artifacts"
+
+Resources:
+  CrowDetectorLambdaBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${CrowDetectorLambdaBucketName}-${Environment}"
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+Outputs:
+  CrowDetectorLambdaBucketName:
+    Value: !Ref CrowDetectorLambdaBucket
+    Export:
+      Name: !Sub "CrowDetectorLambdaBucketName-${Environment}"
+  CrowDetectorLambdaBucketArn:
+    Value: !GetAtt CrowDetectorLambdaBucket.Arn
+    Export:
+      Name: !Sub "CrowDetectorLambdaBucketArn-${Environment}"
