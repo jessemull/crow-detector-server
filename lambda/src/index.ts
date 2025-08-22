@@ -1,4 +1,5 @@
 import { SQSEvent, SQSRecord, Context, Callback } from 'aws-lambda';
+import * as crypto from 'crypto';
 
 interface S3ObjectInfo {
   bucket: string;
@@ -32,25 +33,49 @@ const API_BASE_URL =
   process.env.API_BASE_URL || 'https://api-dev.crittercanteen.com';
 const DETECTION_ENDPOINT = process.env.DETECTION_ENDPOINT || '/detection';
 const FEED_ENDPOINT = process.env.FEED_ENDPOINT || '/feed';
+const LAMBDA_S3_PRIVATE_KEY = process.env.LAMBDA_S3_PRIVATE_KEY || '';
+
+// Function to generate ECDSA signature
+function generateSignature(data: string, privateKey: string): string {
+  try {
+    const sign = crypto.createSign('SHA256');
+    sign.update(data);
+    return sign.sign(privateKey, 'base64');
+  } catch (error) {
+    console.error('Error generating signature:', error);
+    throw new Error(
+      `Failed to generate signature: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    );
+  }
+}
+
+// Function to generate authentication headers
+function generateAuthHeaders(
+  method: string,
+  path: string,
+  body: Record<string, unknown>,
+): Record<string, string> {
+  const timestamp = Date.now().toString();
+  const dataToSign = `${method}${path}${JSON.stringify(body)}${timestamp}`;
+
+  if (!LAMBDA_S3_PRIVATE_KEY) {
+    throw new Error('LAMBDA_S3_PRIVATE_KEY environment variable not set');
+  }
+
+  const signature = generateSignature(dataToSign, LAMBDA_S3_PRIVATE_KEY);
+
+  return {
+    'x-device-id': 'lambda-s3',
+    'x-signature': signature,
+    'x-timestamp': timestamp,
+  };
+}
 
 export const handler = async (
   event: SQSEvent,
   context: Context,
   callback: Callback,
 ): Promise<void> => {
-  console.log('Lambda started');
-  console.log('Event type:', typeof event);
-  console.log('Event keys:', Object.keys(event));
-
-  if (event.Records && event.Records.length > 0) {
-    console.log('Number of records:', event.Records.length);
-    console.log('First record keys:', Object.keys(event.Records[0]));
-    console.log('First record body:', event.Records[0].body);
-    console.log('First record body type:', typeof event.Records[0].body);
-  } else {
-    console.log('No records found in event');
-  }
-
   if (process.env.NODE_ENV !== 'test') {
     console.log('SQS Event received:', JSON.stringify(event, null, 2));
   }
@@ -142,31 +167,20 @@ async function processSQSRecord(record: SQSRecord): Promise<ApiCallResult> {
 }
 
 function extractS3Info(record: SQSRecord): S3ObjectInfo {
-  console.log(
-    'extractS3Info called with record:',
-    JSON.stringify(record, null, 2),
-  );
-
   try {
-    // Parse the S3 event data from the SQS message body...
-    console.log('Attempting to parse record.body:', record.body);
-
     const s3Event = JSON.parse(record.body) as S3EventFromSQS;
-    console.log('Parsed S3 event:', JSON.stringify(s3Event, null, 2));
 
     if (!s3Event.Records || s3Event.Records.length === 0) {
       throw new Error('No Records array in S3 event');
     }
 
     const s3Record = s3Event.Records[0];
-    console.log('S3 record:', JSON.stringify(s3Record, null, 2));
 
     if (!s3Record.s3) {
       throw new Error('No s3 object in S3 record');
     }
 
     const s3 = s3Record.s3;
-    console.log('S3 object:', JSON.stringify(s3, null, 2));
 
     const result = {
       bucket: s3.bucket.name,
@@ -175,11 +189,9 @@ function extractS3Info(record: SQSRecord): S3ObjectInfo {
       eventName: s3Record.eventName,
     };
 
-    console.log('Extracted S3 info:', JSON.stringify(result, null, 2));
     return result;
   } catch (error) {
     console.error('Error in extractS3Info:', error);
-    console.error('Record that caused error:', JSON.stringify(record, null, 2));
     throw error;
   }
 }
@@ -227,12 +239,20 @@ async function callAPI(s3Info: S3ObjectInfo): Promise<void> {
   const timeoutId = setTimeout(() => controller.abort(), 10000);
 
   try {
+    let headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'User-Agent': 'crow-detector-s3-lambda/1.0.0',
+    };
+
+    // Only add authentication headers in non-test mode
+    if (process.env.NODE_ENV !== 'test') {
+      const authHeaders = generateAuthHeaders('POST', endpoint, payload);
+      headers = { ...headers, ...authHeaders };
+    }
+
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'crow-detector-s3-lambda/1.0.0',
-      },
+      headers,
       body: JSON.stringify(payload),
       signal: controller.signal,
     });

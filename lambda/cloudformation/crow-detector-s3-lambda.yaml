@@ -39,6 +39,7 @@ Resources:
           DETECTION_ENDPOINT: "/detection"
           FEED_ENDPOINT: "/feed"
           NODE_ENV: !Ref Environment
+          LAMBDA_S3_PRIVATE_KEY: '{{resolve:secretsmanager:crow-detector-keys:SecretString:lambda-s3-private-key}}'
       Tags:
         - Key: Environment
           Value: !Ref Environment
