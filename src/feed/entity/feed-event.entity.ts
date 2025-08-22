@@ -6,19 +6,12 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { Source } from 'src/common/types';
+import { Source, ProcessingStatus } from 'src/common/types';
 import { DetectionEvent } from 'src/detection/entity/detection-event.entity';
 
 enum Status {
   ACCEPTED = 'ACCEPTED',
   REJECTED = 'REJECTED',
-}
-
-enum ProcessingStatus {
-  PENDING = 'PENDING',
-  PROCESSING = 'PROCESSING',
-  COMPLETED = 'COMPLETED',
-  FAILED = 'FAILED',
 }
 
 @Entity('feed_event')

@@ -5,13 +5,7 @@ import { ImageProcessingService } from './image-processing.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { S3MetadataService } from './s3-metadata.service';
-
-enum ProcessingStatus {
-  PENDING = 'PENDING',
-  PROCESSING = 'PROCESSING',
-  COMPLETED = 'COMPLETED',
-  FAILED = 'FAILED',
-}
+import { ProcessingStatus } from 'src/common/types';
 
 @Injectable()
 export class FeedEventService {

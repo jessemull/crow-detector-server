@@ -2,29 +2,11 @@ import * as AWS from 'aws-sdk';
 import sharp from 'sharp';
 import { ConfigService } from '@nestjs/config';
 import { Injectable, Logger } from '@nestjs/common';
-
-export interface FaceDetectionResult {
-  faceDetected: boolean;
-  boundingBox?: {
-    Height: number;
-    Left: number;
-    Top: number;
-    Width: number;
-  };
-}
-
-export interface ContentModerationResult {
-  confidence: number;
-  isAppropriate: boolean;
-  labels: string[];
-}
-
-export interface ImageProcessingResult {
-  contentModeration: ContentModerationResult;
-  croppedImageBuffer?: Buffer;
-  faceDetection: FaceDetectionResult;
-  processingDuration: number;
-}
+import {
+  FaceDetectionResult,
+  ContentModerationResult,
+  ImageProcessingResult,
+} from 'src/common/types';
 
 @Injectable()
 export class ImageProcessingService {
