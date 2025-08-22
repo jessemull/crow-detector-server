@@ -157,11 +157,17 @@ export class FeedEventService {
     });
   }
 
-  async findById(id: string): Promise<FeedEvent | null> {
-    return this.feedEventRepository.findOne({
+  async findById(id: string): Promise<FeedEvent> {
+    const feedEvent = await this.feedEventRepository.findOne({
       where: { id },
       relations: ['detectionEvents'],
     });
+
+    if (!feedEvent) {
+      throw new NotFoundException(`Feed event with id ${id} not found!`);
+    }
+
+    return feedEvent;
   }
 
   async update(
@@ -185,9 +191,6 @@ export class FeedEventService {
 
   async reprocessImage(eventId: string): Promise<void> {
     const feedEvent = await this.findById(eventId);
-    if (!feedEvent) {
-      throw new NotFoundException(`Feed event with id ${eventId} not found!`);
-    }
 
     // Extract S3 metadata from imageUrl for reprocessing...
 

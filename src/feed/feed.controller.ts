@@ -38,6 +38,11 @@ export class FeedController {
     return this.feedEventService.find(limit, from, to);
   }
 
+  @Get(':id')
+  async getFeedEventById(@Param('id') id: string): Promise<FeedEvent> {
+    return this.feedEventService.findById(id);
+  }
+
   @Patch(':id')
   @UseGuards(EcdsaAuthGuard)
   async updateFeedEvent(
