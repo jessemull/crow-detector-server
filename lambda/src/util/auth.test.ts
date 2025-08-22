@@ -1,14 +1,6 @@
-/**
- * src/util/auth.test.ts
- */
 const mockSign = jest.fn();
 const mockUpdate = jest.fn();
-const mockCreateSign = jest.fn(() => ({
-  update: mockUpdate,
-  sign: mockSign,
-}));
 
-// Mock crypto BEFORE importing the module
 jest.mock('crypto', () => ({
   createSign: jest.fn(() => ({
     update: mockUpdate,
