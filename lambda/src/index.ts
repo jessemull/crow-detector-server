@@ -33,7 +33,22 @@ const API_BASE_URL =
   process.env.API_BASE_URL || 'https://api-dev.crittercanteen.com';
 const DETECTION_ENDPOINT = process.env.DETECTION_ENDPOINT || '/detection';
 const FEED_ENDPOINT = process.env.FEED_ENDPOINT || '/feed';
-const LAMBDA_S3_PRIVATE_KEY = process.env.LAMBDA_S3_PRIVATE_KEY || '';
+
+// Decode the base64 encoded private key
+function decodePrivateKey(base64Key: string | undefined): string | undefined {
+  if (!base64Key) {
+    return undefined;
+  }
+
+  const decoded = Buffer.from(base64Key, 'base64').toString('utf-8');
+  const normalizedKey = decoded.replace(/\\n/g, '\n');
+
+  return normalizedKey;
+}
+
+const LAMBDA_S3_PRIVATE_KEY = decodePrivateKey(
+  process.env.LAMBDA_S3_PRIVATE_KEY,
+);
 
 // Function to generate ECDSA signature
 function generateSignature(data: string, privateKey: string): string {
@@ -239,20 +254,14 @@ async function callAPI(s3Info: S3ObjectInfo): Promise<void> {
   const timeoutId = setTimeout(() => controller.abort(), 10000);
 
   try {
-    let headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'User-Agent': 'crow-detector-s3-lambda/1.0.0',
-    };
-
-    // Only add authentication headers in non-test mode
-    if (process.env.NODE_ENV !== 'test') {
-      const authHeaders = generateAuthHeaders('POST', endpoint, payload);
-      headers = { ...headers, ...authHeaders };
-    }
-
+    const authHeaders = generateAuthHeaders('POST', endpoint, payload);
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       method: 'POST',
-      headers,
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'crow-detector-s3-lambda/1.0.0',
+        ...authHeaders,
+      },
       body: JSON.stringify(payload),
       signal: controller.signal,
     });

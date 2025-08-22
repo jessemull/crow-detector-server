@@ -1,8 +1,28 @@
 import { SQSEvent, SQSRecord, Context, Callback } from 'aws-lambda';
+
+// Set environment variables before importing the handler
+process.env.LAMBDA_S3_PRIVATE_KEY = Buffer.from(
+  `-----BEGIN EC PRIVATE KEY-----
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgR3AvaHdwoFmc/ZPp
+OM1i6/Mi8hIOhEsdWXm8iFHYAQhabVoAoGCCqGSM49AwEHoUQDQgAE8OmBTWgAbW
+BgKdDZ7TihYwGHxEdOQsjr/tP6Npnrrmr04+ANVy43H57PBfjPSG90Tb8VOVV6c5
+Pq8qB9wBHipQ==
+-----END EC PRIVATE KEY-----`,
+).toString('base64');
+
 import { handler } from './index';
 
 global.fetch = jest.fn();
 const mockedFetch = global.fetch as jest.MockedFunction<typeof fetch>;
+
+// Mock the crypto module for signature generation
+jest.mock('crypto', () => ({
+  ...jest.requireActual('crypto'),
+  createSign: jest.fn(() => ({
+    update: jest.fn(),
+    sign: jest.fn(() => 'mocked-signature'),
+  })),
+}));
 
 describe('S3 Event Lambda Handler', () => {
   let mockContext: Context;
