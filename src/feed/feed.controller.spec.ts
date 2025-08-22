@@ -26,6 +26,7 @@ describe('FeedController', () => {
     find: jest.fn(),
     findById: jest.fn(),
     update: jest.fn(),
+    reprocessImage: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -207,6 +208,43 @@ describe('FeedController', () => {
         controller.updateFeedEvent(id, patchFeedDTO),
       ).rejects.toThrow('Service error');
       expect(service.update).toHaveBeenCalledWith(id, patchFeedDTO);
+    });
+  });
+
+  describe('reprocessImage', () => {
+    it('should start image reprocessing successfully', async () => {
+      const id = 'test-uuid';
+      mockFeedEventService.reprocessImage.mockResolvedValue(undefined);
+
+      const result = await controller.reprocessImage(id);
+
+      expect(service.reprocessImage).toHaveBeenCalledWith(id);
+      expect(result).toEqual({
+        data: null,
+        message: 'Image reprocessing started successfully!',
+      });
+    });
+
+    it('should handle service errors', async () => {
+      const id = 'test-uuid';
+      const error = new Error('Service error');
+      mockFeedEventService.reprocessImage.mockRejectedValue(error);
+
+      await expect(controller.reprocessImage(id)).rejects.toThrow(
+        'Service error',
+      );
+      expect(service.reprocessImage).toHaveBeenCalledWith(id);
+    });
+
+    it('should handle service string errors', async () => {
+      const id = 'test-uuid';
+      const error = 'String service error';
+      mockFeedEventService.reprocessImage.mockRejectedValue(error);
+
+      await expect(controller.reprocessImage(id)).rejects.toBe(
+        'String service error',
+      );
+      expect(service.reprocessImage).toHaveBeenCalledWith(id);
     });
   });
 });
