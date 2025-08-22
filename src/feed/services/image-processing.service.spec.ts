@@ -233,6 +233,36 @@ describe('ImageProcessingService', () => {
       const result = await service.processImage(bucket, key);
       expect(result.faceDetection.faceDetected).toBe(false);
     });
+
+    it('should throw error from main catch block when checkContentModeration throws unhandled error', async () => {
+      const error = new Error('Unhandled moderation error');
+
+      // Create a spy on the private method to make it throw directly
+      const checkContentModerationSpy = jest.spyOn(
+        service as any,
+        'checkContentModeration',
+      );
+      checkContentModerationSpy.mockRejectedValue(error);
+
+      await expect(service.processImage(bucket, key)).rejects.toBe(error);
+
+      checkContentModerationSpy.mockRestore();
+    });
+
+    it('should throw string error from main catch block when checkContentModeration throws unhandled string error', async () => {
+      const error = 'Unhandled string moderation error';
+
+      // Create a spy on the private method to make it throw directly
+      const checkContentModerationSpy = jest.spyOn(
+        service as any,
+        'checkContentModeration',
+      );
+      checkContentModerationSpy.mockRejectedValue(error);
+
+      await expect(service.processImage(bucket, key)).rejects.toBe(error);
+
+      checkContentModerationSpy.mockRestore();
+    });
   });
 
   describe('checkContentModeration', () => {
