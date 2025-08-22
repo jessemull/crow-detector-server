@@ -64,7 +64,7 @@ describe('S3 Utility', () => {
         'test-key.jpg',
         'ObjectCreated:Put',
       );
-      // Remove Records array
+
       const s3Event = JSON.parse(mockRecord.body);
       delete s3Event.Records;
       mockRecord.body = JSON.stringify(s3Event);

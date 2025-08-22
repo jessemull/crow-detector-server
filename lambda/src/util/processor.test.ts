@@ -103,7 +103,6 @@ describe('Processor Utility', () => {
     });
 
     it('should not log processing info in test environment', async () => {
-      // Ensure NODE_ENV is test
       process.env.NODE_ENV = 'test';
 
       await processSQSRecord(mockRecord);

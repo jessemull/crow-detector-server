@@ -31,12 +31,10 @@ describe('Auth module', () => {
     jest.resetModules();
     jest.spyOn(Date, 'now').mockReturnValue(1234567890);
 
-    // Mock console.error to silence error logs during tests
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    // Restore console.error
     consoleErrorSpy.mockRestore();
   });
 
