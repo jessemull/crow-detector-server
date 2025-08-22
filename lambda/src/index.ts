@@ -38,6 +38,19 @@ export const handler = async (
   context: Context,
   callback: Callback,
 ): Promise<void> => {
+  console.log('Lambda started');
+  console.log('Event type:', typeof event);
+  console.log('Event keys:', Object.keys(event));
+
+  if (event.Records && event.Records.length > 0) {
+    console.log('Number of records:', event.Records.length);
+    console.log('First record keys:', Object.keys(event.Records[0]));
+    console.log('First record body:', event.Records[0].body);
+    console.log('First record body type:', typeof event.Records[0].body);
+  } else {
+    console.log('No records found in event');
+  }
+
   if (process.env.NODE_ENV !== 'test') {
     console.log('SQS Event received:', JSON.stringify(event, null, 2));
   }
@@ -129,18 +142,46 @@ async function processSQSRecord(record: SQSRecord): Promise<ApiCallResult> {
 }
 
 function extractS3Info(record: SQSRecord): S3ObjectInfo {
-  // Parse the S3 event data from the SQS message body...
+  console.log(
+    'extractS3Info called with record:',
+    JSON.stringify(record, null, 2),
+  );
 
-  const s3Event = JSON.parse(record.body) as S3EventFromSQS;
-  const s3Record = s3Event.Records[0];
-  const s3 = s3Record.s3;
+  try {
+    // Parse the S3 event data from the SQS message body...
+    console.log('Attempting to parse record.body:', record.body);
 
-  return {
-    bucket: s3.bucket.name,
-    key: decodeURIComponent(s3.object.key.replace(/\+/g, ' ')),
-    size: s3.object.size || 0,
-    eventName: s3Record.eventName,
-  };
+    const s3Event = JSON.parse(record.body) as S3EventFromSQS;
+    console.log('Parsed S3 event:', JSON.stringify(s3Event, null, 2));
+
+    if (!s3Event.Records || s3Event.Records.length === 0) {
+      throw new Error('No Records array in S3 event');
+    }
+
+    const s3Record = s3Event.Records[0];
+    console.log('S3 record:', JSON.stringify(s3Record, null, 2));
+
+    if (!s3Record.s3) {
+      throw new Error('No s3 object in S3 record');
+    }
+
+    const s3 = s3Record.s3;
+    console.log('S3 object:', JSON.stringify(s3, null, 2));
+
+    const result = {
+      bucket: s3.bucket.name,
+      key: decodeURIComponent(s3.object.key.replace(/\+/g, ' ')),
+      size: s3.object.size || 0,
+      eventName: s3Record.eventName,
+    };
+
+    console.log('Extracted S3 info:', JSON.stringify(result, null, 2));
+    return result;
+  } catch (error) {
+    console.error('Error in extractS3Info:', error);
+    console.error('Record that caused error:', JSON.stringify(record, null, 2));
+    throw error;
+  }
 }
 
 function isImageFile(key: string): boolean {

@@ -1,9 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
-import {
-  HealthCheck,
-  HealthCheckService,
-  TypeOrmHealthIndicator,
-} from '@nestjs/terminus';
+import { HealthCheckService, TypeOrmHealthIndicator } from '@nestjs/terminus';
 
 @Controller('health')
 export class HealthController {
@@ -13,7 +9,6 @@ export class HealthController {
   ) {}
 
   @Get()
-  @HealthCheck()
   check() {
     return { status: 'ok', timestamp: new Date().toISOString() };
   }
