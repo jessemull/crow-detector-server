@@ -24,6 +24,7 @@ describe('FeedController', () => {
   const mockFeedEventService = {
     create: jest.fn(),
     find: jest.fn(),
+    findById: jest.fn(),
     update: jest.fn(),
   };
 
@@ -144,6 +145,29 @@ describe('FeedController', () => {
       await expect(
         controller.getFeedEvents(10, '2024-01-01', '2024-12-31'),
       ).rejects.toThrow('Service error');
+    });
+  });
+
+  describe('getFeedEventById', () => {
+    it('should return a feed event by id successfully', async () => {
+      const id = 'test-uuid';
+      mockFeedEventService.findById.mockResolvedValue(mockFeedEvent);
+
+      const result = await controller.getFeedEventById(id);
+
+      expect(service.findById).toHaveBeenCalledWith(id);
+      expect(result).toEqual(mockFeedEvent);
+    });
+
+    it('should handle service errors', async () => {
+      const id = 'test-uuid';
+      const error = new Error('Service error');
+      mockFeedEventService.findById.mockRejectedValue(error);
+
+      await expect(controller.getFeedEventById(id)).rejects.toThrow(
+        'Service error',
+      );
+      expect(service.findById).toHaveBeenCalledWith(id);
     });
   });
 

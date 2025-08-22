@@ -290,4 +290,251 @@ describe('FeedEventService', () => {
       );
     });
   });
+
+  describe('processImageAsync', () => {
+    const eventId = 'test-uuid';
+    const bucket = 'test-bucket';
+    const key = 'test-key.jpg';
+
+    beforeEach(() => {
+      // Setup common mocks for processImageAsync tests
+      mockRepository.update.mockResolvedValue({ affected: 1 });
+    });
+
+    it('should process image and upload cropped version when face detected and content appropriate', async () => {
+      const imageProcessingService = service['imageProcessingService'];
+      const s3MetadataService = service['s3MetadataService'];
+
+      // Mock successful image processing with face detected
+      (imageProcessingService.processImage as jest.Mock).mockResolvedValue({
+        contentModeration: { isAppropriate: true, labels: [], confidence: 95 },
+        faceDetection: {
+          faceDetected: true,
+          boundingBox: { Width: 0.3, Height: 0.4, Left: 0.2, Top: 0.1 },
+        },
+        croppedImageBuffer: Buffer.from('cropped-image-data'),
+        processingDuration: 1500,
+      });
+
+      // Mock successful image upload
+      (
+        imageProcessingService.uploadProcessedImage as jest.Mock
+      ).mockResolvedValue(
+        'https://bucket.s3.amazonaws.com/test-key_cropped.jpg',
+      );
+
+      // Mock processed image size
+      (s3MetadataService.getObjectSize as jest.Mock).mockResolvedValue(512);
+
+      // Call the private method
+      await (service as any).processImageAsync(eventId, bucket, key);
+
+      // Verify processing status updates
+      expect(repository.update).toHaveBeenCalledWith(eventId, {
+        processingStatus: ProcessingStatus.PROCESSING,
+      });
+
+      // Verify image processing was called
+      expect(imageProcessingService.processImage).toHaveBeenCalledWith(
+        bucket,
+        key,
+      );
+
+      // Verify image upload was called
+      expect(imageProcessingService.uploadProcessedImage).toHaveBeenCalledWith(
+        bucket,
+        key,
+        Buffer.from('cropped-image-data'),
+      );
+
+      // Verify processed image size was fetched
+      expect(s3MetadataService.getObjectSize).toHaveBeenCalledWith(
+        bucket,
+        'test-key_cropped.jpg',
+      );
+
+      // Verify final update with all processing results
+      expect(repository.update).toHaveBeenCalledWith(
+        eventId,
+        expect.objectContaining({
+          processingStatus: ProcessingStatus.COMPLETED,
+          isAppropriate: true,
+          moderationLabels: '[]',
+          faceDetected: true,
+          faceBoundingBox: JSON.stringify({
+            Width: 0.3,
+            Height: 0.4,
+            Left: 0.2,
+            Top: 0.1,
+          }),
+          processingDuration: 1500,
+          croppedImageUrl:
+            'https://bucket.s3.amazonaws.com/test-key_cropped.jpg',
+          processedImageSize: 512,
+        }),
+      );
+    });
+
+    it('should process image without uploading cropped version when no face detected', async () => {
+      const imageProcessingService = service['imageProcessingService'];
+
+      // Mock image processing with no face detected
+      (imageProcessingService.processImage as jest.Mock).mockResolvedValue({
+        contentModeration: { isAppropriate: true, labels: [], confidence: 95 },
+        faceDetection: { faceDetected: false },
+        croppedImageBuffer: undefined,
+        processingDuration: 800,
+      });
+
+      await (service as any).processImageAsync(eventId, bucket, key);
+
+      // Verify image upload was NOT called
+      expect(
+        imageProcessingService.uploadProcessedImage,
+      ).not.toHaveBeenCalled();
+
+      // Verify final update without cropped image data
+      expect(repository.update).toHaveBeenCalledWith(
+        eventId,
+        expect.objectContaining({
+          processingStatus: ProcessingStatus.COMPLETED,
+          isAppropriate: true,
+          faceDetected: false,
+          faceBoundingBox: undefined,
+          processingDuration: 800,
+        }),
+      );
+    });
+
+    it('should process image without uploading cropped version when content inappropriate', async () => {
+      const imageProcessingService = service['imageProcessingService'];
+
+      // Mock image processing with inappropriate content
+      (imageProcessingService.processImage as jest.Mock).mockResolvedValue({
+        contentModeration: {
+          isAppropriate: false,
+          labels: ['Violence'],
+          confidence: 87,
+        },
+        faceDetection: {
+          faceDetected: true,
+          boundingBox: { Width: 0.3, Height: 0.4, Left: 0.2, Top: 0.1 },
+        },
+        croppedImageBuffer: Buffer.from('cropped-image-data'),
+        processingDuration: 900,
+      });
+
+      await (service as any).processImageAsync(eventId, bucket, key);
+
+      // Verify image upload was NOT called (inappropriate content)
+      expect(
+        imageProcessingService.uploadProcessedImage,
+      ).not.toHaveBeenCalled();
+
+      // Verify final update without cropped image data
+      expect(repository.update).toHaveBeenCalledWith(
+        eventId,
+        expect.objectContaining({
+          processingStatus: ProcessingStatus.COMPLETED,
+          isAppropriate: false,
+          moderationLabels: '["Violence"]',
+          faceDetected: true,
+          processingDuration: 900,
+        }),
+      );
+    });
+
+    it('should handle image processing errors and mark as failed', async () => {
+      const imageProcessingService = service['imageProcessingService'];
+      const error = new Error('Image processing failed');
+
+      // Mock image processing to throw error
+      (imageProcessingService.processImage as jest.Mock).mockRejectedValue(
+        error,
+      );
+
+      await (service as any).processImageAsync(eventId, bucket, key);
+
+      // Verify status update to PROCESSING was called
+      expect(repository.update).toHaveBeenCalledWith(eventId, {
+        processingStatus: ProcessingStatus.PROCESSING,
+      });
+
+      // Verify status update to FAILED was called
+      expect(repository.update).toHaveBeenCalledWith(eventId, {
+        processingStatus: ProcessingStatus.FAILED,
+        processingError: 'Image processing failed',
+      });
+    });
+  });
+
+  describe('reprocessImage', () => {
+    const eventId = 'test-uuid';
+
+    it('should reprocess image successfully', async () => {
+      const s3MetadataService = service['s3MetadataService'];
+
+      // Mock findById to return existing event
+      mockRepository.findOne.mockResolvedValue(mockFeedEvent);
+
+      // Mock S3 metadata extraction
+      (s3MetadataService.extractMetadataFromUrl as jest.Mock).mockResolvedValue(
+        {
+          bucket: 'test-bucket',
+          key: 'test-key.jpg',
+          source: Source.BUTTON,
+          timestamp: Date.now(),
+          type: 'feed' as const,
+        },
+      );
+
+      // Mock repository update
+      mockRepository.update.mockResolvedValue({ affected: 1 });
+
+      await service.reprocessImage(eventId);
+
+      // Verify findById was called
+      expect(repository.findOne).toHaveBeenCalledWith({
+        where: { id: eventId },
+        relations: ['detectionEvents'],
+      });
+
+      // Verify S3 metadata extraction
+      expect(s3MetadataService.extractMetadataFromUrl).toHaveBeenCalledWith(
+        mockFeedEvent.imageUrl,
+      );
+
+      // Verify processing status reset
+      expect(repository.update).toHaveBeenCalledWith(eventId, {
+        processingStatus: ProcessingStatus.PENDING,
+        processingError: undefined,
+      });
+    });
+
+    it('should handle errors when event not found', async () => {
+      // Mock findById to throw NotFoundException
+      mockRepository.findOne.mockResolvedValue(null);
+
+      await expect(service.reprocessImage(eventId)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('should handle S3 metadata extraction errors', async () => {
+      const s3MetadataService = service['s3MetadataService'];
+
+      // Mock findById to return existing event
+      mockRepository.findOne.mockResolvedValue(mockFeedEvent);
+
+      // Mock S3 metadata extraction to throw error
+      const error = new Error('S3 metadata extraction failed');
+      (s3MetadataService.extractMetadataFromUrl as jest.Mock).mockRejectedValue(
+        error,
+      );
+
+      await expect(service.reprocessImage(eventId)).rejects.toThrow(
+        'S3 metadata extraction failed',
+      );
+    });
+  });
 });

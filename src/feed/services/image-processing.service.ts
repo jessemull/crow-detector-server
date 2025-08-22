@@ -1,16 +1,17 @@
 import * as AWS from 'aws-sdk';
 import sharp from 'sharp';
 import { ConfigService } from '@nestjs/config';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import {
   FaceDetectionResult,
   ContentModerationResult,
   ImageProcessingResult,
 } from 'src/common/types';
+import { createLogger } from 'src/common/logger/logger.config';
 
 @Injectable()
 export class ImageProcessingService {
-  private readonly logger = new Logger(ImageProcessingService.name);
+  private readonly logger = createLogger(ImageProcessingService.name);
   private readonly rekognition: AWS.Rekognition;
   private readonly s3: AWS.S3;
 
@@ -30,7 +31,7 @@ export class ImageProcessingService {
   ): Promise<ImageProcessingResult> {
     const startTime = Date.now();
 
-    this.logger.log(`Starting image processing for s3://${bucket}/${key}`);
+    this.logger.info(`Starting image processing for s3://${bucket}/${key}`);
 
     try {
       // Step 1: Content moderation check...
@@ -65,7 +66,7 @@ export class ImageProcessingService {
       }
 
       const processingDuration = Date.now() - startTime;
-      this.logger.log(`Image processing completed in ${processingDuration}ms`);
+      this.logger.info(`Image processing completed in ${processingDuration}ms`);
 
       return {
         faceDetection,
@@ -242,7 +243,7 @@ export class ImageProcessingService {
         .jpeg({ quality: 85 })
         .toBuffer();
 
-      this.logger.log(
+      this.logger.info(
         `Image cropped to face: ${cropWidth}x${cropHeight} -> 800x800`,
       );
       return croppedBuffer;
@@ -273,7 +274,7 @@ export class ImageProcessingService {
         .promise();
 
       const processedUrl = `https://${bucket}.s3.${this.configService.get('AWS_REGION', 'us-west-2')}.amazonaws.com/${processedKey}`;
-      this.logger.log(`Processed image uploaded: ${processedUrl}`);
+      this.logger.info(`Processed image uploaded: ${processedUrl}`);
 
       return processedUrl;
     } catch (error) {

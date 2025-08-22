@@ -1,11 +1,12 @@
 import * as AWS from 'aws-sdk';
 import { ConfigService } from '@nestjs/config';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Source, S3Metadata } from 'src/common/types';
+import { createLogger } from 'src/common/logger/logger.config';
 
 @Injectable()
 export class S3MetadataService {
-  private readonly logger = new Logger(S3MetadataService.name);
+  private readonly logger = createLogger(S3MetadataService.name);
   private readonly s3: AWS.S3;
 
   constructor(private readonly configService: ConfigService) {
