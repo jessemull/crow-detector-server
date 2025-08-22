@@ -88,7 +88,6 @@ describe('FeedEventService', () => {
 
       const result = await service.create(createFeedDTO);
 
-      // The service now extracts S3 metadata and creates the event with additional fields
       expect(repository.create).toHaveBeenCalledWith(
         expect.objectContaining({
           imageUrl: createFeedDTO.imageUrl,
