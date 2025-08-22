@@ -1,17 +1,17 @@
-import * as AWS from 'aws-sdk';
 import { ConfigService } from '@nestjs/config';
 import { Injectable } from '@nestjs/common';
+import { S3Client, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { Source, S3Metadata } from 'src/common/types';
 import { createLogger } from 'src/common/logger/logger.config';
 
 @Injectable()
 export class S3MetadataService {
   private readonly logger = createLogger(S3MetadataService.name);
-  private readonly s3: AWS.S3;
+  private readonly s3: S3Client;
 
   constructor(private readonly configService: ConfigService) {
-    this.s3 = new AWS.S3({
-      region: this.configService.get('AWS_REGION', 'us-west-2'),
+    this.s3 = new S3Client({
+      region: this.configService.get<string>('AWS_REGION') || 'us-west-2',
     });
   }
 
@@ -91,11 +91,13 @@ export class S3MetadataService {
   async getObjectMetadata(
     bucket: string,
     key: string,
-  ): Promise<AWS.S3.HeadObjectOutput> {
+  ): Promise<{
+    ContentLength?: number;
+    Metadata?: Record<string, string>;
+  }> {
     try {
-      const result = await this.s3
-        .headObject({ Bucket: bucket, Key: key })
-        .promise();
+      const command = new HeadObjectCommand({ Bucket: bucket, Key: key });
+      const result = await this.s3.send(command);
       return result;
     } catch (error) {
       this.logger.error(

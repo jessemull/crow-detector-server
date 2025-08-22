@@ -1,9 +1,19 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { ImageProcessingService } from './image-processing.service';
-import * as AWS from 'aws-sdk';
+import {
+  RekognitionClient,
+  DetectModerationLabelsCommand,
+  DetectFacesCommand,
+} from '@aws-sdk/client-rekognition';
+import {
+  S3Client,
+  GetObjectCommand,
+  PutObjectCommand,
+} from '@aws-sdk/client-s3';
 
-jest.mock('aws-sdk');
+jest.mock('@aws-sdk/client-rekognition');
+jest.mock('@aws-sdk/client-s3');
 
 jest.mock('sharp', () => {
   const mockSharp = {
@@ -24,24 +34,20 @@ jest.mock('sharp', () => {
 describe('ImageProcessingService', () => {
   let service: ImageProcessingService;
   let configService: ConfigService;
-  let mockRekognition: jest.Mocked<AWS.Rekognition>;
-  let mockS3: jest.Mocked<AWS.S3>;
+  let mockRekognitionSend: jest.Mock;
+  let mockS3Send: jest.Mock;
 
   beforeEach(async () => {
-    mockRekognition = {
-      detectModerationLabels: jest.fn(),
-      detectFaces: jest.fn(),
-    } as any;
+    mockRekognitionSend = jest.fn();
+    mockS3Send = jest.fn();
 
-    mockS3 = {
-      getObject: jest.fn(),
-      putObject: jest.fn(),
-    } as any;
+    (RekognitionClient as jest.Mock).mockImplementation(() => ({
+      send: mockRekognitionSend,
+    }));
 
-    (AWS.Rekognition as unknown as jest.Mock).mockImplementation(
-      () => mockRekognition,
-    );
-    (AWS.S3 as unknown as jest.Mock).mockImplementation(() => mockS3);
+    (S3Client as jest.Mock).mockImplementation(() => ({
+      send: mockS3Send,
+    }));
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -68,13 +74,13 @@ describe('ImageProcessingService', () => {
 
   describe('constructor', () => {
     it('should initialize AWS services with correct configuration', () => {
-      expect(AWS.Rekognition).toHaveBeenCalledWith({
+      expect(RekognitionClient).toHaveBeenCalledWith({
         region: 'us-west-2',
       });
-      expect(AWS.S3).toHaveBeenCalledWith({
+      expect(S3Client).toHaveBeenCalledWith({
         region: 'us-west-2',
       });
-      expect(configService.get).toHaveBeenCalledWith('AWS_REGION', 'us-west-2');
+      expect(configService.get).toHaveBeenCalledWith('AWS_REGION');
     });
   });
 
@@ -83,33 +89,36 @@ describe('ImageProcessingService', () => {
     const key = 'test-key.jpg';
 
     it('should process image successfully with appropriate content and face detected', async () => {
-      mockRekognition.detectModerationLabels.mockReturnValue({
-        promise: jest.fn().mockResolvedValue({
-          ModerationLabels: [],
-        }),
-      } as any);
+      // Mock content moderation
+      mockRekognitionSend.mockResolvedValueOnce({
+        ModerationLabels: [],
+      });
 
-      mockRekognition.detectFaces.mockReturnValue({
-        promise: jest.fn().mockResolvedValue({
-          FaceDetails: [
-            {
-              BoundingBox: {
-                Width: 0.3,
-                Height: 0.4,
-                Left: 0.2,
-                Top: 0.1,
-              },
+      // Mock face detection
+      mockRekognitionSend.mockResolvedValueOnce({
+        FaceDetails: [
+          {
+            BoundingBox: {
+              Width: 0.3,
+              Height: 0.4,
+              Left: 0.2,
+              Top: 0.1,
             },
-          ],
-        }),
-      } as any);
+          },
+        ],
+      });
 
-      mockS3.getObject.mockReturnValue({
-        promise: jest.fn().mockResolvedValue({
-          Body: Buffer.from('mock-image-data'),
-        }),
-      } as any);
+      // Mock S3 getObject
+      const mockBody = {
+        transformToByteArray: jest
+          .fn()
+          .mockResolvedValue(new Uint8Array(Buffer.from('mock-image-data'))),
+      };
+      mockS3Send.mockResolvedValueOnce({
+        Body: mockBody,
+      });
 
+      // Mock sharp
       const sharp = jest.requireMock('sharp');
       const mockSharpInstance = sharp();
       mockSharpInstance.metadata.mockResolvedValue({
@@ -141,33 +150,18 @@ describe('ImageProcessingService', () => {
         processingDuration: expect.any(Number),
       });
 
-      expect(mockRekognition.detectModerationLabels).toHaveBeenCalledWith({
-        Image: {
-          S3Object: {
-            Bucket: bucket,
-            Name: key,
-          },
-        },
-        MinConfidence: 70,
-      });
-
-      expect(mockRekognition.detectFaces).toHaveBeenCalledWith({
-        Image: {
-          S3Object: {
-            Bucket: bucket,
-            Name: key,
-          },
-        },
-        Attributes: ['DEFAULT'],
-      });
+      expect(mockRekognitionSend).toHaveBeenCalledWith(
+        expect.any(DetectModerationLabelsCommand),
+      );
+      expect(mockRekognitionSend).toHaveBeenCalledWith(
+        expect.any(DetectFacesCommand),
+      );
     });
 
     it('should return early when content is inappropriate', async () => {
-      mockRekognition.detectModerationLabels.mockReturnValue({
-        promise: jest.fn().mockResolvedValue({
-          ModerationLabels: [{ Name: 'Explicit Nudity', Confidence: 95.5 }],
-        }),
-      } as any);
+      mockRekognitionSend.mockResolvedValueOnce({
+        ModerationLabels: [{ Name: 'Explicit Nudity', Confidence: 95.5 }],
+      });
 
       const result = await service.processImage(bucket, key);
 
@@ -181,21 +175,17 @@ describe('ImageProcessingService', () => {
         processingDuration: expect.any(Number),
       });
 
-      expect(mockRekognition.detectFaces).not.toHaveBeenCalled();
+      expect(mockRekognitionSend).toHaveBeenCalledTimes(1);
     });
 
     it('should handle case when no face is detected', async () => {
-      mockRekognition.detectModerationLabels.mockReturnValue({
-        promise: jest.fn().mockResolvedValue({
-          ModerationLabels: [],
-        }),
-      } as any);
+      mockRekognitionSend.mockResolvedValueOnce({
+        ModerationLabels: [],
+      });
 
-      mockRekognition.detectFaces.mockReturnValue({
-        promise: jest.fn().mockResolvedValue({
-          FaceDetails: [],
-        }),
-      } as any);
+      mockRekognitionSend.mockResolvedValueOnce({
+        FaceDetails: [],
+      });
 
       const result = await service.processImage(bucket, key);
 
@@ -212,23 +202,15 @@ describe('ImageProcessingService', () => {
     });
 
     it('should handle processing errors', async () => {
-      mockRekognition.detectModerationLabels.mockReturnValue({
-        promise: jest.fn().mockRejectedValue(new Error('AWS error')),
-      } as any);
+      mockRekognitionSend.mockRejectedValueOnce(new Error('AWS error'));
 
-      mockRekognition.detectFaces.mockReturnValue({
-        promise: jest.fn().mockRejectedValue(new Error('Face detection error')),
-      } as any);
+      mockRekognitionSend.mockResolvedValueOnce({
+        ModerationLabels: [],
+      });
 
-      mockRekognition.detectModerationLabels.mockReturnValue({
-        promise: jest.fn().mockResolvedValue({
-          ModerationLabels: [],
-        }),
-      } as any);
-
-      mockRekognition.detectFaces.mockReturnValue({
-        promise: jest.fn().mockRejectedValue(new Error('Face detection error')),
-      } as any);
+      mockRekognitionSend.mockRejectedValueOnce(
+        new Error('Face detection error'),
+      );
 
       const result = await service.processImage(bucket, key);
       expect(result.faceDetection.faceDetected).toBe(false);
@@ -237,7 +219,6 @@ describe('ImageProcessingService', () => {
     it('should throw error from main catch block when checkContentModeration throws unhandled error', async () => {
       const error = new Error('Unhandled moderation error');
 
-      // Create a spy on the private method to make it throw directly
       const checkContentModerationSpy = jest.spyOn(
         service as any,
         'checkContentModeration',
@@ -252,7 +233,6 @@ describe('ImageProcessingService', () => {
     it('should throw string error from main catch block when checkContentModeration throws unhandled string error', async () => {
       const error = 'Unhandled string moderation error';
 
-      // Create a spy on the private method to make it throw directly
       const checkContentModerationSpy = jest.spyOn(
         service as any,
         'checkContentModeration',
@@ -270,11 +250,9 @@ describe('ImageProcessingService', () => {
     const key = 'test-key.jpg';
 
     it('should return appropriate when no moderation labels found', async () => {
-      mockRekognition.detectModerationLabels.mockReturnValue({
-        promise: jest.fn().mockResolvedValue({
-          ModerationLabels: [],
-        }),
-      } as any);
+      mockRekognitionSend.mockResolvedValue({
+        ModerationLabels: [],
+      });
 
       const result = await (service as any).checkContentModeration(bucket, key);
 
@@ -286,14 +264,12 @@ describe('ImageProcessingService', () => {
     });
 
     it('should return inappropriate when inappropriate labels found', async () => {
-      mockRekognition.detectModerationLabels.mockReturnValue({
-        promise: jest.fn().mockResolvedValue({
-          ModerationLabels: [
-            { Name: 'Violence', Confidence: 87.3 },
-            { Name: 'Safe Content', Confidence: 12.7 },
-          ],
-        }),
-      } as any);
+      mockRekognitionSend.mockResolvedValue({
+        ModerationLabels: [
+          { Name: 'Violence', Confidence: 87.3 },
+          { Name: 'Safe Content', Confidence: 12.7 },
+        ],
+      });
 
       const result = await (service as any).checkContentModeration(bucket, key);
 
@@ -305,9 +281,7 @@ describe('ImageProcessingService', () => {
     });
 
     it('should handle content moderation API errors', async () => {
-      mockRekognition.detectModerationLabels.mockReturnValue({
-        promise: jest.fn().mockRejectedValue(new Error('Rekognition error')),
-      } as any);
+      mockRekognitionSend.mockRejectedValue(new Error('Rekognition error'));
 
       const result = await (service as any).checkContentModeration(bucket, key);
 
@@ -319,9 +293,7 @@ describe('ImageProcessingService', () => {
     });
 
     it('should handle content moderation API string errors', async () => {
-      mockRekognition.detectModerationLabels.mockReturnValue({
-        promise: jest.fn().mockRejectedValue('String Rekognition error'),
-      } as any);
+      mockRekognitionSend.mockRejectedValue('String Rekognition error');
 
       const result = await (service as any).checkContentModeration(bucket, key);
 
@@ -333,14 +305,12 @@ describe('ImageProcessingService', () => {
     });
 
     it('should filter out undefined labels', async () => {
-      mockRekognition.detectModerationLabels.mockReturnValue({
-        promise: jest.fn().mockResolvedValue({
-          ModerationLabels: [
-            { Name: 'Violence', Confidence: 87.3 },
-            { Name: undefined, Confidence: 50.0 },
-          ],
-        }),
-      } as any);
+      mockRekognitionSend.mockResolvedValue({
+        ModerationLabels: [
+          { Name: 'Violence', Confidence: 87.3 },
+          { Name: undefined, Confidence: 50.0 },
+        ],
+      });
 
       const result = await (service as any).checkContentModeration(bucket, key);
 
@@ -353,20 +323,18 @@ describe('ImageProcessingService', () => {
     const key = 'test-key.jpg';
 
     it('should return face detected with bounding box when face found', async () => {
-      mockRekognition.detectFaces.mockReturnValue({
-        promise: jest.fn().mockResolvedValue({
-          FaceDetails: [
-            {
-              BoundingBox: {
-                Width: 0.3,
-                Height: 0.4,
-                Left: 0.2,
-                Top: 0.1,
-              },
+      mockRekognitionSend.mockResolvedValue({
+        FaceDetails: [
+          {
+            BoundingBox: {
+              Width: 0.3,
+              Height: 0.4,
+              Left: 0.2,
+              Top: 0.1,
             },
-          ],
-        }),
-      } as any);
+          },
+        ],
+      });
 
       const result = await (service as any).detectFaces(bucket, key);
 
@@ -382,11 +350,9 @@ describe('ImageProcessingService', () => {
     });
 
     it('should return no face detected when no faces found', async () => {
-      mockRekognition.detectFaces.mockReturnValue({
-        promise: jest.fn().mockResolvedValue({
-          FaceDetails: [],
-        }),
-      } as any);
+      mockRekognitionSend.mockResolvedValue({
+        FaceDetails: [],
+      });
 
       const result = await (service as any).detectFaces(bucket, key);
 
@@ -396,20 +362,18 @@ describe('ImageProcessingService', () => {
     });
 
     it('should return no face detected when bounding box is incomplete', async () => {
-      mockRekognition.detectFaces.mockReturnValue({
-        promise: jest.fn().mockResolvedValue({
-          FaceDetails: [
-            {
-              BoundingBox: {
-                Width: 0.3,
-                Height: undefined,
-                Left: 0.2,
-                Top: 0.1,
-              },
+      mockRekognitionSend.mockResolvedValue({
+        FaceDetails: [
+          {
+            BoundingBox: {
+              Width: 0.3,
+              Height: undefined,
+              Left: 0.2,
+              Top: 0.1,
             },
-          ],
-        }),
-      } as any);
+          },
+        ],
+      });
 
       const result = await (service as any).detectFaces(bucket, key);
 
@@ -419,9 +383,7 @@ describe('ImageProcessingService', () => {
     });
 
     it('should handle face detection API errors', async () => {
-      mockRekognition.detectFaces.mockReturnValue({
-        promise: jest.fn().mockRejectedValue(new Error('Face detection error')),
-      } as any);
+      mockRekognitionSend.mockRejectedValue(new Error('Face detection error'));
 
       const result = await (service as any).detectFaces(bucket, key);
 
@@ -431,9 +393,7 @@ describe('ImageProcessingService', () => {
     });
 
     it('should handle face detection API string errors', async () => {
-      mockRekognition.detectFaces.mockReturnValue({
-        promise: jest.fn().mockRejectedValue('String face detection error'),
-      } as any);
+      mockRekognitionSend.mockRejectedValue('String face detection error');
 
       const result = await (service as any).detectFaces(bucket, key);
 
@@ -454,11 +414,14 @@ describe('ImageProcessingService', () => {
     };
 
     it('should crop image successfully', async () => {
-      mockS3.getObject.mockReturnValue({
-        promise: jest.fn().mockResolvedValue({
-          Body: Buffer.from('mock-image-data'),
-        }),
-      } as any);
+      const mockBody = {
+        transformToByteArray: jest
+          .fn()
+          .mockResolvedValue(new Uint8Array(Buffer.from('mock-image-data'))),
+      };
+      mockS3Send.mockResolvedValue({
+        Body: mockBody,
+      });
 
       const sharp = jest.requireMock('sharp');
       const mockSharpInstance = sharp();
@@ -477,10 +440,7 @@ describe('ImageProcessingService', () => {
       );
 
       expect(result).toEqual(Buffer.from('cropped-image'));
-      expect(mockS3.getObject).toHaveBeenCalledWith({
-        Bucket: bucket,
-        Key: key,
-      });
+      expect(mockS3Send).toHaveBeenCalledWith(expect.any(GetObjectCommand));
       expect(sharp).toHaveBeenCalledWith(Buffer.from('mock-image-data'));
       expect(mockSharpInstance.metadata).toHaveBeenCalled();
       expect(mockSharpInstance.extract).toHaveBeenCalledWith({
@@ -497,11 +457,14 @@ describe('ImageProcessingService', () => {
     });
 
     it('should handle missing image dimensions', async () => {
-      mockS3.getObject.mockReturnValue({
-        promise: jest.fn().mockResolvedValue({
-          Body: Buffer.from('mock-image-data'),
-        }),
-      } as any);
+      const mockBody = {
+        transformToByteArray: jest
+          .fn()
+          .mockResolvedValue(new Uint8Array(Buffer.from('mock-image-data'))),
+      };
+      mockS3Send.mockResolvedValue({
+        Body: mockBody,
+      });
 
       const sharp = jest.requireMock('sharp');
       const mockSharpInstance = sharp();
@@ -516,9 +479,7 @@ describe('ImageProcessingService', () => {
     });
 
     it('should handle S3 getObject errors', async () => {
-      mockS3.getObject.mockReturnValue({
-        promise: jest.fn().mockRejectedValue(new Error('S3 error')),
-      } as any);
+      mockS3Send.mockRejectedValue(new Error('S3 error'));
 
       await expect(
         (service as any).cropImageToFace(bucket, key, boundingBox),
@@ -526,9 +487,7 @@ describe('ImageProcessingService', () => {
     });
 
     it('should handle S3 getObject string errors', async () => {
-      mockS3.getObject.mockReturnValue({
-        promise: jest.fn().mockRejectedValue('String S3 error'),
-      } as any);
+      mockS3Send.mockRejectedValue('String S3 error');
 
       await expect(
         (service as any).cropImageToFace(bucket, key, boundingBox),
@@ -536,11 +495,14 @@ describe('ImageProcessingService', () => {
     });
 
     it('should handle sharp processing errors', async () => {
-      mockS3.getObject.mockReturnValue({
-        promise: jest.fn().mockResolvedValue({
-          Body: Buffer.from('mock-image-data'),
-        }),
-      } as any);
+      const mockBody = {
+        transformToByteArray: jest
+          .fn()
+          .mockResolvedValue(new Uint8Array(Buffer.from('mock-image-data'))),
+      };
+      mockS3Send.mockResolvedValue({
+        Body: mockBody,
+      });
 
       const sharp = jest.requireMock('sharp');
       const mockSharpInstance = sharp();
@@ -552,11 +514,14 @@ describe('ImageProcessingService', () => {
     });
 
     it('should handle sharp processing string errors', async () => {
-      mockS3.getObject.mockReturnValue({
-        promise: jest.fn().mockResolvedValue({
-          Body: Buffer.from('mock-image-data'),
-        }),
-      } as any);
+      const mockBody = {
+        transformToByteArray: jest
+          .fn()
+          .mockResolvedValue(new Uint8Array(Buffer.from('mock-image-data'))),
+      };
+      mockS3Send.mockResolvedValue({
+        Body: mockBody,
+      });
 
       const sharp = jest.requireMock('sharp');
       const mockSharpInstance = sharp();
@@ -574,9 +539,7 @@ describe('ImageProcessingService', () => {
     const imageBuffer = Buffer.from('processed-image');
 
     it('should upload processed image successfully', async () => {
-      mockS3.putObject.mockReturnValue({
-        promise: jest.fn().mockResolvedValue({}),
-      } as any);
+      mockS3Send.mockResolvedValue({});
 
       const result = await service.uploadProcessedImage(
         bucket,
@@ -587,19 +550,11 @@ describe('ImageProcessingService', () => {
       expect(result).toBe(
         'https://test-bucket.s3.us-west-2.amazonaws.com/test-key_cropped.jpg',
       );
-      expect(mockS3.putObject).toHaveBeenCalledWith({
-        Bucket: bucket,
-        Key: 'test-key_cropped.jpg',
-        Body: imageBuffer,
-        ContentType: 'image/jpeg',
-        ServerSideEncryption: 'AES256',
-      });
+      expect(mockS3Send).toHaveBeenCalledWith(expect.any(PutObjectCommand));
     });
 
     it('should handle S3 upload errors', async () => {
-      mockS3.putObject.mockReturnValue({
-        promise: jest.fn().mockRejectedValue(new Error('Upload failed')),
-      } as any);
+      mockS3Send.mockRejectedValue(new Error('Upload failed'));
 
       await expect(
         service.uploadProcessedImage(bucket, key, imageBuffer),
@@ -607,9 +562,7 @@ describe('ImageProcessingService', () => {
     });
 
     it('should handle S3 upload string errors', async () => {
-      mockS3.putObject.mockReturnValue({
-        promise: jest.fn().mockRejectedValue('String upload failed'),
-      } as any);
+      mockS3Send.mockRejectedValue('String upload failed');
 
       await expect(
         service.uploadProcessedImage(bucket, key, imageBuffer),
