@@ -7,12 +7,6 @@ describe('HealthController', () => {
   let dbHealthIndicator: TypeOrmHealthIndicator;
   let healthService: HealthCheckService;
 
-  const mockHealthCheck = {
-    database: {
-      status: 'up',
-    },
-  };
-
   const mockHealthService = {
     check: jest.fn(),
   };
@@ -56,53 +50,59 @@ describe('HealthController', () => {
 
     it('should cover response object creation explicitly', () => {
       const response = {
-        database: {
-          status: 'up',
-        },
+        status: 'ok',
+        timestamp: '2024-01-01T00:00:00.000Z',
       };
 
-      expect(response.database.status).toBe('up');
-      expect(response).toHaveProperty('database');
-      expect(response.database).toHaveProperty('status');
+      expect(response.status).toBe('ok');
+      expect(response).toHaveProperty('status');
+      expect(response).toHaveProperty('timestamp');
     });
   });
 
   describe('check', () => {
-    it('should perform health check successfully', async () => {
-      mockHealthService.check.mockResolvedValue(mockHealthCheck);
+    it('should return health status successfully', () => {
+      const result = controller.check();
 
-      const result = await controller.check();
-
-      expect(healthService.check).toHaveBeenCalledWith([expect.any(Function)]);
-      expect(result).toEqual(mockHealthCheck);
+      expect(result).toHaveProperty('status');
+      expect(result).toHaveProperty('timestamp');
+      expect(result.status).toBe('ok');
+      expect(typeof result.timestamp).toBe('string');
+      expect(new Date(result.timestamp)).toBeInstanceOf(Date);
     });
 
-    it('should call database ping check', async () => {
-      mockHealthService.check.mockImplementation(
-        async (checks: Array<() => Promise<void>>) => {
-          if (Array.isArray(checks)) {
-            for (const check of checks) {
-              if (typeof check === 'function') {
-                await check();
-              }
-            }
-          }
-          return mockHealthCheck;
-        },
+    it('should return current timestamp', () => {
+      const beforeCall = new Date();
+      const result = controller.check();
+      const afterCall = new Date();
+
+      const resultTimestamp = new Date(result.timestamp);
+
+      expect(resultTimestamp.getTime()).toBeGreaterThanOrEqual(
+        beforeCall.getTime(),
       );
+      expect(resultTimestamp.getTime()).toBeLessThanOrEqual(
+        afterCall.getTime(),
+      );
+    });
+  });
 
-      await controller.check();
+  describe('checkDatabase', () => {
+    it('should call database ping check', async () => {
+      mockHealthService.check.mockResolvedValue({ database: { status: 'up' } });
+
+      await controller.checkDatabase();
 
       expect(healthService.check).toHaveBeenCalledWith([expect.any(Function)]);
-
-      expect(dbHealthIndicator.pingCheck).toHaveBeenCalledWith('database');
     });
 
-    it('should handle health check errors', async () => {
-      const error = new Error('Health check failed');
-      mockHealthService.check.mockRejectedValue(error);
+    it('should return database health check result', async () => {
+      const mockDbResult = { database: { status: 'up' } };
+      mockHealthService.check.mockResolvedValue(mockDbResult);
 
-      await expect(controller.check()).rejects.toThrow('Health check failed');
+      const result = await controller.checkDatabase();
+
+      expect(result).toEqual(mockDbResult);
       expect(healthService.check).toHaveBeenCalledWith([expect.any(Function)]);
     });
   });

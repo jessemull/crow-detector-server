@@ -15,6 +15,11 @@ export class HealthController {
   @Get()
   @HealthCheck()
   check() {
+    return { status: 'ok', timestamp: new Date().toISOString() };
+  }
+
+  @Get('database')
+  checkDatabase() {
     return this.health.check([() => this.db.pingCheck('database')]);
   }
 }
