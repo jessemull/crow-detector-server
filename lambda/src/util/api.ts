@@ -1,4 +1,3 @@
-import { S3ObjectInfo } from '../types';
 import {
   API_BASE_URL,
   DETECTION_ENDPOINT,
@@ -6,6 +5,7 @@ import {
   API_TIMEOUT_MS,
   USER_AGENT,
 } from '../constants';
+import { S3ObjectInfo } from '../types';
 import { generateAuthHeaders } from './auth';
 import { getImageType } from './images';
 
@@ -16,13 +16,6 @@ export async function callAPI(s3Info: S3ObjectInfo): Promise<void> {
   const payload = {
     imageUrl: `https://${s3Info.bucket}.s3.amazonaws.com/${s3Info.key}`,
   };
-
-  if (process.env.NODE_ENV !== 'test') {
-    console.log(
-      `Calling ${imageType} API with payload:`,
-      JSON.stringify(payload, null, 2),
-    );
-  }
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
