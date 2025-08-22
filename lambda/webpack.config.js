@@ -50,7 +50,7 @@ module.exports = {
         exclude: /index\.ts$/,
         terserOptions: {
           compress: {
-            drop_console: true,
+            drop_console: false,
           },
           output: {
             comments: false,
