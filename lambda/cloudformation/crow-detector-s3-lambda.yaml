@@ -89,15 +89,12 @@ Resources:
         - Key: Project
           Value: "crow-detector"
 
-  CrowDetectorS3LambdaVersion:
-    Type: AWS::Lambda::Version
-    Properties:
-      FunctionName: !Ref CrowDetectorS3LambdaFunction
+
 
   CrowDetectorS3LambdaPermission:
     Type: AWS::Lambda::Permission
     Properties:
-      FunctionName: !Ref CrowDetectorS3LambdaVersion
+      FunctionName: !Ref CrowDetectorS3LambdaFunction
       Action: lambda:InvokeFunction
       Principal: sqs.amazonaws.com
       SourceArn: !ImportValue 
@@ -106,7 +103,7 @@ Resources:
   CrowDetectorSQSEventSourceMapping:
     Type: AWS::Lambda::EventSourceMapping
     Properties:
-      FunctionName: !Ref CrowDetectorS3LambdaVersion
+      FunctionName: !Ref CrowDetectorS3LambdaFunction
       EventSourceArn: !ImportValue 
         Fn::Sub: "CrowDetectorSQSQueueArn-${Environment}"
       BatchSize: 10
@@ -116,7 +113,7 @@ Resources:
 Outputs:
   CrowDetectorS3LambdaFunctionArn:
     Description: "ARN of the S3 Event Lambda function"
-    Value: !Ref CrowDetectorS3LambdaVersion
+    Value: !Ref CrowDetectorS3LambdaFunction
     Export:
       Name: !Sub "CrowDetectorS3LambdaFunctionArn-${Environment}"
 
