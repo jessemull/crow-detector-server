@@ -6,13 +6,8 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { Source, ProcessingStatus } from 'src/common/types';
+import { Source, ProcessingStatus, Status } from 'src/common/types';
 import { DetectionEvent } from 'src/detection/entity/detection-event.entity';
-
-enum Status {
-  ACCEPTED = 'ACCEPTED',
-  REJECTED = 'REJECTED',
-}
 
 @Entity('feed_event')
 export class FeedEvent {
@@ -69,7 +64,6 @@ export class FeedEvent {
   @UpdateDateColumn()
   updatedAt: Date;
 
-  // New fields for image processing
   @Column({ nullable: true })
   s3Bucket?: string;
 
@@ -87,13 +81,13 @@ export class FeedEvent {
   processingError?: string;
 
   @Column({ nullable: true })
-  moderationLabels?: string; // JSON string of AWS Rekognition labels
+  moderationLabels?: string;
 
   @Column({ nullable: true })
   faceDetected: boolean;
 
   @Column({ nullable: true })
-  faceBoundingBox?: string; // JSON string of face coordinates
+  faceBoundingBox?: string;
 
   @Column({ nullable: true })
   originalImageSize?: number;
@@ -102,5 +96,5 @@ export class FeedEvent {
   processedImageSize?: number;
 
   @Column({ nullable: true })
-  processingDuration?: number; // in milliseconds
+  processingDuration?: number; // Milliseconds
 }

@@ -4,8 +4,8 @@ import { FeedEvent } from '../entity/feed-event.entity';
 import { ImageProcessingService } from './image-processing.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
-import { S3MetadataService } from './s3-metadata.service';
 import { ProcessingStatus } from 'src/common/types';
+import { S3MetadataService } from './s3-metadata.service';
 
 @Injectable()
 export class FeedEventService {

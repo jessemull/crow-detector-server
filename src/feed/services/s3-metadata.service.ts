@@ -1,15 +1,7 @@
 import * as AWS from 'aws-sdk';
 import { ConfigService } from '@nestjs/config';
 import { Injectable, Logger } from '@nestjs/common';
-import { Source } from 'src/common/types';
-
-export interface S3Metadata {
-  bucket: string;
-  key: string;
-  source: Source;
-  timestamp: number;
-  type: 'feed' | 'detection';
-}
+import { Source, S3Metadata } from 'src/common/types';
 
 @Injectable()
 export class S3MetadataService {

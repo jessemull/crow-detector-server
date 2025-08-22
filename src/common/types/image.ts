@@ -1,3 +1,5 @@
+import { Source } from './feed';
+
 export enum ImageFormat {
   JPG = 'jpg',
   JPEG = 'jpeg',
@@ -28,4 +30,12 @@ export interface ImageProcessingResult {
   contentModeration: ContentModerationResult;
   croppedImageBuffer?: Buffer;
   processingDuration: number;
+}
+
+export interface S3Metadata {
+  bucket: string;
+  key: string;
+  source: Source;
+  timestamp: number;
+  type: 'feed' | 'detection';
 }
