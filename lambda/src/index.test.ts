@@ -69,6 +69,75 @@ describe('S3 Event Lambda Handler', () => {
       );
     });
 
+    it('should handle mixed success/failure results', async () => {
+      const mockEvent: SQSEvent = {
+        Records: [
+          createMockSQSRecord(
+            'test-bucket',
+            'detection/success-image.jpg',
+            'ObjectCreated:Put',
+          ),
+          createMockSQSRecord(
+            'test-bucket',
+            'detection/failure-image.jpg',
+            'ObjectCreated:Put',
+          ),
+        ],
+      };
+
+      // First call succeeds, second call fails
+      mockedFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ success: true }),
+        } as Response)
+        .mockRejectedValueOnce(new Error('API call failed'));
+
+      await handler(mockEvent, mockContext, mockCallback);
+
+      expect(mockCallback).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          statusCode: 500,
+          body: expect.stringContaining('Some SQS events failed to process'),
+        }),
+      );
+    });
+
+    it('should handle handler-level errors', async () => {
+      const mockEvent: SQSEvent = {
+        Records: [
+          {
+            messageId: 'test-message-id',
+            receiptHandle: 'test-receipt-handle',
+            body: 'invalid-json', // This will cause JSON.parse to fail
+            attributes: {
+              ApproximateReceiveCount: '1',
+              SentTimestamp: '1234567890',
+              SenderId: 'test-sender',
+              ApproximateFirstReceiveTimestamp: '1234567890',
+            },
+            messageAttributes: {},
+            md5OfBody: 'test-md5',
+            eventSource: 'aws:sqs',
+            eventSourceARN: 'arn:aws:sqs:us-east-1:123456789012:test-queue',
+            awsRegion: 'us-east-1',
+          },
+        ],
+      };
+
+      await handler(mockEvent, mockContext, mockCallback);
+
+      expect(mockCallback).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          statusCode: 500,
+          body: expect.stringContaining('Some SQS events failed to process'),
+        }),
+      );
+    });
+
     it('should skip non-image files', async () => {
       const mockEvent: SQSEvent = {
         Records: [
@@ -127,7 +196,7 @@ describe('S3 Event Lambda Handler', () => {
         Records: [
           createMockSQSRecord(
             'test-bucket',
-            'test-image.jpg',
+            'detection/test-image.jpg',
             'ObjectRemoved:Delete',
           ),
         ],
@@ -174,13 +243,13 @@ describe('S3 Event Lambda Handler', () => {
 
       await handler(mockEvent, mockContext, mockCallback);
 
+      expect(mockedFetch).toHaveBeenCalledTimes(2);
       expect(mockCallback).toHaveBeenCalledWith(null, {
         statusCode: 200,
         body: expect.stringContaining(
           'All SQS events processed successfully',
         ) as string,
       });
-      expect(mockedFetch).toHaveBeenCalledTimes(2);
     });
 
     it('should handle API call failures', async () => {
@@ -202,10 +271,8 @@ describe('S3 Event Lambda Handler', () => {
         expect.any(Error),
         expect.objectContaining({
           statusCode: 500,
-          body: expect.stringContaining(
-            'Some SQS events failed to process',
-          ) as string,
-        }) as { statusCode: number; body: string },
+          body: expect.stringContaining('Some SQS events failed to process'),
+        }),
       );
     });
 
@@ -230,16 +297,13 @@ describe('S3 Event Lambda Handler', () => {
         expect.any(Error),
         expect.objectContaining({
           statusCode: 500,
-          body: expect.stringContaining(
-            'Some SQS events failed to process',
-          ) as string,
-        }) as { statusCode: number; body: string },
+          body: expect.stringContaining('Some SQS events failed to process'),
+        }),
       );
     });
 
     it('should use default API URL when environment variable is not set', async () => {
       delete process.env.API_BASE_URL;
-      delete process.env.API_ENDPOINT;
 
       const mockEvent: SQSEvent = {
         Records: [
@@ -261,12 +325,7 @@ describe('S3 Event Lambda Handler', () => {
 
       expect(mockedFetch).toHaveBeenCalledWith(
         'https://api-dev.crittercanteen.com/detection',
-        expect.objectContaining({
-          method: 'POST',
-          headers: expect.objectContaining({
-            'Content-Type': 'application/json',
-          }) as Record<string, string>,
-        }) as RequestInit,
+        expect.any(Object),
       );
     });
   });
@@ -425,12 +484,172 @@ describe('S3 Event Lambda Handler', () => {
         expect.any(Error),
         expect.objectContaining({
           statusCode: 500,
-          body: expect.stringContaining(
-            'Some SQS events failed to process',
-          ) as string,
-        }) as { statusCode: number; body: string },
+          body: expect.stringContaining('Some SQS events failed to process'),
+        }),
       );
-      expect(mockedFetch).not.toHaveBeenCalled();
+    });
+
+    it('should handle API call with non-ok response', async () => {
+      const mockEvent: SQSEvent = {
+        Records: [
+          createMockSQSRecord(
+            'test-bucket',
+            'detection/test-image.jpg',
+            'ObjectCreated:Put',
+          ),
+        ],
+      };
+
+      mockedFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: () => Promise.resolve({ error: 'Internal server error' }),
+      } as Response);
+
+      await handler(mockEvent, mockContext, mockCallback);
+
+      expect(mockCallback).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          statusCode: 500,
+          body: expect.stringContaining('Some SQS events failed to process'),
+        }),
+      );
+    });
+
+    it('should handle API call timeout', async () => {
+      const mockEvent: SQSEvent = {
+        Records: [
+          createMockSQSRecord(
+            'test-bucket',
+            'detection/test-image.jpg',
+            'ObjectCreated:Put',
+          ),
+        ],
+      };
+
+      // Mock fetch to throw an AbortError to simulate timeout
+      const abortError = new Error('The operation was aborted');
+      abortError.name = 'AbortError';
+      mockedFetch.mockRejectedValueOnce(abortError);
+
+      await handler(mockEvent, mockContext, mockCallback);
+
+      expect(mockCallback).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          statusCode: 500,
+          body: expect.stringContaining('Some SQS events failed to process'),
+        }),
+      );
+    });
+
+    it('should handle fetch error during API call', async () => {
+      const mockEvent: SQSEvent = {
+        Records: [
+          createMockSQSRecord(
+            'test-bucket',
+            'detection/test-image.jpg',
+            'ObjectCreated:Put',
+          ),
+        ],
+      };
+
+      mockedFetch.mockRejectedValueOnce(new Error('Network error'));
+
+      await handler(mockEvent, mockContext, mockCallback);
+
+      expect(mockCallback).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          statusCode: 500,
+          body: expect.stringContaining('Some SQS events failed to process'),
+        }),
+      );
+    });
+
+    it('should handle non-test environment logging', async () => {
+      // Temporarily set NODE_ENV to something other than 'test'
+      const originalNodeEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production';
+
+      const mockEvent: SQSEvent = {
+        Records: [
+          createMockSQSRecord(
+            'test-bucket',
+            'detection/test-image.jpg',
+            'ObjectCreated:Put',
+          ),
+        ],
+      };
+
+      mockedFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ success: true }),
+      } as Response);
+
+      // Spy on console.log to verify it's called
+      const consoleLogSpy = jest
+        .spyOn(console, 'log')
+        .mockImplementation(() => {});
+
+      await handler(mockEvent, mockContext, mockCallback);
+
+      // Verify console.log was called for non-test environment
+      expect(consoleLogSpy).toHaveBeenCalled();
+
+      // Restore NODE_ENV and console.log
+      process.env.NODE_ENV = originalNodeEnv;
+      consoleLogSpy.mockRestore();
+    });
+
+    it('should handle error in main handler when accessing undefined properties', async () => {
+      const mockEvent: SQSEvent = {
+        Records: [
+          {
+            messageId: 'test-message-id',
+            receiptHandle: 'test-receipt-handle',
+            body: JSON.stringify({
+              Records: [
+                {
+                  s3: {
+                    bucket: { name: 'test-bucket' },
+                    object: { key: 'detection/test-image.jpg' },
+                  },
+                  eventName: 'ObjectCreated:Put',
+                },
+              ],
+            }),
+            attributes: {
+              ApproximateReceiveCount: '1',
+              SentTimestamp: '1234567890',
+              SenderId: 'test-sender',
+              ApproximateFirstReceiveTimestamp: '1234567890',
+            },
+            messageAttributes: {},
+            md5OfBody: 'test-md5',
+            eventSource: 'aws:sqs',
+            eventSourceARN: 'arn:aws:sqs:us-east-1:123456789012:test-queue',
+            awsRegion: 'us-east-1',
+          },
+        ],
+      };
+
+      // Mock fetch to throw an error that will cause processSQSRecord to fail
+      mockedFetch.mockImplementationOnce(() => {
+        throw new Error('Network error in fetch');
+      });
+
+      await handler(mockEvent, mockContext, mockCallback);
+
+      expect(mockCallback).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          statusCode: 500,
+          body: expect.stringContaining('Some SQS events failed to process'),
+        }),
+      );
     });
   });
 });

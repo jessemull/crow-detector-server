@@ -17,6 +17,7 @@
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "lambda:build": "cd lambda && npm run build",
     "lambda:clean": "cd lambda && npm run clean",
+    "lambda:test:coverage": "cd lambda && npm run test:coverage",
     "lambda:lint": "cd lambda && npm run lint",
     "lambda:package": "cd lambda && npm run package",
     "lambda:test": "cd lambda && npm test",
