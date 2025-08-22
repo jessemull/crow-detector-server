@@ -1,8 +1,26 @@
 import { SQSEvent, SQSRecord, Context, Callback } from 'aws-lambda';
+
+process.env.LAMBDA_S3_PRIVATE_KEY = Buffer.from(
+  `-----BEGIN EC PRIVATE KEY-----
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgR3AvaHdwoFmc/ZPp
+OM1i6/Mi8hIOhEsdWXm8iFHYAQhabVoAoGCCqGSM49AwEHoUQDQgAE8OmBTWgAbW
+BgKdDZ7TihYwGHxEdOQsjr/tP6Npnrrmr04+ANVy43H57PBfjPSG90Tb8VOVV6c5
+Pq8qB9wBHipQ==
+-----END EC PRIVATE KEY-----`,
+).toString('base64');
+
 import { handler } from './index';
 
 global.fetch = jest.fn();
 const mockedFetch = global.fetch as jest.MockedFunction<typeof fetch>;
+
+jest.mock('crypto', () => ({
+  ...jest.requireActual('crypto'),
+  createSign: jest.fn(() => ({
+    update: jest.fn(),
+    sign: jest.fn(() => 'mocked-signature'),
+  })),
+}));
 
 describe('S3 Event Lambda Handler', () => {
   let mockContext: Context;
@@ -11,9 +29,8 @@ describe('S3 Event Lambda Handler', () => {
   beforeEach(() => {
     mockContext = {} as Context;
     mockCallback = jest.fn();
-    jest.clearAllMocks();
 
-    // Mock console methods to silence output during tests
+    jest.clearAllMocks();
     jest.spyOn(console, 'log').mockImplementation(() => {});
     jest.spyOn(console, 'error').mockImplementation(() => {});
 
@@ -23,7 +40,6 @@ describe('S3 Event Lambda Handler', () => {
   });
 
   afterEach(() => {
-    // Restore console methods
     jest.restoreAllMocks();
 
     delete process.env.NODE_ENV;
@@ -69,6 +85,48 @@ describe('S3 Event Lambda Handler', () => {
       );
     });
 
+    it('should hit handler-level catch block', async () => {
+      const mockEvent: SQSEvent = {
+        Records: [
+          createMockSQSRecord(
+            'test-bucket',
+            'detection/image.jpg',
+            'ObjectCreated:Put',
+          ),
+        ],
+      };
+
+      const util = await import('./util');
+      jest.spyOn(util, 'processSQSRecord').mockImplementationOnce(() => {
+        throw new Error('Forced handler-level error');
+      });
+
+      await handler(mockEvent, mockContext, mockCallback);
+
+      expect(mockCallback).toHaveBeenCalledWith(expect.any(Error));
+    });
+
+    it('should hit handler-level catch block with non-string error', async () => {
+      const mockEvent: SQSEvent = {
+        Records: [
+          createMockSQSRecord(
+            'test-bucket',
+            'detection/image.jpg',
+            'ObjectCreated:Put',
+          ),
+        ],
+      };
+
+      const util = await import('./util');
+      jest.spyOn(util, 'processSQSRecord').mockImplementationOnce(() => {
+        throw 'string error';
+      });
+
+      await handler(mockEvent, mockContext, mockCallback);
+
+      expect(mockCallback).toHaveBeenCalledWith(expect.any(Error));
+    });
+
     it('should handle mixed success/failure results', async () => {
       const mockEvent: SQSEvent = {
         Records: [
@@ -111,7 +169,7 @@ describe('S3 Event Lambda Handler', () => {
           {
             messageId: 'test-message-id',
             receiptHandle: 'test-receipt-handle',
-            body: 'invalid-json', // This will cause JSON.parse to fail
+            body: 'invalid-json',
             attributes: {
               ApproximateReceiveCount: '1',
               SentTimestamp: '1234567890',
@@ -569,7 +627,6 @@ describe('S3 Event Lambda Handler', () => {
     });
 
     it('should handle non-test environment logging', async () => {
-      // Temporarily set NODE_ENV to something other than 'test'
       const originalNodeEnv = process.env.NODE_ENV;
       process.env.NODE_ENV = 'production';
 
@@ -589,38 +646,26 @@ describe('S3 Event Lambda Handler', () => {
         json: () => Promise.resolve({ success: true }),
       } as Response);
 
-      // Spy on console.log to verify it's called
       const consoleLogSpy = jest
         .spyOn(console, 'log')
         .mockImplementation(() => {});
 
       await handler(mockEvent, mockContext, mockCallback);
 
-      // Verify console.log was called for non-test environment
       expect(consoleLogSpy).toHaveBeenCalled();
 
-      // Restore NODE_ENV and console.log
       process.env.NODE_ENV = originalNodeEnv;
       consoleLogSpy.mockRestore();
     });
 
-    it('should handle error in main handler when accessing undefined properties', async () => {
+    it('should handle JSON parsing errors in catch block', async () => {
+      // Create an event that will cause a JSON parsing error
       const mockEvent: SQSEvent = {
         Records: [
           {
             messageId: 'test-message-id',
             receiptHandle: 'test-receipt-handle',
-            body: JSON.stringify({
-              Records: [
-                {
-                  s3: {
-                    bucket: { name: 'test-bucket' },
-                    object: { key: 'detection/test-image.jpg' },
-                  },
-                  eventName: 'ObjectCreated:Put',
-                },
-              ],
-            }),
+            body: 'invalid-json-that-will-cause-error', // This will cause JSON.parse to fail
             attributes: {
               ApproximateReceiveCount: '1',
               SentTimestamp: '1234567890',
@@ -635,11 +680,6 @@ describe('S3 Event Lambda Handler', () => {
           },
         ],
       };
-
-      // Mock fetch to throw an error that will cause processSQSRecord to fail
-      mockedFetch.mockImplementationOnce(() => {
-        throw new Error('Network error in fetch');
-      });
 
       await handler(mockEvent, mockContext, mockCallback);
 
@@ -659,7 +699,6 @@ function createMockSQSRecord(
   key: string,
   eventName: string,
 ): SQSRecord {
-  // Create a mock S3 event that would be in the SQS message body
   const s3Event = {
     Records: [
       {
