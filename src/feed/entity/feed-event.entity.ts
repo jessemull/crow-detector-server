@@ -6,13 +6,8 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { Source } from 'src/common/types';
+import { Source, ProcessingStatus, Status } from 'src/common/types';
 import { DetectionEvent } from 'src/detection/entity/detection-event.entity';
-
-enum Status {
-  ACCEPTED = 'ACCEPTED',
-  REJECTED = 'REJECTED',
-}
 
 @Entity('feed_event')
 export class FeedEvent {
@@ -68,4 +63,32 @@ export class FeedEvent {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @Column({
+    enum: ProcessingStatus,
+    default: ProcessingStatus.PENDING,
+    type: 'enum',
+  })
+  processingStatus: ProcessingStatus;
+
+  @Column({ nullable: true })
+  processingError?: string;
+
+  @Column({ nullable: true })
+  moderationLabels?: string;
+
+  @Column({ nullable: true })
+  faceDetected: boolean;
+
+  @Column({ nullable: true })
+  faceBoundingBox?: string;
+
+  @Column({ nullable: true })
+  originalImageSize?: number;
+
+  @Column({ nullable: true })
+  processedImageSize?: number;
+
+  @Column({ nullable: true })
+  processingDuration?: number; // Milliseconds
 }

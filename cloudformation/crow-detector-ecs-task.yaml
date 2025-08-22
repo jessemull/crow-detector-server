@@ -100,9 +100,9 @@ Resources:
               - CMD-SHELL
               - 'node -e "require(\"http\").get(\"http://localhost:3000/health\", (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"'
             Interval: 30
-            Timeout: 5
-            Retries: 3
-            StartPeriod: 60
+            Timeout: 10
+            Retries: 5
+            StartPeriod: 120
 
   ECSService:
     Type: AWS::ECS::Service

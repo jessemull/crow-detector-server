@@ -12,6 +12,13 @@ export enum Status {
   REJECTED = 'REJECTED',
 }
 
+export enum ProcessingStatus {
+  PENDING = 'PENDING',
+  PROCESSING = 'PROCESSING',
+  COMPLETED = 'COMPLETED',
+  FAILED = 'FAILED',
+}
+
 export interface FeedResponse {
   data: FeedEvent | null;
   message: string;

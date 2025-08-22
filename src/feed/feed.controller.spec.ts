@@ -24,7 +24,9 @@ describe('FeedController', () => {
   const mockFeedEventService = {
     create: jest.fn(),
     find: jest.fn(),
+    findById: jest.fn(),
     update: jest.fn(),
+    reprocessImage: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -147,10 +149,33 @@ describe('FeedController', () => {
     });
   });
 
+  describe('getFeedEventById', () => {
+    it('should return a feed event by id successfully', async () => {
+      const id = 'test-uuid';
+      mockFeedEventService.findById.mockResolvedValue(mockFeedEvent);
+
+      const result = await controller.getFeedEventById(id);
+
+      expect(service.findById).toHaveBeenCalledWith(id);
+      expect(result).toEqual(mockFeedEvent);
+    });
+
+    it('should handle service errors', async () => {
+      const id = 'test-uuid';
+      const error = new Error('Service error');
+      mockFeedEventService.findById.mockRejectedValue(error);
+
+      await expect(controller.getFeedEventById(id)).rejects.toThrow(
+        'Service error',
+      );
+      expect(service.findById).toHaveBeenCalledWith(id);
+    });
+  });
+
   describe('updateFeedEvent', () => {
     it('should update a feed event successfully', async () => {
+      const id = 'test-uuid';
       const patchFeedDTO: PatchFeedDTO = {
-        id: 'test-uuid',
         confidence: 0.95,
         croppedImageUrl: 'https://example.com/cropped.jpg',
         status: Status.REJECTED,
@@ -159,9 +184,9 @@ describe('FeedController', () => {
       const updatedEvent = { ...mockFeedEvent, status: Status.REJECTED };
       mockFeedEventService.update.mockResolvedValue(updatedEvent);
 
-      const result = await controller.updateFeedEvent(patchFeedDTO);
+      const result = await controller.updateFeedEvent(id, patchFeedDTO);
 
-      expect(service.update).toHaveBeenCalledWith(patchFeedDTO);
+      expect(service.update).toHaveBeenCalledWith(id, patchFeedDTO);
       expect(result).toEqual({
         data: updatedEvent,
         message: 'Feeder event updated successfully!',
@@ -169,8 +194,8 @@ describe('FeedController', () => {
     });
 
     it('should handle service errors', async () => {
+      const id = 'test-uuid';
       const patchFeedDTO: PatchFeedDTO = {
-        id: 'test-uuid',
         confidence: 0.95,
         croppedImageUrl: 'https://example.com/cropped.jpg',
         status: Status.REJECTED,
@@ -179,10 +204,47 @@ describe('FeedController', () => {
       const error = new Error('Service error');
       mockFeedEventService.update.mockRejectedValue(error);
 
-      await expect(controller.updateFeedEvent(patchFeedDTO)).rejects.toThrow(
+      await expect(
+        controller.updateFeedEvent(id, patchFeedDTO),
+      ).rejects.toThrow('Service error');
+      expect(service.update).toHaveBeenCalledWith(id, patchFeedDTO);
+    });
+  });
+
+  describe('reprocessImage', () => {
+    it('should start image reprocessing successfully', async () => {
+      const id = 'test-uuid';
+      mockFeedEventService.reprocessImage.mockResolvedValue(undefined);
+
+      const result = await controller.reprocessImage(id);
+
+      expect(service.reprocessImage).toHaveBeenCalledWith(id);
+      expect(result).toEqual({
+        data: null,
+        message: 'Image reprocessing started successfully!',
+      });
+    });
+
+    it('should handle service errors', async () => {
+      const id = 'test-uuid';
+      const error = new Error('Service error');
+      mockFeedEventService.reprocessImage.mockRejectedValue(error);
+
+      await expect(controller.reprocessImage(id)).rejects.toThrow(
         'Service error',
       );
-      expect(service.update).toHaveBeenCalledWith(patchFeedDTO);
+      expect(service.reprocessImage).toHaveBeenCalledWith(id);
+    });
+
+    it('should handle service string errors', async () => {
+      const id = 'test-uuid';
+      const error = 'String service error';
+      mockFeedEventService.reprocessImage.mockRejectedValue(error);
+
+      await expect(controller.reprocessImage(id)).rejects.toBe(
+        'String service error',
+      );
+      expect(service.reprocessImage).toHaveBeenCalledWith(id);
     });
   });
 });
