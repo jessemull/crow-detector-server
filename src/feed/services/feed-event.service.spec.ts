@@ -111,6 +111,20 @@ describe('FeedEventService', () => {
         'Repository error',
       );
     });
+
+    it('should handle repository string errors', async () => {
+      const createFeedDTO: CreateFeedDTO = {
+        imageUrl: 'https://example.com/image.jpg',
+      };
+
+      const error = 'String repository error';
+      mockRepository.create.mockReturnValue({});
+      mockRepository.save.mockRejectedValue(error);
+
+      await expect(service.create(createFeedDTO)).rejects.toBe(
+        'String repository error',
+      );
+    });
   });
 
   describe('find', () => {
@@ -447,6 +461,26 @@ describe('FeedEventService', () => {
         processingError: 'Image processing failed',
       });
     });
+
+    it('should handle image processing string errors and mark as failed', async () => {
+      const imageProcessingService = service['imageProcessingService'];
+      const error = 'String image processing failed';
+
+      (imageProcessingService.processImage as jest.Mock).mockRejectedValue(
+        error,
+      );
+
+      await (service as any).processImageAsync(eventId, bucket, key);
+
+      expect(repository.update).toHaveBeenCalledWith(eventId, {
+        processingStatus: ProcessingStatus.PROCESSING,
+      });
+
+      expect(repository.update).toHaveBeenCalledWith(eventId, {
+        processingStatus: ProcessingStatus.FAILED,
+        processingError: 'String image processing failed',
+      });
+    });
   });
 
   describe('reprocessImage', () => {
@@ -506,6 +540,21 @@ describe('FeedEventService', () => {
 
       await expect(service.reprocessImage(eventId)).rejects.toThrow(
         'S3 metadata extraction failed',
+      );
+    });
+
+    it('should handle S3 metadata extraction string errors', async () => {
+      const s3MetadataService = service['s3MetadataService'];
+
+      mockRepository.findOne.mockResolvedValue(mockFeedEvent);
+
+      const error = 'String S3 metadata extraction failed';
+      (s3MetadataService.extractMetadataFromUrl as jest.Mock).mockRejectedValue(
+        error,
+      );
+
+      await expect(service.reprocessImage(eventId)).rejects.toBe(
+        'String S3 metadata extraction failed',
       );
     });
   });

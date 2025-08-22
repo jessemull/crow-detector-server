@@ -184,6 +184,16 @@ describe('S3MetadataService', () => {
         'Invalid S3 URL format',
       );
     });
+
+    it('should handle S3 headObject string errors', async () => {
+      mockS3.headObject.mockReturnValue({
+        promise: jest.fn().mockRejectedValue('String S3 access denied'),
+      } as any);
+
+      await expect(service.extractMetadataFromUrl(validUrl)).rejects.toThrow(
+        'Invalid S3 URL format',
+      );
+    });
   });
 
   describe('getObjectMetadata', () => {
@@ -222,6 +232,17 @@ describe('S3MetadataService', () => {
         'Object not found',
       );
     });
+
+    it('should handle S3 headObject string errors', async () => {
+      const s3Error = 'String error message';
+      mockS3.headObject.mockReturnValue({
+        promise: jest.fn().mockRejectedValue(s3Error),
+      } as any);
+
+      await expect(service.getObjectMetadata(bucket, key)).rejects.toBe(
+        'String error message',
+      );
+    });
   });
 
   describe('getObjectSize', () => {
@@ -255,6 +276,16 @@ describe('S3MetadataService', () => {
     it('should return 0 and log error when S3 call fails', async () => {
       mockS3.headObject.mockReturnValue({
         promise: jest.fn().mockRejectedValue(new Error('Network error')),
+      } as any);
+
+      const result = await service.getObjectSize(bucket, key);
+
+      expect(result).toBe(0);
+    });
+
+    it('should return 0 and log error when S3 call fails with string error', async () => {
+      mockS3.headObject.mockReturnValue({
+        promise: jest.fn().mockRejectedValue('String network error'),
       } as any);
 
       const result = await service.getObjectSize(bucket, key);

@@ -288,6 +288,20 @@ describe('ImageProcessingService', () => {
       });
     });
 
+    it('should handle content moderation API string errors', async () => {
+      mockRekognition.detectModerationLabels.mockReturnValue({
+        promise: jest.fn().mockRejectedValue('String Rekognition error'),
+      } as any);
+
+      const result = await (service as any).checkContentModeration(bucket, key);
+
+      expect(result).toEqual({
+        isAppropriate: false,
+        labels: ['ModerationCheckFailed'],
+        confidence: 0,
+      });
+    });
+
     it('should filter out undefined labels', async () => {
       mockRekognition.detectModerationLabels.mockReturnValue({
         promise: jest.fn().mockResolvedValue({
@@ -385,6 +399,18 @@ describe('ImageProcessingService', () => {
         faceDetected: false,
       });
     });
+
+    it('should handle face detection API string errors', async () => {
+      mockRekognition.detectFaces.mockReturnValue({
+        promise: jest.fn().mockRejectedValue('String face detection error'),
+      } as any);
+
+      const result = await (service as any).detectFaces(bucket, key);
+
+      expect(result).toEqual({
+        faceDetected: false,
+      });
+    });
   });
 
   describe('cropImageToFace', () => {
@@ -469,6 +495,16 @@ describe('ImageProcessingService', () => {
       ).rejects.toThrow('S3 error');
     });
 
+    it('should handle S3 getObject string errors', async () => {
+      mockS3.getObject.mockReturnValue({
+        promise: jest.fn().mockRejectedValue('String S3 error'),
+      } as any);
+
+      await expect(
+        (service as any).cropImageToFace(bucket, key, boundingBox),
+      ).rejects.toBe('String S3 error');
+    });
+
     it('should handle sharp processing errors', async () => {
       mockS3.getObject.mockReturnValue({
         promise: jest.fn().mockResolvedValue({
@@ -483,6 +519,22 @@ describe('ImageProcessingService', () => {
       await expect(
         (service as any).cropImageToFace(bucket, key, boundingBox),
       ).rejects.toThrow('Sharp error');
+    });
+
+    it('should handle sharp processing string errors', async () => {
+      mockS3.getObject.mockReturnValue({
+        promise: jest.fn().mockResolvedValue({
+          Body: Buffer.from('mock-image-data'),
+        }),
+      } as any);
+
+      const sharp = jest.requireMock('sharp');
+      const mockSharpInstance = sharp();
+      mockSharpInstance.metadata.mockRejectedValue('String sharp error');
+
+      await expect(
+        (service as any).cropImageToFace(bucket, key, boundingBox),
+      ).rejects.toBe('String sharp error');
     });
   });
 
@@ -522,6 +574,16 @@ describe('ImageProcessingService', () => {
       await expect(
         service.uploadProcessedImage(bucket, key, imageBuffer),
       ).rejects.toThrow('Upload failed');
+    });
+
+    it('should handle S3 upload string errors', async () => {
+      mockS3.putObject.mockReturnValue({
+        promise: jest.fn().mockRejectedValue('String upload failed'),
+      } as any);
+
+      await expect(
+        service.uploadProcessedImage(bucket, key, imageBuffer),
+      ).rejects.toBe('String upload failed');
     });
   });
 });
