@@ -3,13 +3,14 @@ import { CreateFeedDTO, PatchFeedDTO } from '../dto';
 import { FeedEvent } from '../entity/feed-event.entity';
 import { ImageProcessingService } from './image-processing.service';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { ProcessingStatus } from 'src/common/types';
 import { S3MetadataService } from './s3-metadata.service';
+import { createLogger } from 'src/common/logger/logger.config';
 
 @Injectable()
 export class FeedEventService {
-  private readonly logger = new Logger(FeedEventService.name);
+  private readonly logger = createLogger(FeedEventService.name);
 
   constructor(
     @InjectRepository(FeedEvent)
@@ -70,7 +71,7 @@ export class FeedEventService {
     key: string,
   ): Promise<void> {
     try {
-      this.logger.log(`Starting async image processing for event ${eventId}`);
+      this.logger.info(`Starting async image processing for event ${eventId}`);
 
       // Update status to processing...
 
@@ -125,7 +126,7 @@ export class FeedEventService {
 
       await this.feedEventRepository.update(eventId, updateData);
 
-      this.logger.log(`Image processing completed for event ${eventId}`);
+      this.logger.info(`Image processing completed for event ${eventId}`);
     } catch (error) {
       this.logger.error(
         `Image processing failed for event ${eventId}: ${error instanceof Error ? error.message : String(error)}`,

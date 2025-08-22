@@ -149,8 +149,8 @@ describe('FeedController', () => {
 
   describe('updateFeedEvent', () => {
     it('should update a feed event successfully', async () => {
+      const id = 'test-uuid';
       const patchFeedDTO: PatchFeedDTO = {
-        id: 'test-uuid',
         confidence: 0.95,
         croppedImageUrl: 'https://example.com/cropped.jpg',
         status: Status.REJECTED,
@@ -159,9 +159,9 @@ describe('FeedController', () => {
       const updatedEvent = { ...mockFeedEvent, status: Status.REJECTED };
       mockFeedEventService.update.mockResolvedValue(updatedEvent);
 
-      const result = await controller.updateFeedEvent(patchFeedDTO);
+      const result = await controller.updateFeedEvent(id, patchFeedDTO);
 
-      expect(service.update).toHaveBeenCalledWith(patchFeedDTO);
+      expect(service.update).toHaveBeenCalledWith(id, patchFeedDTO);
       expect(result).toEqual({
         data: updatedEvent,
         message: 'Feeder event updated successfully!',
@@ -169,8 +169,8 @@ describe('FeedController', () => {
     });
 
     it('should handle service errors', async () => {
+      const id = 'test-uuid';
       const patchFeedDTO: PatchFeedDTO = {
-        id: 'test-uuid',
         confidence: 0.95,
         croppedImageUrl: 'https://example.com/cropped.jpg',
         status: Status.REJECTED,
@@ -179,10 +179,10 @@ describe('FeedController', () => {
       const error = new Error('Service error');
       mockFeedEventService.update.mockRejectedValue(error);
 
-      await expect(controller.updateFeedEvent(patchFeedDTO)).rejects.toThrow(
-        'Service error',
-      );
-      expect(service.update).toHaveBeenCalledWith(patchFeedDTO);
+      await expect(
+        controller.updateFeedEvent(id, patchFeedDTO),
+      ).rejects.toThrow('Service error');
+      expect(service.update).toHaveBeenCalledWith(id, patchFeedDTO);
     });
   });
 });

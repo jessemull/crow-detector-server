@@ -202,13 +202,18 @@ describe('FeedEventService', () => {
       expect(result).toEqual(mockFeedEvent);
     });
 
-    it('should return null when feed event not found', async () => {
+    it('should throw NotFoundException when feed event not found', async () => {
       const id = 'non-existent-uuid';
       mockRepository.findOne.mockResolvedValue(null);
 
-      const result = await service.findById(id);
+      await expect(service.findById(id)).rejects.toThrow(
+        `Feed event with id ${id} not found!`,
+      );
 
-      expect(result).toBeNull();
+      expect(repository.findOne).toHaveBeenCalledWith({
+        where: { id },
+        relations: ['detectionEvents'],
+      });
     });
 
     it('should handle repository errors', async () => {
