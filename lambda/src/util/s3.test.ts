@@ -80,7 +80,7 @@ describe('S3 Utility', () => {
         'test-key.jpg',
         'ObjectCreated:Put',
       );
-      // Make Records array empty
+
       const s3Event = JSON.parse(mockRecord.body);
       s3Event.Records = [];
       mockRecord.body = JSON.stringify(s3Event);
@@ -96,7 +96,7 @@ describe('S3 Utility', () => {
         'test-key.jpg',
         'ObjectCreated:Put',
       );
-      // Remove s3 object
+
       const s3Event = JSON.parse(mockRecord.body);
       delete s3Event.Records[0].s3;
       mockRecord.body = JSON.stringify(s3Event);
@@ -112,7 +112,7 @@ describe('S3 Utility', () => {
         'test-key.jpg',
         'ObjectCreated:Put',
       );
-      // Make body invalid JSON
+
       mockRecord.body = 'invalid json';
 
       expect(() => extractS3Info(mockRecord)).toThrow();
@@ -128,7 +128,7 @@ describe('S3 Utility', () => {
         'test-key.jpg',
         'ObjectCreated:Put',
       );
-      // Make body invalid JSON to trigger error
+
       mockRecord.body = 'invalid json';
 
       expect(() => extractS3Info(mockRecord)).toThrow();

@@ -1,7 +1,8 @@
 import * as crypto from 'crypto';
 
-// Decode the base64 encoded private key
-function decodePrivateKey(base64Key: string | undefined): string | undefined {
+export function decodePrivateKey(
+  base64Key: string | undefined,
+): string | undefined {
   if (!base64Key) {
     return undefined;
   }
@@ -12,12 +13,7 @@ function decodePrivateKey(base64Key: string | undefined): string | undefined {
   return normalizedKey;
 }
 
-const LAMBDA_S3_PRIVATE_KEY = decodePrivateKey(
-  process.env.LAMBDA_S3_PRIVATE_KEY,
-);
-
-// Function to generate ECDSA signature
-function generateSignature(data: string, privateKey: string): string {
+export function generateSignature(data: string, privateKey: string): string {
   try {
     const sign = crypto.createSign('SHA256');
     sign.update(data);
@@ -30,7 +26,6 @@ function generateSignature(data: string, privateKey: string): string {
   }
 }
 
-// Function to generate authentication headers
 export function generateAuthHeaders(
   method: string,
   path: string,
@@ -39,11 +34,13 @@ export function generateAuthHeaders(
   const timestamp = Date.now().toString();
   const dataToSign = `${method}${path}${JSON.stringify(body)}${timestamp}`;
 
-  if (!LAMBDA_S3_PRIVATE_KEY) {
+  const privateKey = decodePrivateKey(process.env.LAMBDA_S3_PRIVATE_KEY);
+
+  if (!privateKey) {
     throw new Error('LAMBDA_S3_PRIVATE_KEY environment variable not set');
   }
 
-  const signature = generateSignature(dataToSign, LAMBDA_S3_PRIVATE_KEY);
+  const signature = generateSignature(dataToSign, privateKey);
 
   return {
     'x-device-id': 'lambda-s3',
