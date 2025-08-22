@@ -1,10 +1,12 @@
 import { CreateFeedDTO } from '../dto/create-feed.dto';
 import { FeedEvent } from '../entity/feed-event.entity';
 import { FeedEventService } from './feed-event.service';
+import { ImageProcessingService } from './image-processing.service';
 import { NotFoundException } from '@nestjs/common';
 import { PatchFeedDTO } from '../dto/patch-feed.dto';
 import { Repository, Between } from 'typeorm';
-import { Source, Status } from '../../common/types';
+import { S3MetadataService } from './s3-metadata.service';
+import { Source, Status, ProcessingStatus } from '../../common/types';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 
@@ -18,10 +20,12 @@ describe('FeedEventService', () => {
     id: 'test-uuid',
     imageUrl: 'https://example.com/image.jpg',
     isAppropriate: true,
-    source: Source.API,
+    source: Source.BUTTON,
     status: Status.ACCEPTED,
     updatedAt: new Date(),
-  };
+    processingStatus: ProcessingStatus.PENDING,
+    faceDetected: false,
+  } as FeedEvent;
 
   const mockRepository = {
     create: jest.fn(),
@@ -38,6 +42,26 @@ describe('FeedEventService', () => {
         {
           provide: getRepositoryToken(FeedEvent),
           useValue: mockRepository,
+        },
+        {
+          provide: ImageProcessingService,
+          useValue: {
+            processImage: jest.fn(),
+            uploadProcessedImage: jest.fn(),
+          },
+        },
+        {
+          provide: S3MetadataService,
+          useValue: {
+            extractMetadataFromUrl: jest.fn().mockResolvedValue({
+              bucket: 'test-bucket',
+              key: 'test-key',
+              source: Source.BUTTON,
+              timestamp: Date.now(),
+              type: 'feed' as const,
+            }),
+            getObjectSize: jest.fn().mockResolvedValue(1024),
+          },
         },
       ],
     }).compile();
@@ -56,7 +80,6 @@ describe('FeedEventService', () => {
     it('should create a feed event successfully', async () => {
       const createFeedDTO: CreateFeedDTO = {
         imageUrl: 'https://example.com/image.jpg',
-        source: Source.API,
       };
 
       const createdEvent = { ...mockFeedEvent, ...createFeedDTO };
@@ -65,15 +88,20 @@ describe('FeedEventService', () => {
 
       const result = await service.create(createFeedDTO);
 
-      expect(repository.create).toHaveBeenCalledWith(createFeedDTO);
-      expect(repository.save).toHaveBeenCalledWith(createdEvent);
+      // The service now extracts S3 metadata and creates the event with additional fields
+      expect(repository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          imageUrl: createFeedDTO.imageUrl,
+          processingStatus: ProcessingStatus.PENDING,
+        }),
+      );
+      expect(repository.save).toHaveBeenCalled();
       expect(result).toEqual(createdEvent);
     });
 
     it('should handle repository errors', async () => {
       const createFeedDTO: CreateFeedDTO = {
         imageUrl: 'https://example.com/image.jpg',
-        source: Source.API,
       };
 
       const error = new Error('Repository error');

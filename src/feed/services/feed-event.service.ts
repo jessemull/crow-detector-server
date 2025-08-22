@@ -39,8 +39,6 @@ export class FeedEventService {
       const event = this.feedEventRepository.create({
         imageUrl,
         source: s3Metadata.source, // Use extracted source from S3
-        s3Bucket: s3Metadata.bucket,
-        s3Key: s3Metadata.key,
         processingStatus: ProcessingStatus.PENDING,
         originalImageSize,
         createdAt: new Date(s3Metadata.timestamp), // Use S3 timestamp
@@ -177,7 +175,8 @@ export class FeedEventService {
       throw new NotFoundException(`Feed event with id ${id} not found!`);
     }
 
-    // Allow updating any field for dev/debugging purposes
+    // Allow updating any field for dev/debugging purposes...
+
     await this.feedEventRepository.update(id, updateData);
 
     return this.findById(id);
@@ -189,9 +188,11 @@ export class FeedEventService {
       throw new NotFoundException(`Feed event with id ${eventId} not found!`);
     }
 
-    if (!feedEvent.s3Bucket || !feedEvent.s3Key) {
-      throw new Error('Feed event does not have S3 metadata for reprocessing');
-    }
+    // Extract S3 metadata from imageUrl for reprocessing...
+
+    const s3Metadata = await this.s3MetadataService.extractMetadataFromUrl(
+      feedEvent.imageUrl,
+    );
 
     // Reset processing status and start over...
 
@@ -202,6 +203,6 @@ export class FeedEventService {
 
     // Start async processing again...
 
-    void this.processImageAsync(eventId, feedEvent.s3Bucket, feedEvent.s3Key);
+    void this.processImageAsync(eventId, s3Metadata.bucket, s3Metadata.key);
   }
 }

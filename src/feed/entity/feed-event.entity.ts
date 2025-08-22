@@ -64,12 +64,6 @@ export class FeedEvent {
   @UpdateDateColumn()
   updatedAt: Date;
 
-  @Column({ nullable: true })
-  s3Bucket?: string;
-
-  @Column({ nullable: true })
-  s3Key?: string;
-
   @Column({
     enum: ProcessingStatus,
     default: ProcessingStatus.PENDING,
