@@ -34,7 +34,8 @@ const API_BASE_URL =
 const DETECTION_ENDPOINT = process.env.DETECTION_ENDPOINT || '/detection';
 const FEED_ENDPOINT = process.env.FEED_ENDPOINT || '/feed';
 
-// Decode the base64 encoded private key
+// Decode the base64 encoded private key...
+
 function decodePrivateKey(base64Key: string | undefined): string | undefined {
   if (!base64Key) {
     return undefined;
@@ -50,7 +51,8 @@ const LAMBDA_S3_PRIVATE_KEY = decodePrivateKey(
   process.env.LAMBDA_S3_PRIVATE_KEY,
 );
 
-// Function to generate ECDSA signature
+// Function to generate ECDSA signature...
+
 function generateSignature(data: string, privateKey: string): string {
   try {
     const sign = crypto.createSign('SHA256');
@@ -64,7 +66,8 @@ function generateSignature(data: string, privateKey: string): string {
   }
 }
 
-// Function to generate authentication headers
+// Function to generate authentication headers...
+
 function generateAuthHeaders(
   method: string,
   path: string,
