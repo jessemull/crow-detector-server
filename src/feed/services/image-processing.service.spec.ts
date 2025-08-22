@@ -3,10 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { ImageProcessingService } from './image-processing.service';
 import * as AWS from 'aws-sdk';
 
-// Mock AWS SDK
 jest.mock('aws-sdk');
 
-// Mock sharp
 jest.mock('sharp', () => {
   const mockSharp = {
     metadata: jest.fn(),
@@ -16,7 +14,6 @@ jest.mock('sharp', () => {
     toBuffer: jest.fn(),
   };
 
-  // Chain methods
   mockSharp.extract.mockReturnValue(mockSharp);
   mockSharp.resize.mockReturnValue(mockSharp);
   mockSharp.jpeg.mockReturnValue(mockSharp);
@@ -31,7 +28,6 @@ describe('ImageProcessingService', () => {
   let mockS3: jest.Mocked<AWS.S3>;
 
   beforeEach(async () => {
-    // Create mock AWS services
     mockRekognition = {
       detectModerationLabels: jest.fn(),
       detectFaces: jest.fn(),
@@ -42,7 +38,6 @@ describe('ImageProcessingService', () => {
       putObject: jest.fn(),
     } as any;
 
-    // Mock AWS constructors
     (AWS.Rekognition as unknown as jest.Mock).mockImplementation(
       () => mockRekognition,
     );
@@ -88,14 +83,12 @@ describe('ImageProcessingService', () => {
     const key = 'test-key.jpg';
 
     it('should process image successfully with appropriate content and face detected', async () => {
-      // Mock content moderation - appropriate
       mockRekognition.detectModerationLabels.mockReturnValue({
         promise: jest.fn().mockResolvedValue({
           ModerationLabels: [],
         }),
       } as any);
 
-      // Mock face detection - face found
       mockRekognition.detectFaces.mockReturnValue({
         promise: jest.fn().mockResolvedValue({
           FaceDetails: [
@@ -111,14 +104,12 @@ describe('ImageProcessingService', () => {
         }),
       } as any);
 
-      // Mock S3 getObject
       mockS3.getObject.mockReturnValue({
         promise: jest.fn().mockResolvedValue({
           Body: Buffer.from('mock-image-data'),
         }),
       } as any);
 
-      // Mock sharp
       const sharp = jest.requireMock('sharp');
       const mockSharpInstance = sharp();
       mockSharpInstance.metadata.mockResolvedValue({
@@ -172,7 +163,6 @@ describe('ImageProcessingService', () => {
     });
 
     it('should return early when content is inappropriate', async () => {
-      // Mock content moderation - inappropriate
       mockRekognition.detectModerationLabels.mockReturnValue({
         promise: jest.fn().mockResolvedValue({
           ModerationLabels: [{ Name: 'Explicit Nudity', Confidence: 95.5 }],
@@ -191,19 +181,16 @@ describe('ImageProcessingService', () => {
         processingDuration: expect.any(Number),
       });
 
-      // Should not call face detection for inappropriate content
       expect(mockRekognition.detectFaces).not.toHaveBeenCalled();
     });
 
     it('should handle case when no face is detected', async () => {
-      // Mock content moderation - appropriate
       mockRekognition.detectModerationLabels.mockReturnValue({
         promise: jest.fn().mockResolvedValue({
           ModerationLabels: [],
         }),
       } as any);
 
-      // Mock face detection - no faces
       mockRekognition.detectFaces.mockReturnValue({
         promise: jest.fn().mockResolvedValue({
           FaceDetails: [],
@@ -225,19 +212,14 @@ describe('ImageProcessingService', () => {
     });
 
     it('should handle processing errors', async () => {
-      // Mock content moderation to throw error that's not caught internally
       mockRekognition.detectModerationLabels.mockReturnValue({
         promise: jest.fn().mockRejectedValue(new Error('AWS error')),
       } as any);
 
-      // Mock face detection to also fail (since content moderation will catch errors)
       mockRekognition.detectFaces.mockReturnValue({
         promise: jest.fn().mockRejectedValue(new Error('Face detection error')),
       } as any);
 
-      // Since the service catches content moderation errors and returns appropriate result,
-      // we need to test a different error path. Let's test when face detection also fails
-      // after content moderation succeeds but with internal error
       mockRekognition.detectModerationLabels.mockReturnValue({
         promise: jest.fn().mockResolvedValue({
           ModerationLabels: [],
@@ -248,7 +230,6 @@ describe('ImageProcessingService', () => {
         promise: jest.fn().mockRejectedValue(new Error('Face detection error')),
       } as any);
 
-      // Should complete successfully since face detection errors are caught
       const result = await service.processImage(bucket, key);
       expect(result.faceDetection.faceDetected).toBe(false);
     });
@@ -377,7 +358,7 @@ describe('ImageProcessingService', () => {
             {
               BoundingBox: {
                 Width: 0.3,
-                Height: undefined, // Missing height
+                Height: undefined,
                 Left: 0.2,
                 Top: 0.1,
               },
@@ -417,14 +398,12 @@ describe('ImageProcessingService', () => {
     };
 
     it('should crop image successfully', async () => {
-      // Mock S3 getObject
       mockS3.getObject.mockReturnValue({
         promise: jest.fn().mockResolvedValue({
           Body: Buffer.from('mock-image-data'),
         }),
       } as any);
 
-      // Mock sharp
       const sharp = jest.requireMock('sharp');
       const mockSharpInstance = sharp();
       mockSharpInstance.metadata.mockResolvedValue({
@@ -449,10 +428,10 @@ describe('ImageProcessingService', () => {
       expect(sharp).toHaveBeenCalledWith(Buffer.from('mock-image-data'));
       expect(mockSharpInstance.metadata).toHaveBeenCalled();
       expect(mockSharpInstance.extract).toHaveBeenCalledWith({
-        left: 140, // max(0, 200 - 60) = 140
-        top: 16, // max(0, 80 - 64) = 16
-        width: 420, // min(860, 420) = 420
-        height: 448, // min(784, 448) = 448
+        left: 140,
+        top: 16,
+        width: 420,
+        height: 448,
       });
       expect(mockSharpInstance.resize).toHaveBeenCalledWith(800, 800, {
         fit: 'inside',
@@ -462,14 +441,12 @@ describe('ImageProcessingService', () => {
     });
 
     it('should handle missing image dimensions', async () => {
-      // Mock S3 getObject
       mockS3.getObject.mockReturnValue({
         promise: jest.fn().mockResolvedValue({
           Body: Buffer.from('mock-image-data'),
         }),
       } as any);
 
-      // Mock sharp with missing dimensions
       const sharp = jest.requireMock('sharp');
       const mockSharpInstance = sharp();
       mockSharpInstance.metadata.mockResolvedValue({
@@ -483,7 +460,6 @@ describe('ImageProcessingService', () => {
     });
 
     it('should handle S3 getObject errors', async () => {
-      // Mock S3 getObject to throw error
       mockS3.getObject.mockReturnValue({
         promise: jest.fn().mockRejectedValue(new Error('S3 error')),
       } as any);
@@ -494,14 +470,12 @@ describe('ImageProcessingService', () => {
     });
 
     it('should handle sharp processing errors', async () => {
-      // Mock S3 getObject
       mockS3.getObject.mockReturnValue({
         promise: jest.fn().mockResolvedValue({
           Body: Buffer.from('mock-image-data'),
         }),
       } as any);
 
-      // Mock sharp to throw error
       const sharp = jest.requireMock('sharp');
       const mockSharpInstance = sharp();
       mockSharpInstance.metadata.mockRejectedValue(new Error('Sharp error'));

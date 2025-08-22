@@ -4,7 +4,6 @@ import { S3MetadataService } from './s3-metadata.service';
 import { Source } from 'src/common/types';
 import * as AWS from 'aws-sdk';
 
-// Mock AWS SDK
 jest.mock('aws-sdk');
 
 describe('S3MetadataService', () => {
@@ -13,12 +12,10 @@ describe('S3MetadataService', () => {
   let mockS3: jest.Mocked<AWS.S3>;
 
   beforeEach(async () => {
-    // Create mock S3 service
     mockS3 = {
       headObject: jest.fn(),
     } as any;
 
-    // Mock AWS S3 constructor
     (AWS.S3 as unknown as jest.Mock).mockImplementation(() => mockS3);
 
     const module: TestingModule = await Test.createTestingModule({
@@ -148,8 +145,8 @@ describe('S3MetadataService', () => {
     it('should throw error for invalid S3 URL format', async () => {
       const invalidUrls = [
         'https://invalid-url.com/file.jpg',
-        'https://bucket.storage.amazonaws.com/file.jpg', // not s3
-        'https://bucket.amazonaws.com/file.jpg', // missing s3
+        'https://bucket.storage.amazonaws.com/file.jpg',
+        'https://bucket.amazonaws.com/file.jpg',
         'not-a-url',
       ];
 
