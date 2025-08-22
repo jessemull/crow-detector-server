@@ -223,8 +223,8 @@ describe('FeedEventService', () => {
 
   describe('update', () => {
     it('should update a feed event successfully', async () => {
+      const id = 'test-uuid';
       const patchFeedDTO: PatchFeedDTO = {
-        id: 'test-uuid',
         confidence: 0.95,
         croppedImageUrl: 'https://example.com/cropped.jpg',
         status: Status.REJECTED,
@@ -239,12 +239,12 @@ describe('FeedEventService', () => {
           ...patchFeedDTO,
         });
 
-      const result = await service.update(patchFeedDTO);
+      const result = await service.update(id, patchFeedDTO);
 
       expect(repository.findOne).toHaveBeenCalledWith({
-        where: { id: patchFeedDTO.id },
+        where: { id },
       });
-      expect(repository.update).toHaveBeenCalledWith(patchFeedDTO.id, {
+      expect(repository.update).toHaveBeenCalledWith(id, {
         confidence: patchFeedDTO.confidence,
         croppedImageUrl: patchFeedDTO.croppedImageUrl,
         status: patchFeedDTO.status,
@@ -253,8 +253,8 @@ describe('FeedEventService', () => {
     });
 
     it('should throw NotFoundException when feed event not found', async () => {
+      const id = 'non-existent-uuid';
       const patchFeedDTO: PatchFeedDTO = {
-        id: 'non-existent-uuid',
         confidence: 0.95,
         croppedImageUrl: 'https://example.com/cropped.jpg',
         status: Status.REJECTED,
@@ -262,17 +262,17 @@ describe('FeedEventService', () => {
 
       mockRepository.findOne.mockResolvedValue(null);
 
-      await expect(service.update(patchFeedDTO)).rejects.toThrow(
+      await expect(service.update(id, patchFeedDTO)).rejects.toThrow(
         NotFoundException,
       );
       expect(repository.findOne).toHaveBeenCalledWith({
-        where: { id: patchFeedDTO.id },
+        where: { id },
       });
     });
 
     it('should handle repository errors', async () => {
+      const id = 'test-uuid';
       const patchFeedDTO: PatchFeedDTO = {
-        id: 'test-uuid',
         confidence: 0.95,
         croppedImageUrl: 'https://example.com/cropped.jpg',
         status: Status.REJECTED,
@@ -281,7 +281,7 @@ describe('FeedEventService', () => {
       const error = new Error('Repository error');
       mockRepository.findOne.mockRejectedValue(error);
 
-      await expect(service.update(patchFeedDTO)).rejects.toThrow(
+      await expect(service.update(id, patchFeedDTO)).rejects.toThrow(
         'Repository error',
       );
     });

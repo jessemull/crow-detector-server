@@ -38,12 +38,13 @@ export class FeedController {
     return this.feedEventService.find(limit, from, to);
   }
 
-  @Patch()
+  @Patch(':id')
   @UseGuards(EcdsaAuthGuard)
   async updateFeedEvent(
+    @Param('id') id: string,
     @Body() patchFeedDTO: PatchFeedDTO,
   ): Promise<FeedResponse> {
-    const event = await this.feedEventService.update(patchFeedDTO);
+    const event = await this.feedEventService.update(id, patchFeedDTO);
     return {
       data: event,
       message: 'Feeder event updated successfully!',

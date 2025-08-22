@@ -164,9 +164,10 @@ export class FeedEventService {
     });
   }
 
-  async update(patchFeedDTO: PatchFeedDTO): Promise<FeedEvent | null> {
-    const { id, ...updateData } = patchFeedDTO;
-
+  async update(
+    id: string,
+    patchFeedDTO: PatchFeedDTO,
+  ): Promise<FeedEvent | null> {
     const feedEvent = await this.feedEventRepository.findOne({
       where: { id },
     });
@@ -177,7 +178,7 @@ export class FeedEventService {
 
     // Allow updating any field for dev/debugging purposes...
 
-    await this.feedEventRepository.update(id, updateData);
+    await this.feedEventRepository.update(id, patchFeedDTO);
 
     return this.findById(id);
   }
