@@ -7,12 +7,13 @@ import { DeleteObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { Injectable } from '@nestjs/common';
 import { createLogger } from 'src/common/logger/logger.config';
 import { ClaudeService } from './claude.service';
+import { DetectedAnimal } from 'src/common/types';
 
 export interface AnimalDetectionResult {
   hasAnimals: boolean;
   crowCount: number;
   animalCount: number;
-  detectedAnimals: string[];
+  detectedAnimals: DetectedAnimal[];
   processingDuration: number;
 }
 
@@ -139,7 +140,7 @@ export class DetectionImageProcessingService {
     const mammalCategories = ['Mammal', 'Furry Animal'];
     const crowTerms = ['crow', 'raven', 'blackbird', 'corvid'];
 
-    const detectedAnimals: string[] = [];
+    const detectedAnimals: DetectedAnimal[] = [];
 
     let crowCount = 0;
     let animalCount = 0;
@@ -167,7 +168,11 @@ export class DetectionImageProcessingService {
           isCrow;
 
         if (isAnimal) {
-          detectedAnimals.push(label.Name);
+          detectedAnimals.push({
+            name: label.Name,
+            confidence: label.Confidence || 0,
+            count: 1,
+          });
           animalCount++;
           if (isCrow) {
             crowCount++;

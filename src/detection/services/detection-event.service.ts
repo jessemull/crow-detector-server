@@ -135,7 +135,7 @@ export class DetectionEventService {
         processingStatus: ProcessingStatus.COMPLETED,
         processingDuration: result.processingDuration,
         originalImageSize,
-        detectedAnimals: JSON.stringify(result.detectedAnimals),
+        detectedAnimals: result.detectedAnimals,
       };
 
       if (result.hasAnimals) {

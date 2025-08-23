@@ -198,6 +198,9 @@ To clone the repository, install dependencies, and run the project locally follo
    AWS_REGION=us-west-2
    S3_BUCKET_NAME=crow-detector-images-dev
 
+   # AI Configuration
+   CLAUDE_API_KEY=your_claude_api_key
+
    # Private Key Paths (for token generation)
    PI_USER_PRIVATE_KEY_PATH=/path/to/pi-user-private.pem
    PI_MOTION_PRIVATE_KEY_PATH=/path/to/pi-motion-private.pem
@@ -504,6 +507,21 @@ The system integrates with external AI services for advanced image analysis:
 - **API Integration**: Secure communication with Claude's API for image analysis
 - **Fallback Processing**: Local detection algorithms when AI services are unavailable
 
+### Required AWS Secrets
+
+The following secrets must be configured in AWS Secrets Manager:
+
+- **`crow-detector-keys`**: Contains device public keys for authentication
+  - `pi-user-public-key`
+  - `pi-motion-public-key` 
+  - `pi-feeder-public-key`
+  - `lambda-s3-public-key`
+- **`crow-detector-db-{environment}`**: Database credentials
+  - `username`
+  - `password`
+- **`crow-detector-claude-api-key`**: Claude AI API key
+  - `claude-api-key`
+
 ### ECS Task Definition
 
 The ECS task definition includes:
@@ -512,7 +530,7 @@ The ECS task definition includes:
 - **Resource Allocation**: CPU and memory specifications.
 - **Environment Variables**: Database connection, S3 configuration, device keys, and Claude API configuration.
 - **IAM Roles**: Permissions for S3, RDS, and other AWS services.
-- **AI Service Configuration**: Claude API key and endpoint configuration for animal detection.
+- **AI Service Configuration**: Claude API key (from AWS Secrets Manager) and endpoint configuration for animal detection.
 
 ### S3 Bucket Configuration
 

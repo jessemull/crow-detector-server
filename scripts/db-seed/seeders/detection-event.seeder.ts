@@ -50,12 +50,23 @@ export class DetectionEventSeeder extends BaseSeeder {
               ? 'Mock processing error for testing'
               : undefined,
           detectedAnimals: hasAnimals
-            ? JSON.stringify(
-                ['Crow', 'Bird', 'Squirrel'].slice(
-                  0,
-                  this.getRandomNumber(1, 3),
-                ),
-              )
+            ? [
+                {
+                  name: 'Crow',
+                  confidence: 95.5,
+                  count: this.getRandomNumber(1, 3),
+                },
+                {
+                  name: 'Bird',
+                  confidence: 92.1,
+                  count: this.getRandomNumber(1, 2),
+                },
+                {
+                  name: 'Squirrel',
+                  confidence: 88.7,
+                  count: this.getRandomNumber(1, 2),
+                },
+              ].slice(0, this.getRandomNumber(1, 3))
             : undefined,
           originalImageSize,
           processingDuration,

@@ -1,5 +1,5 @@
 import { FeedEvent } from 'src/feed/entity/feed-event.entity';
-import { ProcessingStatus } from 'src/common/types';
+import { ProcessingStatus, DetectedAnimal } from 'src/common/types';
 import {
   Column,
   CreateDateColumn,
@@ -41,8 +41,8 @@ export class DetectionEvent {
   @Column({ nullable: true })
   processingError?: string;
 
-  @Column({ nullable: true, type: 'text' })
-  detectedAnimals?: string; // JSON string of detected animals
+  @Column({ nullable: true, type: 'json' })
+  detectedAnimals?: DetectedAnimal[];
 
   @Column({ nullable: true })
   originalImageSize?: number;

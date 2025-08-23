@@ -3,11 +3,13 @@ import { ConfigService } from '@nestjs/config';
 import { Injectable } from '@nestjs/common';
 import { createLogger } from '../../common/logger/logger.config';
 
+import { DetectedAnimal } from '../../common/types';
+
 export interface AnimalAnalysisResult {
   hasAnimals: boolean;
   crowCount: number;
   animalCount: number;
-  detectedAnimals: string[];
+  detectedAnimals: DetectedAnimal[];
 }
 
 @Injectable()
@@ -17,6 +19,11 @@ export class ClaudeService {
 
   constructor(private readonly configService: ConfigService) {
     const apiKey = this.configService.get<string>('CLAUDE_API_KEY');
+    this.logger.info(`CLAUDE_API_KEY loaded: ${apiKey ? 'YES' : 'NO'}`);
+    if (apiKey) {
+      this.logger.info(`API key starts with: ${apiKey.substring(0, 10)}...`);
+    }
+
     if (!apiKey) {
       this.logger.warn('CLAUDE_API_KEY not found in environment variables');
     }
@@ -27,7 +34,11 @@ export class ClaudeService {
   }
 
   async analyzeAnimalDetection(
-    labels: Array<{ Name?: string; Confidence?: number }>,
+    labels: Array<{
+      Name?: string;
+      Confidence?: number;
+      Instances?: Array<{ BoundingBox?: any; Confidence?: number }>;
+    }>,
   ): Promise<AnimalAnalysisResult> {
     try {
       if (!this.configService.get<string>('CLAUDE_API_KEY')) {
@@ -36,28 +47,39 @@ export class ClaudeService {
 
       const labelsText = labels
         .filter((label) => label.Name && label.Confidence)
-        .map((label) => `${label.Name} (${label.Confidence}%)`)
+        .map((label) => {
+          const instanceCount = label.Instances ? label.Instances.length : 0;
+          return `${label.Name} (${label.Confidence}%) - ${instanceCount} instance${instanceCount !== 1 ? 's' : ''}`;
+        })
         .join(', ');
 
       const prompt = `Analyze these image labels and determine if any animals are present. Focus on identifying crows specifically.
 
 Labels: ${labelsText}
 
+CRITICAL: Count individual animals using the Instances data, not just label names.
+
 Return ONLY valid JSON with this exact structure:
 {
   "hasAnimals": boolean,
   "crowCount": number,
   "animalCount": number,
-  "detectedAnimals": string[]
+  "detectedAnimals": [
+    {
+      "name": "string",
+      "confidence": number,
+      "count": number
+    }
+  ]
 }
 
-Rules:
-- hasAnimals: true if ANY animals are detected
-- crowCount: count of crows, ravens, blackbirds, corvids, or similar birds
-- animalCount: total count of all animals (including crows)
-- detectedAnimals: array of all animal names found
+COUNTING RULES:
+- crowCount: Count individual crows/blackbirds (if Bird has 2 instances, that's 2 crows)
+- animalCount: Sum of all individual animals (Bird instances + Pig instances)
+- detectedAnimals: Array of objects with animal name, confidence score, and instance count
 
-Be comprehensive - if you see "Bird", "Mammal", "Pet", "Wildlife", etc., these likely indicate animals.`;
+Example: Bird with 2 instances + Pig with 1 instance = 3 total animals, 2 crows.
+detectedAnimals: [{"name": "Bird", "confidence": 99.1, "count": 2}, {"name": "Pig", "confidence": 99.2, "count": 1}]`;
 
       const message = await this.anthropic.messages.create({
         model: 'claude-3-5-sonnet-20241022',

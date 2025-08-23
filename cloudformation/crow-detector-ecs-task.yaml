@@ -89,6 +89,8 @@ Resources:
               ValueFrom: !Sub 'arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:crow-detector-db-${Environment}:username::'
             - Name: RDS_PASSWORD
               ValueFrom: !Sub 'arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:crow-detector-db-${Environment}:password::'
+            - Name: CLAUDE_API_KEY
+              ValueFrom: !Sub 'arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:crow-detector-claude-api-key:claude-api-key::'
           LogConfiguration:
             LogDriver: awslogs
             Options:

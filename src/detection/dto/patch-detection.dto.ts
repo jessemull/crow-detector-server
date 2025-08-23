@@ -1,6 +1,6 @@
 import { IsNumber, IsOptional } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { ProcessingStatus } from 'src/common/types';
+import { ProcessingStatus, DetectedAnimal } from 'src/common/types';
 
 export class PatchDetectionDTO {
   @IsOptional()
@@ -30,7 +30,7 @@ export class PatchDetectionDTO {
   processingError?: string;
 
   @IsOptional()
-  detectedAnimals?: string; // JSON string of detected animals
+  detectedAnimals?: DetectedAnimal[];
 
   @IsOptional()
   @IsNumber()
