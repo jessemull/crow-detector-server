@@ -157,7 +157,7 @@ paths:
   /feed:
     post:
       summary: Create feed event
-      description: Record a new feed event
+      description: Record a new feed event with image processing pipeline
       tags:
         - Feed
       security:
@@ -227,13 +227,51 @@ paths:
         '500':
           description: Internal server error
 
-    patch:
-      summary: Update feed event
-      description: Update an existing feed event with confidence, cropped image, and status
+  /feed/{id}:
+    get:
+      summary: Get feed event by ID
+      description: Retrieve a specific feed event by its unique identifier
       tags:
         - Feed
       security:
         - ECDSA: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Unique identifier of the feed event
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Feed event retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedEvent'
+        '404':
+          description: Feed event not found
+        '401':
+          description: Unauthorized - invalid authentication
+        '500':
+          description: Internal server error
+
+    patch:
+      summary: Update feed event
+      description: Update an existing feed event with flexible field updates
+      tags:
+        - Feed
+      security:
+        - ECDSA: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Unique identifier of the feed event
+          schema:
+            type: string
+            format: uuid
       requestBody:
         required: true
         content:
@@ -253,6 +291,36 @@ paths:
           description: Unauthorized - invalid authentication
         '404':
           description: Feed event not found
+        '500':
+          description: Internal server error
+
+  /feed/reprocess/{id}:
+    post:
+      summary: Reprocess feed event image
+      description: Trigger image reprocessing for a specific feed event
+      tags:
+        - Feed
+      security:
+        - ECDSA: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Unique identifier of the feed event to reprocess
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Image reprocessing started successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedResponse'
+        '404':
+          description: Feed event not found
+        '401':
+          description: Unauthorized - invalid authentication
         '500':
           description: Internal server error
 
@@ -402,17 +470,7 @@ components:
 
     PatchFeedDTO:
       type: object
-      required:
-        - id
-        - confidence
-        - croppedImageUrl
-        - status
       properties:
-        id:
-          type: string
-          format: uuid
-          description: UUID of the feed event to update
-          example: "123e4567-e89b-12d3-a456-426614174000"
         confidence:
           type: number
           format: float
@@ -427,6 +485,45 @@ components:
           example: "https://example.com/images/feed-cropped.jpg"
         status:
           $ref: '#/components/schemas/Status'
+        isAppropriate:
+          type: boolean
+          description: Whether the feed image is appropriate
+          example: true
+        source:
+          $ref: '#/components/schemas/Source'
+        processingStatus:
+          type: string
+          enum: [PENDING, PROCESSING, COMPLETED, FAILED]
+          description: Current processing status of the image
+          example: "COMPLETED"
+        processingError:
+          type: string
+          description: Error message if processing failed
+          example: "Image processing timeout"
+        moderationLabels:
+          type: string
+          description: JSON string of content moderation labels
+          example: '["Safe Content"]'
+        faceDetected:
+          type: boolean
+          description: Whether a face was detected in the image
+          example: true
+        faceBoundingBox:
+          type: string
+          description: JSON string of face bounding box coordinates
+          example: '{"Width":0.3,"Height":0.4,"Left":0.2,"Top":0.1}'
+        originalImageSize:
+          type: integer
+          description: Size of the original image in bytes
+          example: 210453
+        processedImageSize:
+          type: integer
+          description: Size of the processed image in bytes
+          example: 9842
+        processingDuration:
+          type: integer
+          description: Time taken to process the image in milliseconds
+          example: 1325
 
     CreateFeedImageUrlDTO:
       type: object
@@ -534,8 +631,8 @@ components:
         croppedImageUrl:
           type: string
           format: uri
-          description: URL of the cropped feed image
-          example: "https://example.com/images/feed-cropped.jpg"
+          description: URL of the cropped feed image (stored in processed/ directory)
+          example: "https://example.com/images/processed/feed-cropped.jpg"
         isAppropriate:
           type: boolean
           description: Whether the feed image is appropriate
@@ -544,6 +641,39 @@ components:
           $ref: '#/components/schemas/Source'
         status:
           $ref: '#/components/schemas/Status'
+        processingStatus:
+          type: string
+          enum: [PENDING, PROCESSING, COMPLETED, FAILED]
+          description: Current processing status of the image
+          example: "COMPLETED"
+        processingError:
+          type: string
+          description: Error message if processing failed
+          example: "Image processing timeout"
+        moderationLabels:
+          type: string
+          description: JSON string of content moderation labels
+          example: '["Safe Content"]'
+        faceDetected:
+          type: boolean
+          description: Whether a face was detected in the image
+          example: true
+        faceBoundingBox:
+          type: string
+          description: JSON string of face bounding box coordinates
+          example: '{"Width":0.3,"Height":0.4,"Left":0.2,"Top":0.1}'
+        originalImageSize:
+          type: integer
+          description: Size of the original image in bytes
+          example: 210453
+        processedImageSize:
+          type: integer
+          description: Size of the processed image in bytes
+          example: 9842
+        processingDuration:
+          type: integer
+          description: Time taken to process the image in milliseconds
+          example: 1325
         createdAt:
           type: string
           format: date-time
