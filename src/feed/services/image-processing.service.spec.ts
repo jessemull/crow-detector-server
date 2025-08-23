@@ -548,7 +548,7 @@ describe('ImageProcessingService', () => {
       );
 
       expect(result).toBe(
-        'https://test-bucket.s3.us-west-2.amazonaws.com/test-key_cropped.jpg',
+        'https://test-bucket.s3.us-west-2.amazonaws.com/processed/test-key_cropped.jpg',
       );
       expect(mockS3Send).toHaveBeenCalledWith(expect.any(PutObjectCommand));
     });

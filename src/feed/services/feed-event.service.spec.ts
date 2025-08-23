@@ -331,7 +331,7 @@ describe('FeedEventService', () => {
       (
         imageProcessingService.uploadProcessedImage as jest.Mock
       ).mockResolvedValue(
-        'https://bucket.s3.amazonaws.com/test-key_cropped.jpg',
+        'https://bucket.s3.amazonaws.com/processed/test-key_cropped.jpg',
       );
 
       (s3MetadataService.getObjectSize as jest.Mock).mockResolvedValue(512);
@@ -355,7 +355,7 @@ describe('FeedEventService', () => {
 
       expect(s3MetadataService.getObjectSize).toHaveBeenCalledWith(
         bucket,
-        'test-key_cropped.jpg',
+        'processed/test-key_cropped.jpg',
       );
 
       expect(repository.update).toHaveBeenCalledWith(
@@ -373,7 +373,7 @@ describe('FeedEventService', () => {
           }),
           processingDuration: 1500,
           croppedImageUrl:
-            'https://bucket.s3.amazonaws.com/test-key_cropped.jpg',
+            'https://bucket.s3.amazonaws.com/processed/test-key_cropped.jpg',
           processedImageSize: 512,
         }),
       );
