@@ -292,18 +292,18 @@ The system provides secure image upload capabilities through pre-signed S3 URLs:
 
 ### Image Processing Flow
 
-1. **Upload**: Image uploaded to `feed/` or `detection/` directory
-2. **Processing**: Lambda function triggers image processing pipeline
-3. **Storage**: Processed images stored in separate `processed/` directory
-4. **Safety**: Processed images don't trigger reprocessing (prevents infinite loops)
+1. **Upload**: Image uploaded to `feed/` or `detection/` directory.
+2. **Processing**: Lambda function triggers image processing pipeline.
+3. **Storage**: Processed images stored in separate `processed/` directory.
+4. **Safety**: Processed images don't trigger reprocessing (prevents infinite loops).
 
 #### Detection Event Processing Workflow
 
-1. **Initial Status**: Detection events start with `PENDING` status
-2. **Processing Phase**: Status changes to `PROCESSING` during analysis
-3. **AI Analysis**: AWS Rekognition detects animals, Claude AI classifies species
-4. **Completion**: Status updates to `COMPLETED` with results or `FAILED` with errors
-5. **Metadata Storage**: Processing duration, error details, and analysis results saved
+1. **Initial Status**: Detection events start with `PENDING` status.
+2. **Processing Phase**: Status changes to `PROCESSING` during analysis.
+3. **AI Analysis**: AWS Rekognition detects animals, Claude AI classifies species.
+4. **Completion**: Status updates to `COMPLETED` with results or `FAILED` with errors.
+5. **Metadata Storage**: Processing duration, error details, and analysis results saved.
 
 ### Image Metadata
 
@@ -319,25 +319,25 @@ The system provides comprehensive animal detection and analysis capabilities thr
 
 ### Processing Stages
 
-- **PENDING**: Initial state when detection event is created
-- **PROCESSING**: Active analysis phase using AWS services
-- **COMPLETED**: Successful processing with results stored
-- **FAILED**: Processing error with detailed error information
+- **PENDING**: Initial state when detection event is created.
+- **PROCESSING**: Active analysis phase using AWS services.
+- **COMPLETED**: Successful processing with results stored.
+- **FAILED**: Processing error with detailed error information.
 
 ### Analysis Components
 
-- **AWS Rekognition**: Primary animal detection with confidence scores
-- **Claude AI**: Advanced species classification and crow identification
-- **Fallback Detection**: Local processing when external services are unavailable
-- **Error Handling**: Comprehensive error tracking and retry mechanisms
+- **AWS Rekognition**: Primary animal detection with confidence scores.
+- **Claude AI**: Advanced species classification and crow identification.
+- **Fallback Detection**: Local processing when external services are unavailable.
+- **Error Handling**: Comprehensive error tracking and retry mechanisms.
 
 ### Data Captured
 
-- **Animal Counts**: Total animals and specific crow counts
-- **Species Detection**: Identified animal types and classifications
-- **Processing Metrics**: Duration, file sizes, and performance data
-- **Error Details**: Specific failure reasons for debugging
-- **Temporal Data**: Timestamps for processing and completion
+- **Animal Counts**: Total animals and specific crow counts.
+- **Species Detection**: Identified animal types and classifications.
+- **Processing Metrics**: Duration, file sizes, and performance data.
+- **Error Details**: Specific failure reasons for debugging.
+- **Temporal Data**: Timestamps for processing and completion.
 
 ### Security Features
 
@@ -503,9 +503,9 @@ Infrastructure is managed using AWS CloudFormation templates with environment-sp
 
 The system integrates with external AI services for advanced image analysis:
 
-- **Anthropic Claude**: AI-powered animal species classification and crow detection
-- **API Integration**: Secure communication with Claude's API for image analysis
-- **Fallback Processing**: Local detection algorithms when AI services are unavailable
+- **Anthropic Claude**: AI-powered animal species classification and crow detection.
+- **API Integration**: Secure communication with Claude's API for image analysis.
+- **Fallback Processing**: Local detection algorithms when AI services are unavailable.
 
 ### Required AWS Secrets
 
