@@ -13,7 +13,6 @@ export interface AnimalDetectionResult {
   crowCount: number;
   animalCount: number;
   detectedAnimals: string[];
-  confidence: number;
   processingDuration: number;
 }
 
@@ -179,7 +178,6 @@ export class DetectionImageProcessingService {
       crowCount,
       animalCount,
       detectedAnimals,
-      confidence: maxConfidence,
     };
   }
 

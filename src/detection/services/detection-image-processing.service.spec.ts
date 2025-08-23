@@ -123,7 +123,6 @@ describe('DetectionImageProcessingService', () => {
         crowCount: 1,
         animalCount: 1,
         detectedAnimals: ['Crow'],
-        confidence: 87,
       };
 
       mockClaudeService.analyzeAnimalDetection.mockResolvedValue(claudeResult);
@@ -134,7 +133,6 @@ describe('DetectionImageProcessingService', () => {
       expect(result.crowCount).toBe(1);
       expect(result.animalCount).toBe(1);
       expect(result.detectedAnimals).toEqual(['Crow']);
-      expect(result.confidence).toBe(87);
       expect(result.processingDuration).toBeGreaterThan(0);
     });
 
@@ -158,7 +156,6 @@ describe('DetectionImageProcessingService', () => {
       expect(result.crowCount).toBe(1); // Only "Crow" contains "crow"
       expect(result.animalCount).toBe(2); // Both Bird and Crow are animals
       expect(result.detectedAnimals).toEqual(['Bird', 'Crow']);
-      expect(result.confidence).toBe(95);
     });
 
     it('should delete image when no animals detected', async () => {
@@ -179,7 +176,6 @@ describe('DetectionImageProcessingService', () => {
         crowCount: 0,
         animalCount: 0,
         detectedAnimals: [],
-        confidence: 0,
       };
 
       mockClaudeService.analyzeAnimalDetection.mockResolvedValue(claudeResult);

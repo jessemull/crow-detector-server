@@ -8,7 +8,6 @@ export interface AnimalAnalysisResult {
   crowCount: number;
   animalCount: number;
   detectedAnimals: string[];
-  confidence: number;
 }
 
 @Injectable()
@@ -49,8 +48,7 @@ Return ONLY valid JSON with this exact structure:
   "hasAnimals": boolean,
   "crowCount": number,
   "animalCount": number,
-  "detectedAnimals": string[],
-  "confidence": number
+  "detectedAnimals": string[]
 }
 
 Rules:
@@ -58,7 +56,6 @@ Rules:
 - crowCount: count of crows, ravens, blackbirds, corvids, or similar birds
 - animalCount: total count of all animals (including crows)
 - detectedAnimals: array of all animal names found
-- confidence: use the highest confidence score from the labels
 
 Be comprehensive - if you see "Bird", "Mammal", "Pet", "Wildlife", etc., these likely indicate animals.`;
 
@@ -93,8 +90,7 @@ Be comprehensive - if you see "Bird", "Mammal", "Pet", "Wildlife", etc., these l
         typeof result.hasAnimals !== 'boolean' ||
         typeof result.crowCount !== 'number' ||
         typeof result.animalCount !== 'number' ||
-        !Array.isArray(result.detectedAnimals) ||
-        typeof result.confidence !== 'number'
+        !Array.isArray(result.detectedAnimals)
       ) {
         throw new Error('Invalid response structure from Claude');
       }

@@ -140,7 +140,6 @@ export class DetectionEventService {
       if (result.hasAnimals) {
         // If animals detected, store the detection data...
 
-        updateData.confidence = result.confidence;
         updateData.crowCount = result.crowCount;
         updateData.animalCount = result.animalCount;
       } else {
