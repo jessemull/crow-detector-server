@@ -84,6 +84,8 @@ Resources:
               Value: !Sub 'crow-detector-images-${Environment}'
             - Name: AWS_REGION
               Value: !Ref AWS::Region
+            - Name: CLAUDE_MODEL
+              Value: 'claude-3-opus-20240229'
           Secrets:
             - Name: RDS_USERNAME
               ValueFrom: !Sub 'arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:crow-detector-db-${Environment}:username::'
