@@ -1,15 +1,15 @@
 import { CreateDetectionDTO } from '../dto/create-detection.dto';
 import { DetectionEvent } from '../entity/detection-event.entity';
 import { DetectionEventService } from './detection-event.service';
+import { DetectionImageProcessingService } from './detection-image-processing.service';
 import { FeedEvent } from '../../feed/entity/feed-event.entity';
 import { NotFoundException } from '@nestjs/common';
 import { PatchDetectionDTO } from '../dto/patch-detection.dto';
 import { Repository, Between } from 'typeorm';
+import { S3MetadataService } from '../../feed/services/s3-metadata.service';
 import { Source, Status, ProcessingStatus } from '../../common/types';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { DetectionImageProcessingService } from './detection-image-processing.service';
-import { S3MetadataService } from '../../feed/services/s3-metadata.service';
 
 describe('DetectionEventService', () => {
   let service: DetectionEventService;
@@ -98,7 +98,7 @@ describe('DetectionEventService', () => {
       const createdEvent = {
         ...mockDetectionEvent,
         ...createDetectionDTO,
-        processingStatus: 'PENDING',
+        processingStatus: ProcessingStatus.PENDING,
         feedEvent: undefined,
       };
       mockRepository.create.mockReturnValue(createdEvent);
@@ -108,7 +108,7 @@ describe('DetectionEventService', () => {
 
       expect(repository.create).toHaveBeenCalledWith({
         imageUrl: createDetectionDTO.imageUrl,
-        processingStatus: 'PENDING',
+        processingStatus: ProcessingStatus.PENDING,
       });
       expect(repository.save).toHaveBeenCalledWith(createdEvent);
       expect(result).toEqual(createdEvent);
@@ -329,7 +329,7 @@ describe('DetectionEventService', () => {
       await (service as any).processImageAsync(eventId, imageUrl);
 
       expect(mockRepository.update).toHaveBeenCalledWith(eventId, {
-        processingStatus: 'PROCESSING',
+        processingStatus: ProcessingStatus.PROCESSING,
       });
 
       expect(
@@ -337,7 +337,7 @@ describe('DetectionEventService', () => {
       ).toHaveBeenCalledWith('test-bucket', 'test-key');
 
       expect(mockRepository.update).toHaveBeenCalledWith(eventId, {
-        processingStatus: 'COMPLETED',
+        processingStatus: ProcessingStatus.COMPLETED,
         processingDuration: 1500,
         originalImageSize: 1024,
         detectedAnimals: '["Crow","Bird","Squirrel"]',
@@ -372,7 +372,7 @@ describe('DetectionEventService', () => {
       await (service as any).processImageAsync(eventId, imageUrl);
 
       expect(mockRepository.update).toHaveBeenCalledWith(eventId, {
-        processingStatus: 'PROCESSING',
+        processingStatus: ProcessingStatus.PROCESSING,
       });
 
       expect(mockRepository.delete).toHaveBeenCalledWith(eventId);
@@ -401,7 +401,7 @@ describe('DetectionEventService', () => {
       ).rejects.toThrow('AWS service unavailable');
 
       expect(mockRepository.update).toHaveBeenCalledWith(eventId, {
-        processingStatus: 'FAILED',
+        processingStatus: ProcessingStatus.FAILED,
         processingError: 'AWS service unavailable',
       });
     });
@@ -421,7 +421,7 @@ describe('DetectionEventService', () => {
       ).rejects.toThrow('Invalid S3 URL format');
 
       expect(mockRepository.update).toHaveBeenCalledWith(eventId, {
-        processingStatus: 'FAILED',
+        processingStatus: ProcessingStatus.FAILED,
         processingError: 'Invalid S3 URL format',
       });
     });
@@ -457,7 +457,7 @@ describe('DetectionEventService', () => {
       ).rejects.toThrow('S3 object not found');
 
       expect(mockRepository.update).toHaveBeenCalledWith(eventId, {
-        processingStatus: 'FAILED',
+        processingStatus: ProcessingStatus.FAILED,
         processingError: 'S3 object not found',
       });
     });
