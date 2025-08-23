@@ -35,6 +35,7 @@ describe('DetectionController', () => {
   const mockDetectionEventService = {
     create: jest.fn(),
     find: jest.fn(),
+    findById: jest.fn(),
     update: jest.fn(),
   };
 
@@ -90,7 +91,6 @@ describe('DetectionController', () => {
   describe('crowDetectedEvent', () => {
     it('should create a detection event successfully', async () => {
       const dto: CreateDetectionDTO = {
-        feedEvent: 'feed-uuid',
         imageUrl: 'https://example.com/detection-image.jpg',
       };
       mockDetectionEventService.create.mockResolvedValue(mockDetectionEvent);
@@ -107,7 +107,6 @@ describe('DetectionController', () => {
 
     it('should propagate service errors', async () => {
       const dto: CreateDetectionDTO = {
-        feedEvent: 'feed-uuid',
         imageUrl: 'https://example.com/detection-image.jpg',
       };
       const error = new Error('Service error');
@@ -154,10 +153,37 @@ describe('DetectionController', () => {
     });
   });
 
+  describe('getDetectionEventById', () => {
+    it('should return a detection event by id', async () => {
+      const id = 'detection-uuid';
+      mockDetectionEventService.findById.mockResolvedValue(mockDetectionEvent);
+
+      const result = await controller.getDetectionEventById(id);
+
+      expect(service.findById).toHaveBeenCalledWith(id);
+      expect(result).toHaveProperty('data', mockDetectionEvent);
+      expect(result).toHaveProperty(
+        'message',
+        'Detection event retrieved successfully!',
+      );
+    });
+
+    it('should propagate service errors', async () => {
+      const id = 'detection-uuid';
+      const error = new Error('Service error');
+      mockDetectionEventService.findById.mockRejectedValue(error);
+
+      await expect(controller.getDetectionEventById(id)).rejects.toThrow(
+        'Service error',
+      );
+      expect(service.findById).toHaveBeenCalledWith(id);
+    });
+  });
+
   describe('updateCrowDetectedEvent', () => {
     it('should update a detection event successfully', async () => {
+      const id = 'detection-uuid';
       const patchDTO: PatchDetectionDTO = {
-        id: 'detection-uuid',
         confidence: 0.98,
         crowCount: 8,
       };
@@ -168,9 +194,9 @@ describe('DetectionController', () => {
       };
       mockDetectionEventService.update.mockResolvedValue(updatedEvent);
 
-      const result = await controller.updateCrowDetectedEvent(patchDTO);
+      const result = await controller.updateCrowDetectedEvent(id, patchDTO);
 
-      expect(service.update).toHaveBeenCalledWith(patchDTO);
+      expect(service.update).toHaveBeenCalledWith(id, patchDTO);
       expect(result).toHaveProperty('data', updatedEvent);
       expect(result).toHaveProperty(
         'message',
@@ -179,8 +205,8 @@ describe('DetectionController', () => {
     });
 
     it('should propagate service errors', async () => {
+      const id = 'detection-uuid';
       const patchDTO: PatchDetectionDTO = {
-        id: 'detection-uuid',
         confidence: 0.98,
         crowCount: 8,
       };
@@ -188,9 +214,9 @@ describe('DetectionController', () => {
       mockDetectionEventService.update.mockRejectedValue(error);
 
       await expect(
-        controller.updateCrowDetectedEvent(patchDTO),
+        controller.updateCrowDetectedEvent(id, patchDTO),
       ).rejects.toThrow('Service error');
-      expect(service.update).toHaveBeenCalledWith(patchDTO);
+      expect(service.update).toHaveBeenCalledWith(id, patchDTO);
     });
   });
 });

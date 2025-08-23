@@ -8,6 +8,8 @@ import { Repository, Between } from 'typeorm';
 import { Source, Status } from '../../common/types';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { DetectionImageProcessingService } from './detection-image-processing.service';
+import { S3MetadataService } from '../../feed/services/s3-metadata.service';
 
 describe('DetectionEventService', () => {
   let service: DetectionEventService;
@@ -40,6 +42,16 @@ describe('DetectionEventService', () => {
     find: jest.fn(),
     findOne: jest.fn(),
     update: jest.fn(),
+    delete: jest.fn(),
+  };
+
+  const mockDetectionImageProcessingService = {
+    processImage: jest.fn(),
+  };
+
+  const mockS3MetadataService = {
+    extractMetadataFromUrl: jest.fn(),
+    getObjectSize: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -53,6 +65,14 @@ describe('DetectionEventService', () => {
         {
           provide: getRepositoryToken(FeedEvent),
           useValue: mockRepository,
+        },
+        {
+          provide: DetectionImageProcessingService,
+          useValue: mockDetectionImageProcessingService,
+        },
+        {
+          provide: S3MetadataService,
+          useValue: mockS3MetadataService,
         },
       ],
     }).compile();
@@ -70,50 +90,34 @@ describe('DetectionEventService', () => {
   describe('create', () => {
     it('should create a detection event successfully', async () => {
       const createDetectionDTO: CreateDetectionDTO = {
-        feedEvent: 'feed-uuid',
         imageUrl: 'https://example.com/detection-image.jpg',
       };
 
-      const createdEvent = { ...mockDetectionEvent, ...createDetectionDTO };
+      const createdEvent = {
+        ...mockDetectionEvent,
+        ...createDetectionDTO,
+        processingStatus: 'PENDING',
+        feedEvent: undefined,
+      };
       mockRepository.create.mockReturnValue(createdEvent);
       mockRepository.save.mockResolvedValue(createdEvent);
-
-      mockRepository.findOne.mockResolvedValueOnce(mockFeedEvent);
 
       const result = await service.create(createDetectionDTO);
 
       expect(repository.create).toHaveBeenCalledWith({
-        feedEvent: mockFeedEvent,
         imageUrl: createDetectionDTO.imageUrl,
+        processingStatus: 'PENDING',
       });
       expect(repository.save).toHaveBeenCalledWith(createdEvent);
       expect(result).toEqual(createdEvent);
     });
 
-    it('should throw NotFoundException when feed event not found', async () => {
-      const createDetectionDTO: CreateDetectionDTO = {
-        feedEvent: 'non-existent-feed-uuid',
-        imageUrl: 'https://example.com/detection-image.jpg',
-      };
-
-      mockRepository.findOne.mockResolvedValueOnce(null);
-
-      await expect(service.create(createDetectionDTO)).rejects.toThrow(
-        NotFoundException,
-      );
-      expect(repository.findOne).toHaveBeenCalledWith({
-        where: { id: createDetectionDTO.feedEvent },
-      });
-    });
-
     it('should handle repository errors', async () => {
       const createDetectionDTO: CreateDetectionDTO = {
-        feedEvent: 'feed-uuid',
         imageUrl: 'https://example.com/detection-image.jpg',
       };
 
       const error = new Error('Repository error');
-      mockRepository.findOne.mockResolvedValue(mockFeedEvent);
       mockRepository.create.mockReturnValue({});
       mockRepository.save.mockRejectedValue(error);
 
@@ -216,13 +220,11 @@ describe('DetectionEventService', () => {
       expect(result).toEqual(mockDetectionEvent);
     });
 
-    it('should return null when detection event not found', async () => {
+    it('should throw NotFoundException when detection event not found', async () => {
       const id = 'non-existent-uuid';
       mockRepository.findOne.mockResolvedValue(null);
 
-      const result = await service.findById(id);
-
-      expect(result).toBeNull();
+      await expect(service.findById(id)).rejects.toThrow(NotFoundException);
     });
 
     it('should handle repository errors', async () => {
@@ -236,8 +238,8 @@ describe('DetectionEventService', () => {
 
   describe('update', () => {
     it('should update a detection event successfully', async () => {
+      const id = 'test-uuid';
       const patchDetectionDTO: PatchDetectionDTO = {
-        id: 'test-uuid',
         confidence: 0.98,
         crowCount: 8,
       };
@@ -251,38 +253,35 @@ describe('DetectionEventService', () => {
           ...patchDetectionDTO,
         });
 
-      const result = await service.update(patchDetectionDTO);
+      const result = await service.update(id, patchDetectionDTO);
 
       expect(repository.findOne).toHaveBeenCalledWith({
-        where: { id: patchDetectionDTO.id },
+        where: { id },
       });
-      expect(repository.update).toHaveBeenCalledWith(patchDetectionDTO.id, {
-        confidence: patchDetectionDTO.confidence,
-        crowCount: patchDetectionDTO.crowCount,
-      });
+      expect(repository.update).toHaveBeenCalledWith(id, patchDetectionDTO);
       expect(result).toBeDefined();
     });
 
     it('should throw NotFoundException when detection event not found', async () => {
+      const id = 'non-existent-uuid';
       const patchDetectionDTO: PatchDetectionDTO = {
-        id: 'non-existent-uuid',
         confidence: 0.98,
         crowCount: 8,
       };
 
       mockRepository.findOne.mockResolvedValue(null);
 
-      await expect(service.update(patchDetectionDTO)).rejects.toThrow(
+      await expect(service.update(id, patchDetectionDTO)).rejects.toThrow(
         NotFoundException,
       );
       expect(repository.findOne).toHaveBeenCalledWith({
-        where: { id: patchDetectionDTO.id },
+        where: { id },
       });
     });
 
     it('should handle repository errors', async () => {
+      const id = 'test-uuid';
       const patchDetectionDTO: PatchDetectionDTO = {
-        id: 'test-uuid',
         confidence: 0.98,
         crowCount: 8,
       };
@@ -290,7 +289,7 @@ describe('DetectionEventService', () => {
       const error = new Error('Repository error');
       mockRepository.findOne.mockRejectedValue(error);
 
-      await expect(service.update(patchDetectionDTO)).rejects.toThrow(
+      await expect(service.update(id, patchDetectionDTO)).rejects.toThrow(
         'Repository error',
       );
     });

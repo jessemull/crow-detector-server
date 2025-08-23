@@ -31,8 +31,28 @@ export class DetectionEvent {
   @Column({ nullable: true })
   crowCount?: number;
 
-  @ManyToOne(() => FeedEvent, (feedEvent) => feedEvent.detectionEvents)
-  feedEvent: FeedEvent;
+  @Column({ nullable: true })
+  animalCount?: number;
+
+  @Column({ nullable: true })
+  processingStatus?: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+
+  @Column({ nullable: true })
+  processingError?: string;
+
+  @Column({ nullable: true, type: 'text' })
+  detectedAnimals?: string; // JSON string of detected animals
+
+  @Column({ nullable: true })
+  originalImageSize?: number;
+
+  @Column({ nullable: true })
+  processingDuration?: number;
+
+  @ManyToOne(() => FeedEvent, (feedEvent) => feedEvent.detectionEvents, {
+    nullable: true,
+  })
+  feedEvent?: FeedEvent;
 
   @Column()
   imageUrl: string;

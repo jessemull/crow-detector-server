@@ -1,8 +1,8 @@
 export interface S3ObjectInfo {
   bucket: string;
+  eventName: string;
   key: string;
   size: number;
-  eventName: string;
 }
 
 export interface S3EventFromSQS {

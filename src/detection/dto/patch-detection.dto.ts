@@ -1,15 +1,38 @@
-import { IsNumber, IsUUID } from 'class-validator';
+import { IsNumber, IsOptional } from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class PatchDetectionDTO {
-  @IsUUID()
-  id: string;
-
+  @IsOptional()
   @IsNumber()
   @Transform(({ value }) => Number(value))
-  confidence: number;
+  confidence?: number;
 
+  @IsOptional()
   @IsNumber()
   @Transform(({ value }) => Number(value))
-  crowCount: number;
+  crowCount?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Transform(({ value }) => Number(value))
+  animalCount?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Transform(({ value }) => Number(value))
+  processingDuration?: number;
+
+  @IsOptional()
+  processingStatus?: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+
+  @IsOptional()
+  processingError?: string;
+
+  @IsOptional()
+  detectedAnimals?: string; // JSON string of detected animals
+
+  @IsOptional()
+  @IsNumber()
+  @Transform(({ value }) => Number(value))
+  originalImageSize?: number;
 }
