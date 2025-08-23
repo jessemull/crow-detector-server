@@ -126,18 +126,21 @@ export class DetectionImageProcessingService {
   private fallbackAnimalDetection(
     labels: Array<{ Name?: string; Confidence?: number }>,
   ): Omit<AnimalDetectionResult, 'processingDuration'> {
-    // Basic fallback detection for when Claude is unavailable
+    // Basic fallback detection for when Claude is unavailable...
+
     const generalAnimalCategories = [
       'Animal',
       'Wildlife',
       'Pet',
       'Farm Animal',
     ];
+
     const birdCategories = ['Bird', 'Avian', 'Flying Animal'];
     const mammalCategories = ['Mammal', 'Furry Animal'];
     const crowTerms = ['crow', 'raven', 'blackbird', 'corvid'];
 
     const detectedAnimals: string[] = [];
+
     let crowCount = 0;
     let animalCount = 0;
     let maxConfidence = 0;
@@ -147,10 +150,12 @@ export class DetectionImageProcessingService {
         maxConfidence = Math.max(maxConfidence, label.Confidence);
         const labelName = label.Name.toLowerCase();
 
-        // Check if it's a crow first (crows are always animals)
+        // Check if it's a crow first (crows are always animals)...
+
         const isCrow = crowTerms.some((term) => labelName.includes(term));
 
-        // Check if it's an animal using general categories
+        // Check if it's an animal using general categories...
+
         const isAnimal =
           generalAnimalCategories.some((cat) =>
             labelName.includes(cat.toLowerCase()),
@@ -159,13 +164,11 @@ export class DetectionImageProcessingService {
           mammalCategories.some((cat) =>
             labelName.includes(cat.toLowerCase()),
           ) ||
-          isCrow; // Crows are animals too
+          isCrow;
 
         if (isAnimal) {
           detectedAnimals.push(label.Name);
           animalCount++;
-
-          // Count crows specifically
           if (isCrow) {
             crowCount++;
           }

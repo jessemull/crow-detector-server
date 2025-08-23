@@ -1,5 +1,6 @@
 import { IsNumber, IsOptional } from 'class-validator';
 import { Transform } from 'class-transformer';
+import { ProcessingStatus } from 'src/common/types';
 
 export class PatchDetectionDTO {
   @IsOptional()
@@ -23,7 +24,7 @@ export class PatchDetectionDTO {
   processingDuration?: number;
 
   @IsOptional()
-  processingStatus?: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+  processingStatus?: ProcessingStatus;
 
   @IsOptional()
   processingError?: string;

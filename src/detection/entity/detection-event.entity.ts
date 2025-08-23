@@ -1,4 +1,5 @@
 import { FeedEvent } from 'src/feed/entity/feed-event.entity';
+import { ProcessingStatus } from 'src/common/types';
 import {
   Column,
   CreateDateColumn,
@@ -35,7 +36,7 @@ export class DetectionEvent {
   animalCount?: number;
 
   @Column({ nullable: true })
-  processingStatus?: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+  processingStatus?: ProcessingStatus;
 
   @Column({ nullable: true })
   processingError?: string;

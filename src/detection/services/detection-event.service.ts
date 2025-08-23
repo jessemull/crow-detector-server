@@ -8,6 +8,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PatchDetectionDTO } from '../dto/patch-detection.dto';
 import { S3MetadataService } from 'src/feed/services/s3-metadata.service';
 import { createLogger } from 'src/common/logger/logger.config';
+import { ProcessingStatus } from 'src/common/types';
 
 @Injectable()
 export class DetectionEventService {
@@ -29,7 +30,7 @@ export class DetectionEventService {
 
     const event = this.detectionEventRepository.create({
       imageUrl,
-      processingStatus: 'PENDING',
+      processingStatus: ProcessingStatus.PENDING,
     });
 
     const savedEvent = await this.detectionEventRepository.save(event);
@@ -105,7 +106,7 @@ export class DetectionEventService {
       // Update status to processing...
 
       await this.detectionEventRepository.update(eventId, {
-        processingStatus: 'PROCESSING',
+        processingStatus: ProcessingStatus.PROCESSING,
       });
 
       // Extract S3 bucket and key from URL...
@@ -131,7 +132,7 @@ export class DetectionEventService {
       // Update with processing results...
 
       const updateData: Partial<DetectionEvent> = {
-        processingStatus: 'COMPLETED',
+        processingStatus: ProcessingStatus.COMPLETED,
         processingDuration: result.processingDuration,
         originalImageSize,
         detectedAnimals: JSON.stringify(result.detectedAnimals),
@@ -158,7 +159,7 @@ export class DetectionEventService {
       this.logger.info(`Animal detection completed for event ${eventId}`);
     } catch (error: unknown) {
       await this.detectionEventRepository.update(eventId, {
-        processingStatus: 'FAILED',
+        processingStatus: ProcessingStatus.FAILED,
         processingError: error instanceof Error ? error.message : String(error),
       });
       throw error;

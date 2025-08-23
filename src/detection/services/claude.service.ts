@@ -77,7 +77,8 @@ Be comprehensive - if you see "Bird", "Mammal", "Pet", "Wildlife", etc., these l
 
       const responseText = content.text.trim();
 
-      // Try to extract JSON from the response
+      // Try to extract JSON from the response...
+
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         throw new Error('No JSON found in Claude response');
@@ -85,7 +86,8 @@ Be comprehensive - if you see "Bird", "Mammal", "Pet", "Wildlife", etc., these l
 
       const result = JSON.parse(jsonMatch[0]) as AnimalAnalysisResult;
 
-      // Validate the result structure
+      // Validate the result structure...
+
       if (
         typeof result.hasAnimals !== 'boolean' ||
         typeof result.crowCount !== 'number' ||

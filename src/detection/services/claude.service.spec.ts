@@ -3,7 +3,6 @@ import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { createLogger } from '../../common/logger/logger.config';
 
-// Mock the logger
 jest.mock('../../common/logger/logger.config');
 const mockCreateLogger = createLogger as jest.MockedFunction<
   typeof createLogger
@@ -19,17 +18,14 @@ describe('ClaudeService', () => {
   };
 
   beforeEach(async () => {
-    // Reset mocks
     jest.clearAllMocks();
 
-    // Create a fresh mock logger for each test
     mockLogger = {
       warn: jest.fn(),
       info: jest.fn(),
       error: jest.fn(),
     };
 
-    // Setup logger mock
     mockCreateLogger.mockReturnValue(mockLogger);
 
     const module: TestingModule = await Test.createTestingModule({
@@ -97,6 +93,15 @@ describe('ClaudeService', () => {
       { Name: 'Tree', Confidence: 92 },
     ];
 
+    beforeEach(() => {
+      const mockAnthropic = {
+        messages: {
+          create: jest.fn(),
+        },
+      };
+      (service as any).anthropic = mockAnthropic;
+    });
+
     it('should throw error when API key is not configured', async () => {
       mockConfigService.get.mockReturnValue(undefined);
 
@@ -125,6 +130,148 @@ describe('ClaudeService', () => {
       new ClaudeService(freshMockConfigService as any);
 
       expect(freshMockConfigService.get).toHaveBeenCalledWith('CLAUDE_API_KEY');
+    });
+
+    it('should successfully analyze animal detection with valid response', async () => {
+      mockConfigService.get.mockReturnValue('test-api-key');
+
+      const mockResponse = {
+        content: [
+          {
+            type: 'text',
+            text: '{"hasAnimals": true, "crowCount": 1, "animalCount": 2, "detectedAnimals": ["Bird", "Crow"]}',
+          },
+        ],
+      };
+
+      (service as any).anthropic.messages.create.mockResolvedValue(
+        mockResponse,
+      );
+
+      const result = await service.analyzeAnimalDetection(mockLabels);
+
+      expect(result.hasAnimals).toBe(true);
+      expect(result.crowCount).toBe(1);
+      expect(result.animalCount).toBe(2);
+      expect(result.detectedAnimals).toEqual(['Bird', 'Crow']);
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Claude analysis completed: 2 animals, 1 crows',
+      );
+    });
+
+    it('should handle non-text response type from Claude', async () => {
+      mockConfigService.get.mockReturnValue('test-api-key');
+
+      const mockResponse = {
+        content: [
+          {
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: 'image/jpeg',
+              data: 'base64data',
+            },
+          },
+        ],
+      };
+
+      (service as any).anthropic.messages.create.mockResolvedValue(
+        mockResponse,
+      );
+
+      await expect(service.analyzeAnimalDetection(mockLabels)).rejects.toThrow(
+        'Unexpected response type from Claude',
+      );
+    });
+
+    it('should handle Claude response with no JSON content', async () => {
+      mockConfigService.get.mockReturnValue('test-api-key');
+
+      const mockResponse = {
+        content: [
+          {
+            type: 'text',
+            text: 'I cannot analyze this image properly.',
+          },
+        ],
+      };
+
+      (service as any).anthropic.messages.create.mockResolvedValue(
+        mockResponse,
+      );
+
+      await expect(service.analyzeAnimalDetection(mockLabels)).rejects.toThrow(
+        'No JSON found in Claude response',
+      );
+    });
+
+    it('should handle Claude response with invalid JSON structure', async () => {
+      mockConfigService.get.mockReturnValue('test-api-key');
+
+      const mockResponse = {
+        content: [
+          {
+            type: 'text',
+            text: '{"hasAnimals": true, "crowCount": "invalid", "animalCount": 2, "detectedAnimals": ["Bird"]}',
+          },
+        ],
+      };
+
+      (service as any).anthropic.messages.create.mockResolvedValue(
+        mockResponse,
+      );
+
+      await expect(service.analyzeAnimalDetection(mockLabels)).rejects.toThrow(
+        'Invalid response structure from Claude',
+      );
+    });
+
+    it('should handle Claude API errors gracefully', async () => {
+      mockConfigService.get.mockReturnValue('test-api-key');
+
+      (service as any).anthropic.messages.create.mockRejectedValue(
+        new Error('Claude API rate limit exceeded'),
+      );
+
+      await expect(service.analyzeAnimalDetection(mockLabels)).rejects.toThrow(
+        'Claude API rate limit exceeded',
+      );
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Claude analysis failed: Claude API rate limit exceeded',
+        expect.any(String),
+      );
+    });
+
+    it('should filter out labels without name or confidence', async () => {
+      mockConfigService.get.mockReturnValue('test-api-key');
+
+      const incompleteLabels = [
+        { Name: 'Bird', Confidence: 95 },
+        { Name: 'Crow' },
+        { Confidence: 87 },
+        { Name: 'Tree', Confidence: 92 },
+      ];
+
+      const mockResponse = {
+        content: [
+          {
+            type: 'text',
+            text: '{"hasAnimals": true, "crowCount": 1, "animalCount": 1, "detectedAnimals": ["Bird"]}',
+          },
+        ],
+      };
+
+      (service as any).anthropic.messages.create.mockResolvedValue(
+        mockResponse,
+      );
+
+      const result = await service.analyzeAnimalDetection(incompleteLabels);
+
+      expect(result.hasAnimals).toBe(true);
+      expect(result.crowCount).toBe(1);
+      expect(result.animalCount).toBe(1);
+      expect(result.detectedAnimals).toEqual(['Bird']);
     });
   });
 });
