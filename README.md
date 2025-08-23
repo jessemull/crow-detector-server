@@ -398,25 +398,7 @@ The pipeline performs the following steps:
 
 This workflow runs automatically when changes are pushed to the `main` branch. It builds, tests, and deploys the NestJS application to ECS.
 
-## Recent Improvements & Fixes
 
-### AWS SDK v3 Migration (August 2025)
-- **Upgraded from AWS SDK v2** to modern v3 for improved performance
-- **Eliminated deprecation warnings** and future-proofed the codebase
-- **Modular packages** for better tree-shaking and smaller bundles
-- **Enhanced TypeScript support** with better type definitions
-
-### Infinite Processing Loop Fix (August 2025)
-- **Problem**: Processed images were being uploaded to same directory, causing infinite reprocessing
-- **Solution**: Implemented directory separation with `processed/` folder for cropped images
-- **Result**: Clean, single-pass image processing with no more duplicate files
-- **S3 Event Triggers**: Now only fire on `feed/` and `detection/` directories
-
-### Image Processing Pipeline Enhancements
-- **Content Moderation**: AWS Rekognition integration for inappropriate content filtering
-- **Face Detection**: Precise bounding box coordinates for intelligent cropping
-- **Smart Cropping**: Sharp library with face-focused cropping and padding
-- **Processing Status Tracking**: Real-time status updates throughout the pipeline
 
 ## Infrastructure
 

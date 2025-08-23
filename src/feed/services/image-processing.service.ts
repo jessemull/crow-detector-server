@@ -285,12 +285,14 @@ export class ImageProcessingService {
     key: string,
     imageBuffer: Buffer,
   ): Promise<string> {
-    // Extract the base filename without extension
+    // Extract the base filename without extension...
+
     const pathParts = key.split('/');
     const filename = pathParts[pathParts.length - 1];
     const baseName = filename.replace(/\.[^/.]+$/, ''); // Remove file extension
 
-    // Create processed key in a separate 'processed' directory
+    // Create processed key in a separate 'processed' directory...
+
     const processedKey = `processed/${baseName}_cropped.jpg`;
 
     try {

@@ -89,12 +89,10 @@ describe('ImageProcessingService', () => {
     const key = 'test-key.jpg';
 
     it('should process image successfully with appropriate content and face detected', async () => {
-      // Mock content moderation
       mockRekognitionSend.mockResolvedValueOnce({
         ModerationLabels: [],
       });
 
-      // Mock face detection
       mockRekognitionSend.mockResolvedValueOnce({
         FaceDetails: [
           {
@@ -108,7 +106,6 @@ describe('ImageProcessingService', () => {
         ],
       });
 
-      // Mock S3 getObject
       const mockBody = {
         transformToByteArray: jest
           .fn()
@@ -118,7 +115,6 @@ describe('ImageProcessingService', () => {
         Body: mockBody,
       });
 
-      // Mock sharp
       const sharp = jest.requireMock('sharp');
       const mockSharpInstance = sharp();
       mockSharpInstance.metadata.mockResolvedValue({

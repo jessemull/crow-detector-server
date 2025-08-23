@@ -121,6 +121,7 @@ export class FeedEventService {
         const filename = pathParts[pathParts.length - 1];
         const baseName = filename.replace(/\.[^/.]+$/, ''); // Remove file extension
         const processedKey = `processed/${baseName}_cropped.jpg`;
+
         updateData.processedImageSize =
           await this.s3MetadataService.getObjectSize(bucket, processedKey);
       }
