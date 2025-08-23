@@ -113,12 +113,11 @@ describe('FeedEventService', () => {
         imageUrl: 'https://example.com/image.jpg',
       };
 
-      // Mock a recent feed event (within cooldown period)
       const recentFeedEvent = {
         ...mockFeedEvent,
-        createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
+        createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
       };
-      mockRepository.findOne.mockResolvedValue(recentFeedEvent);
+      mockRepository.find.mockResolvedValue([recentFeedEvent]);
 
       await expect(service.create(createFeedDTO)).rejects.toThrow(
         'Feed cooldown active. Please wait 2 hour(s) before feeding again.',
@@ -130,12 +129,11 @@ describe('FeedEventService', () => {
         imageUrl: 'https://example.com/image.jpg',
       };
 
-      // Mock an old feed event (outside cooldown period)
       const oldFeedEvent = {
         ...mockFeedEvent,
-        createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000), // 5 hours ago
+        createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000),
       };
-      mockRepository.findOne.mockResolvedValue(oldFeedEvent);
+      mockRepository.find.mockResolvedValue([oldFeedEvent]);
 
       const createdEvent = { ...mockFeedEvent, ...createFeedDTO };
       mockRepository.create.mockReturnValue(createdEvent);
@@ -150,18 +148,16 @@ describe('FeedEventService', () => {
         imageUrl: 'https://example.com/image.jpg',
       };
 
-      // Mock a recent feed event (within cooldown period)
       const recentFeedEvent = {
         ...mockFeedEvent,
-        createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
+        createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
       };
-      mockRepository.findOne.mockResolvedValue(recentFeedEvent);
+      mockRepository.find.mockResolvedValue([recentFeedEvent]);
 
       const createdEvent = { ...mockFeedEvent, ...createFeedDTO };
       mockRepository.create.mockReturnValue(createdEvent);
       mockRepository.save.mockResolvedValue(createdEvent);
 
-      // Should succeed even with recent feed due to skipCooldown
       const result = await service.create(createFeedDTO, true);
       expect(result).toEqual(createdEvent);
     });
@@ -171,8 +167,7 @@ describe('FeedEventService', () => {
         imageUrl: 'https://example.com/image.jpg',
       };
 
-      // Mock no previous feed events
-      mockRepository.findOne.mockResolvedValue(null);
+      mockRepository.find.mockResolvedValue([]);
 
       const createdEvent = { ...mockFeedEvent, ...createFeedDTO };
       mockRepository.create.mockReturnValue(createdEvent);

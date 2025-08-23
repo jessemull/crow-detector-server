@@ -32,7 +32,8 @@ export class FeedEventService {
     const { imageUrl } = createFeedDTO;
 
     try {
-      // Check cooldown period if not skipped
+      // Check cooldown period if not skipped...
+
       if (!skipCooldown) {
         await this.checkCooldownPeriod();
       }
@@ -81,7 +82,8 @@ export class FeedEventService {
 
   private async checkCooldownPeriod(): Promise<void> {
     try {
-      // Get the most recent feed event
+      // Get the most recent feed event...
+
       const lastFeedEvents = await this.feedEventRepository.find({
         order: { createdAt: 'DESC' },
         take: 1,
@@ -90,16 +92,19 @@ export class FeedEventService {
       const lastFeedEvent = lastFeedEvents[0];
 
       if (!lastFeedEvent) {
-        // No previous feed events, cooldown not applicable
+        // No previous feed events, cooldown not applicable...
+
         return;
       }
 
-      // Get cooldown period from configuration (default 4 hours)
+      // Get cooldown period from configuration (default 4 hours)...
+
       const cooldownHours =
         this.configService.get<number>('FEED_COOLDOWN_HOURS') || 4;
       const cooldownMs = cooldownHours * 60 * 60 * 1000;
 
-      // Calculate time since last feed
+      // Calculate time since last feed...
+
       const timeSinceLastFeed = Date.now() - lastFeedEvent.createdAt.getTime();
 
       if (timeSinceLastFeed < cooldownMs) {
@@ -118,7 +123,9 @@ export class FeedEventService {
         `Error checking cooldown period: ${error instanceof Error ? error.message : String(error)}`,
         error instanceof Error ? error.stack : undefined,
       );
-      // If there's an error checking cooldown, allow the feed to proceed
+
+      // If there's an error checking cooldown, allow the feed to proceed...
+
       this.logger.warn('Cooldown check failed, allowing feed to proceed');
     }
   }

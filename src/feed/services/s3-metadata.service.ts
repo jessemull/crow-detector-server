@@ -82,10 +82,12 @@ export class S3MetadataService {
     let filename: string;
 
     if (type === 'feed' && pathParts.length === 2) {
-      // Feed images: feed/{timestamp}-{filename}
+      // Feed images: feed/{timestamp}-{filename}...
+
       filename = pathParts[1];
     } else if (type === 'detection' && pathParts.length >= 3) {
-      // Detection images: detection/{feedEventId}/{timestamp}-{filename}
+      // Detection images: detection/{feedEventId}/{timestamp}-{filename}...
+
       feedEventId = pathParts[1];
       filename = pathParts[2];
     } else {
