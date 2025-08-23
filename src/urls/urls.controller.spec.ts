@@ -92,7 +92,6 @@ describe('UrlsController', () => {
       const createDetectionImageUrlDto: CreateDetectionImageUrlDto = {
         fileName: 'motion-detected',
         format: ImageFormat.PNG,
-        feedEventId: 'feed-123',
         contentType: 'image/png',
       };
 
@@ -127,7 +126,6 @@ describe('UrlsController', () => {
       const createDetectionImageUrlDto: CreateDetectionImageUrlDto = {
         fileName: 'motion-detected',
         format: ImageFormat.PNG,
-        feedEventId: 'feed-123',
       };
 
       const error = new Error('S3 service error');

@@ -1,16 +1,27 @@
 import { ConfigService } from '@nestjs/config';
 import { CreateFeedImageUrlDto, CreateDetectionImageUrlDto } from '../dto';
-import { Injectable, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { logger } from 'src/common/logger/logger.config';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { FeedEvent } from '../../feed/entity/feed-event.entity';
 
 @Injectable()
 export class UrlsService {
   private readonly s3Client: S3Client;
   private readonly bucketName: string;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    @InjectRepository(FeedEvent)
+    private readonly feedEventRepository: Repository<FeedEvent>,
+  ) {
     this.s3Client = new S3Client({
       region: this.configService.get<string>('AWS_REGION') || 'us-west-2',
     });
@@ -75,9 +86,23 @@ export class UrlsService {
   async createDetectionImageSignedUrl(
     createDetectionImageUrlDto: CreateDetectionImageUrlDto,
   ) {
-    const { fileName, format, feedEventId, contentType } =
-      createDetectionImageUrlDto;
+    const { fileName, format, contentType } = createDetectionImageUrlDto;
 
+    // Get the latest feed event ID from the database
+    const latestFeedEvents = await this.feedEventRepository.find({
+      order: { createdAt: 'DESC' },
+      take: 1,
+    });
+
+    const latestFeedEvent = latestFeedEvents[0];
+
+    if (!latestFeedEvent) {
+      throw new NotFoundException(
+        'No feed events found. Please create a feed event first.',
+      );
+    }
+
+    const feedEventId = latestFeedEvent.id;
     const timestamp = Date.now();
     const uniqueFileName = `${timestamp}-${fileName}`;
     const key = `detection/${feedEventId}/${uniqueFileName}.${format}`;
