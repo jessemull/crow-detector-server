@@ -202,6 +202,9 @@ To clone the repository, install dependencies, and run the project locally follo
    CLAUDE_API_KEY=your_claude_api_key
    CLAUDE_MODEL=claude-3-opus-20240229
 
+   # Feed Configuration
+   FEED_COOLDOWN_HOURS=4
+
    # Private Key Paths (for token generation)
    PI_USER_PRIVATE_KEY_PATH=/path/to/pi-user-private.pem
    PI_MOTION_PRIVATE_KEY_PATH=/path/to/pi-motion-private.pem

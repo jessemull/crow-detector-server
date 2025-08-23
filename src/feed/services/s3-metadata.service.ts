@@ -69,7 +69,7 @@ export class S3MetadataService {
     const pathParts = key.split('/');
     this.logger.info(`Path parts: ${JSON.stringify(pathParts)}`);
 
-    if (pathParts.length < 3) {
+    if (pathParts.length < 2) {
       this.logger.error(
         `Invalid key format: ${key}, parts: ${pathParts.length}`,
       );
@@ -77,11 +77,28 @@ export class S3MetadataService {
     }
 
     const type = pathParts[0] as 'feed' | 'detection';
-    const feedEventId = pathParts[1]; // For detection events, this is the feedEventId
-    const filename = pathParts[2]; // The actual filename with timestamp
+
+    let feedEventId: string | undefined;
+    let filename: string;
+
+    if (type === 'feed' && pathParts.length === 2) {
+      // Feed images: feed/{timestamp}-{filename}...
+
+      filename = pathParts[1];
+    } else if (type === 'detection' && pathParts.length >= 3) {
+      // Detection images: detection/{feedEventId}/{timestamp}-{filename}...
+
+      feedEventId = pathParts[1];
+      filename = pathParts[2];
+    } else {
+      this.logger.error(
+        `Invalid key format for type ${type}: ${key}, parts: ${pathParts.length}`,
+      );
+      throw new Error('Invalid S3 key format');
+    }
 
     this.logger.info(
-      `Extracted type: ${type}, feedEventId: ${feedEventId}, filename: ${filename}`,
+      `Extracted type: ${type}, feedEventId: ${feedEventId || 'N/A'}, filename: ${filename}`,
     );
 
     // Extract timestamp from filename: 1755884038592-test-image.jpg...
@@ -94,8 +111,11 @@ export class S3MetadataService {
       throw new Error('Could not extract timestamp from filename');
     }
 
-    const timestamp = parseInt(timestampMatch[1], 10);
-    this.logger.info(`Extracted timestamp: ${timestamp}`);
+    const timestampSeconds = parseInt(timestampMatch[1], 10);
+    const timestamp = timestampSeconds * 1000; // Convert seconds to milliseconds
+    this.logger.info(
+      `Extracted timestamp: ${timestampSeconds} seconds = ${timestamp} milliseconds`,
+    );
 
     // Extract source from S3 metadata (uploaded with the image)...
 

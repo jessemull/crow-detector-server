@@ -52,7 +52,7 @@ describe('S3MetadataService', () => {
 
   describe('extractMetadataFromUrl', () => {
     const validUrl =
-      'https://test-bucket.s3.us-west-2.amazonaws.com/feed/test-feed-123/1234567890-test-image.jpg';
+      'https://test-bucket.s3.us-west-2.amazonaws.com/feed/1234567890-test-image.jpg';
 
     beforeEach(() => {
       mockS3Send.mockResolvedValue({
@@ -70,9 +70,9 @@ describe('S3MetadataService', () => {
 
       expect(result).toEqual({
         bucket: 'test-bucket',
-        key: 'feed/test-feed-123/1234567890-test-image.jpg',
+        key: 'feed/1234567890-test-image.jpg',
         source: Source.API,
-        timestamp: 1234567890,
+        timestamp: 1234567890000,
         type: 'feed',
       });
 
@@ -90,7 +90,7 @@ describe('S3MetadataService', () => {
         'detection/test-feed-456/9876543210-another-image.jpg',
       );
       expect(result.type).toBe('detection');
-      expect(result.timestamp).toBe(9876543210);
+      expect(result.timestamp).toBe(9876543210000);
     });
 
     it('should default to BUTTON source when metadata is missing', async () => {
@@ -159,7 +159,7 @@ describe('S3MetadataService', () => {
 
     it('should throw error when filename lacks timestamp', async () => {
       const urlWithInvalidFilename =
-        'https://test-bucket.s3.us-west-2.amazonaws.com/feed/test-feed-123/no-timestamp-image.jpg';
+        'https://test-bucket.s3.us-west-2.amazonaws.com/feed/no-timestamp-image.jpg';
 
       await expect(
         service.extractMetadataFromUrl(urlWithInvalidFilename),
@@ -266,7 +266,7 @@ describe('S3MetadataService', () => {
 
   describe('extractMetadataFromS3Object', () => {
     const bucket = 'test-bucket';
-    const key = 'feed/test-feed-123/1234567890-test-image.jpg';
+    const key = 'feed/1234567890-test-image.jpg';
 
     it('should extract metadata from S3 object successfully', async () => {
       mockS3Send.mockResolvedValue({
@@ -283,9 +283,9 @@ describe('S3MetadataService', () => {
 
       expect(result).toEqual({
         bucket: 'test-bucket',
-        key: 'feed/test-feed-123/1234567890-test-image.jpg',
+        key: 'feed/1234567890-test-image.jpg',
         source: Source.API,
-        timestamp: 1234567890,
+        timestamp: 1234567890000,
         type: 'feed',
       });
     });
@@ -306,7 +306,7 @@ describe('S3MetadataService', () => {
       );
 
       expect(result.type).toBe('detection');
-      expect(result.timestamp).toBe(9876543210);
+      expect(result.timestamp).toBe(9876543210000);
     });
 
     it('should handle missing S3 metadata gracefully', async () => {

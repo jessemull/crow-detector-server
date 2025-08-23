@@ -3,10 +3,15 @@ import { CreateFeedDTO, PatchFeedDTO } from '../dto';
 import { FeedEvent } from '../entity/feed-event.entity';
 import { ImageProcessingService } from './image-processing.service';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { ProcessingStatus } from 'src/common/types';
 import { S3MetadataService } from './s3-metadata.service';
 import { createLogger } from 'src/common/logger/logger.config';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class FeedEventService {
@@ -17,12 +22,22 @@ export class FeedEventService {
     private feedEventRepository: Repository<FeedEvent>,
     private readonly imageProcessingService: ImageProcessingService,
     private readonly s3MetadataService: S3MetadataService,
+    private readonly configService: ConfigService,
   ) {}
 
-  async create(createFeedDTO: CreateFeedDTO): Promise<FeedEvent> {
+  async create(
+    createFeedDTO: CreateFeedDTO,
+    skipCooldown = false,
+  ): Promise<FeedEvent> {
     const { imageUrl } = createFeedDTO;
 
     try {
+      // Check cooldown period if not skipped...
+
+      if (!skipCooldown) {
+        await this.checkCooldownPeriod();
+      }
+
       // Extract metadata from S3 URL...
 
       const s3Metadata =
@@ -62,6 +77,56 @@ export class FeedEventService {
         error instanceof Error ? error.stack : undefined,
       );
       throw error;
+    }
+  }
+
+  private async checkCooldownPeriod(): Promise<void> {
+    try {
+      // Get the most recent feed event...
+
+      const lastFeedEvents = await this.feedEventRepository.find({
+        order: { createdAt: 'DESC' },
+        take: 1,
+      });
+
+      const lastFeedEvent = lastFeedEvents[0];
+
+      if (!lastFeedEvent) {
+        // No previous feed events, cooldown not applicable...
+
+        return;
+      }
+
+      // Get cooldown period from configuration (default 4 hours)...
+
+      const cooldownHours =
+        this.configService.get<number>('FEED_COOLDOWN_HOURS') || 4;
+      const cooldownMs = cooldownHours * 60 * 60 * 1000;
+
+      // Calculate time since last feed...
+
+      const timeSinceLastFeed = Date.now() - lastFeedEvent.createdAt.getTime();
+
+      if (timeSinceLastFeed < cooldownMs) {
+        const remainingHours = Math.ceil(
+          (cooldownMs - timeSinceLastFeed) / (60 * 60 * 1000),
+        );
+        throw new BadRequestException(
+          `Feed cooldown active. Please wait ${remainingHours} hour(s) before feeding again.`,
+        );
+      }
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      this.logger.error(
+        `Error checking cooldown period: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+
+      // If there's an error checking cooldown, allow the feed to proceed...
+
+      this.logger.warn('Cooldown check failed, allowing feed to proceed');
     }
   }
 

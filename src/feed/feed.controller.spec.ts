@@ -92,7 +92,7 @@ describe('FeedController', () => {
 
       const result = await controller.feedEvent(createFeedDTO);
 
-      expect(service.create).toHaveBeenCalledWith(createFeedDTO);
+      expect(service.create).toHaveBeenCalledWith(createFeedDTO, false);
       expect(result).toEqual({
         data: mockFeedEvent,
         message: 'Feeder event created successfully!',
@@ -110,7 +110,23 @@ describe('FeedController', () => {
       await expect(controller.feedEvent(createFeedDTO)).rejects.toThrow(
         'Service error',
       );
-      expect(service.create).toHaveBeenCalledWith(createFeedDTO);
+      expect(service.create).toHaveBeenCalledWith(createFeedDTO, false);
+    });
+
+    it('should skip cooldown when x-skip-cooldown header is true', async () => {
+      const createFeedDTO: CreateFeedDTO = {
+        imageUrl: 'https://example.com/image.jpg',
+      };
+
+      mockFeedEventService.create.mockResolvedValue(mockFeedEvent);
+
+      const result = await controller.feedEvent(createFeedDTO, 'true');
+
+      expect(service.create).toHaveBeenCalledWith(createFeedDTO, true);
+      expect(result).toEqual({
+        data: mockFeedEvent,
+        message: 'Feeder event created successfully!',
+      });
     });
   });
 
