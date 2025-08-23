@@ -6,6 +6,7 @@ import { FeedEvent } from 'src/feed';
 import { Module } from '@nestjs/common';
 import { S3MetadataService } from 'src/feed/services/s3-metadata.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ClaudeService } from './services/claude.service';
 
 @Module({
   controllers: [DetectionController],
@@ -15,6 +16,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
     DetectionEventService,
     DetectionImageProcessingService,
     S3MetadataService,
+    ClaudeService,
   ],
 })
 export class DetectionModule {}

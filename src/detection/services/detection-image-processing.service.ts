@@ -6,6 +6,7 @@ import {
 import { DeleteObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { Injectable } from '@nestjs/common';
 import { createLogger } from 'src/common/logger/logger.config';
+import { ClaudeService, AnimalAnalysisResult } from './claude.service';
 
 export interface AnimalDetectionResult {
   hasAnimals: boolean;
@@ -22,7 +23,10 @@ export class DetectionImageProcessingService {
   private readonly rekognition: RekognitionClient;
   private readonly s3: S3Client;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly claudeService: ClaudeService,
+  ) {
     const region = this.configService.get<string>('AWS_REGION') || 'us-west-2';
 
     this.rekognition = new RekognitionClient({
@@ -49,7 +53,7 @@ export class DetectionImageProcessingService {
 
       // Step 2: Analyze results for animals...
 
-      const result = this.analyzeAnimalDetection(labels);
+      const result = await this.analyzeAnimalDetection(labels);
 
       // Step 3: If no animals detected, delete the image...
 
@@ -102,42 +106,39 @@ export class DetectionImageProcessingService {
     }
   }
 
-  private analyzeAnimalDetection(labelsResult: {
+  private async analyzeAnimalDetection(labelsResult: {
     Labels?: Array<{ Name?: string; Confidence?: number }>;
-  }): Omit<AnimalDetectionResult, 'processingDuration'> {
+  }): Promise<Omit<AnimalDetectionResult, 'processingDuration'>> {
     const labels = labelsResult.Labels || [];
 
-    // Define animal categories...
+    try {
+      this.logger.info('Using Claude API for animal detection analysis');
+      const result = await this.claudeService.analyzeAnimalDetection(labels);
+      return result;
+    } catch (error) {
+      this.logger.warn(
+        'Claude analysis failed, falling back to basic detection',
+        error,
+      );
+      return this.fallbackAnimalDetection(labels);
+    }
+  }
 
-    const animalLabels = [
+  private fallbackAnimalDetection(
+    labels: Array<{ Name?: string; Confidence?: number }>,
+  ): Omit<AnimalDetectionResult, 'processingDuration'> {
+    // Basic fallback detection for when Claude is unavailable
+    const generalAnimalCategories = [
       'Animal',
-      'Bird',
-      'Mammal',
-      'Reptile',
-      'Amphibian',
-      'Fish',
-      'Crow',
-      'Raven',
-      'Blackbird',
-      'Bird of Prey',
-      'Raptor',
-      'Dog',
-      'Cat',
-      'Squirrel',
-      'Raccoon',
-      'Deer',
-      'Fox',
-      'Coyote',
-      'Rabbit',
-      'Hare',
-      'Mouse',
-      'Rat',
-      'Chipmunk',
-      'Groundhog',
+      'Wildlife',
+      'Pet',
+      'Farm Animal',
     ];
+    const birdCategories = ['Bird', 'Avian', 'Flying Animal'];
+    const mammalCategories = ['Mammal', 'Furry Animal'];
+    const crowTerms = ['crow', 'raven', 'blackbird', 'corvid'];
 
     const detectedAnimals: string[] = [];
-
     let crowCount = 0;
     let animalCount = 0;
     let maxConfidence = 0;
@@ -145,26 +146,23 @@ export class DetectionImageProcessingService {
     for (const label of labels) {
       if (label.Name && label.Confidence) {
         maxConfidence = Math.max(maxConfidence, label.Confidence);
+        const labelName = label.Name.toLowerCase();
 
-        // Check if it's an animal...
-        const labelName = label.Name;
+        // Check if it's an animal using general categories
         if (
-          animalLabels.some((animalLabel) =>
-            labelName.toLowerCase().includes(animalLabel.toLowerCase()),
-          )
+          generalAnimalCategories.some((cat) =>
+            labelName.includes(cat.toLowerCase()),
+          ) ||
+          birdCategories.some((cat) => labelName.includes(cat.toLowerCase())) ||
+          mammalCategories.some((cat) => labelName.includes(cat.toLowerCase()))
         ) {
-          detectedAnimals.push(labelName);
+          detectedAnimals.push(label.Name);
+          animalCount++;
 
-          // Count crows specifically...
-          if (
-            labelName.toLowerCase().includes('crow') ||
-            labelName.toLowerCase().includes('raven') ||
-            labelName.toLowerCase().includes('blackbird')
-          ) {
+          // Count crows specifically
+          if (crowTerms.some((term) => labelName.includes(term))) {
             crowCount++;
           }
-
-          animalCount++;
         }
       }
     }

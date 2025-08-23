@@ -37,7 +37,7 @@ export class DetectionEventService {
     // Start async image processing...
 
     this.processImageAsync(savedEvent.id, imageUrl).catch((error) => {
-      console.error(
+      this.logger.error(
         `Image processing failed for detection event ${savedEvent.id}:`,
         error,
       );
