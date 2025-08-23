@@ -7,15 +7,12 @@ import { DeleteObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { Injectable } from '@nestjs/common';
 import { createLogger } from 'src/common/logger/logger.config';
 import { ClaudeService } from './claude.service';
-import { DetectedAnimal } from 'src/common/types';
-
-export interface AnimalDetectionResult {
-  hasAnimals: boolean;
-  crowCount: number;
-  animalCount: number;
-  detectedAnimals: DetectedAnimal[];
-  processingDuration: number;
-}
+import {
+  AnimalDetectionResult,
+  DetectedAnimal,
+  RekognitionLabelsResult,
+  RekognitionLabel,
+} from 'src/common/types';
 
 @Injectable()
 export class DetectionImageProcessingService {
@@ -83,7 +80,7 @@ export class DetectionImageProcessingService {
   private async detectLabels(
     bucket: string,
     key: string,
-  ): Promise<{ Labels?: Array<{ Name?: string; Confidence?: number }> }> {
+  ): Promise<RekognitionLabelsResult> {
     const command = new DetectLabelsCommand({
       Image: {
         S3Object: {
@@ -106,9 +103,9 @@ export class DetectionImageProcessingService {
     }
   }
 
-  private async analyzeAnimalDetection(labelsResult: {
-    Labels?: Array<{ Name?: string; Confidence?: number }>;
-  }): Promise<Omit<AnimalDetectionResult, 'processingDuration'>> {
+  private async analyzeAnimalDetection(
+    labelsResult: RekognitionLabelsResult,
+  ): Promise<Omit<AnimalDetectionResult, 'processingDuration'>> {
     const labels = labelsResult.Labels || [];
 
     try {
@@ -125,7 +122,7 @@ export class DetectionImageProcessingService {
   }
 
   private fallbackAnimalDetection(
-    labels: Array<{ Name?: string; Confidence?: number }>,
+    labels: RekognitionLabel[],
   ): Omit<AnimalDetectionResult, 'processingDuration'> {
     // Basic fallback detection for when Claude is unavailable...
 

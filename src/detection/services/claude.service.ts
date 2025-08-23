@@ -3,14 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Injectable } from '@nestjs/common';
 import { createLogger } from '../../common/logger/logger.config';
 
-import { DetectedAnimal } from '../../common/types';
-
-export interface AnimalAnalysisResult {
-  hasAnimals: boolean;
-  crowCount: number;
-  animalCount: number;
-  detectedAnimals: DetectedAnimal[];
-}
+import { AnimalAnalysisResult, RekognitionLabel } from '../../common/types';
 
 @Injectable()
 export class ClaudeService {
@@ -34,11 +27,7 @@ export class ClaudeService {
   }
 
   async analyzeAnimalDetection(
-    labels: Array<{
-      Name?: string;
-      Confidence?: number;
-      Instances?: Array<{ BoundingBox?: any; Confidence?: number }>;
-    }>,
+    labels: RekognitionLabel[],
   ): Promise<AnimalAnalysisResult> {
     try {
       if (!this.configService.get<string>('CLAUDE_API_KEY')) {
