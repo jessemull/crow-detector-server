@@ -5,7 +5,7 @@ import { FeedEvent } from '../../feed/entity/feed-event.entity';
 import { NotFoundException } from '@nestjs/common';
 import { PatchDetectionDTO } from '../dto/patch-detection.dto';
 import { Repository, Between } from 'typeorm';
-import { Source, Status } from '../../common/types';
+import { Source, Status, ProcessingStatus } from '../../common/types';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DetectionImageProcessingService } from './detection-image-processing.service';
@@ -24,6 +24,8 @@ describe('DetectionEventService', () => {
     source: Source.API,
     status: Status.ACCEPTED,
     updatedAt: new Date(),
+    processingStatus: ProcessingStatus.COMPLETED,
+    faceDetected: false,
   };
 
   const mockDetectionEvent: DetectionEvent = {
@@ -297,7 +299,6 @@ describe('DetectionEventService', () => {
 
   describe('processImageAsync', () => {
     beforeEach(() => {
-      // Mock the private method by accessing it through the service instance
       jest.spyOn(service as any, 'processImageAsync');
     });
 
@@ -305,7 +306,6 @@ describe('DetectionEventService', () => {
       const eventId = 'test-uuid';
       const imageUrl = 'https://example.com/image.jpg';
 
-      // Mock S3 metadata service
       mockS3MetadataService.extractMetadataFromUrl.mockResolvedValue({
         bucket: 'test-bucket',
         key: 'test-key',
@@ -316,7 +316,6 @@ describe('DetectionEventService', () => {
 
       mockS3MetadataService.getObjectSize.mockResolvedValue(1024);
 
-      // Mock image processing service
       mockDetectionImageProcessingService.processImage.mockResolvedValue({
         hasAnimals: true,
         crowCount: 2,
@@ -325,13 +324,10 @@ describe('DetectionEventService', () => {
         processingDuration: 1500,
       });
 
-      // Mock repository updates
       mockRepository.update.mockResolvedValue({ affected: 1 });
 
-      // Call the private method
       await (service as any).processImageAsync(eventId, imageUrl);
 
-      // Verify the processing flow
       expect(mockRepository.update).toHaveBeenCalledWith(eventId, {
         processingStatus: 'PROCESSING',
       });
@@ -354,7 +350,6 @@ describe('DetectionEventService', () => {
       const eventId = 'test-uuid';
       const imageUrl = 'https://example.com/image.jpg';
 
-      // Mock S3 metadata service
       mockS3MetadataService.extractMetadataFromUrl.mockResolvedValue({
         bucket: 'test-bucket',
         key: 'test-key',
@@ -363,7 +358,6 @@ describe('DetectionEventService', () => {
         type: 'detection',
       });
 
-      // Mock image processing service - no animals detected
       mockDetectionImageProcessingService.processImage.mockResolvedValue({
         hasAnimals: false,
         crowCount: 0,
@@ -372,14 +366,11 @@ describe('DetectionEventService', () => {
         processingDuration: 800,
       });
 
-      // Mock repository operations
       mockRepository.update.mockResolvedValue({ affected: 1 });
       mockRepository.delete.mockResolvedValue({ affected: 1 });
 
-      // Call the private method
       await (service as any).processImageAsync(eventId, imageUrl);
 
-      // Verify the deletion flow
       expect(mockRepository.update).toHaveBeenCalledWith(eventId, {
         processingStatus: 'PROCESSING',
       });
@@ -391,7 +382,6 @@ describe('DetectionEventService', () => {
       const eventId = 'test-uuid';
       const imageUrl = 'https://example.com/image.jpg';
 
-      // Mock S3 metadata service
       mockS3MetadataService.extractMetadataFromUrl.mockResolvedValue({
         bucket: 'test-bucket',
         key: 'test-key',
@@ -400,20 +390,16 @@ describe('DetectionEventService', () => {
         type: 'detection',
       });
 
-      // Mock image processing service to fail
       mockDetectionImageProcessingService.processImage.mockRejectedValue(
         new Error('AWS service unavailable'),
       );
 
-      // Mock repository updates
       mockRepository.update.mockResolvedValue({ affected: 1 });
 
-      // Call the private method and expect it to throw
       await expect(
         (service as any).processImageAsync(eventId, imageUrl),
       ).rejects.toThrow('AWS service unavailable');
 
-      // Verify error handling
       expect(mockRepository.update).toHaveBeenCalledWith(eventId, {
         processingStatus: 'FAILED',
         processingError: 'AWS service unavailable',
@@ -424,20 +410,16 @@ describe('DetectionEventService', () => {
       const eventId = 'test-uuid';
       const imageUrl = 'https://example.com/image.jpg';
 
-      // Mock S3 metadata service to fail
       mockS3MetadataService.extractMetadataFromUrl.mockRejectedValue(
         new Error('Invalid S3 URL format'),
       );
 
-      // Mock repository updates
       mockRepository.update.mockResolvedValue({ affected: 1 });
 
-      // Call the private method and expect it to throw
       await expect(
         (service as any).processImageAsync(eventId, imageUrl),
       ).rejects.toThrow('Invalid S3 URL format');
 
-      // Verify error handling
       expect(mockRepository.update).toHaveBeenCalledWith(eventId, {
         processingStatus: 'FAILED',
         processingError: 'Invalid S3 URL format',
@@ -448,7 +430,6 @@ describe('DetectionEventService', () => {
       const eventId = 'test-uuid';
       const imageUrl = 'https://example.com/image.jpg';
 
-      // Mock S3 metadata service
       mockS3MetadataService.extractMetadataFromUrl.mockResolvedValue({
         bucket: 'test-bucket',
         key: 'test-key',
@@ -457,7 +438,6 @@ describe('DetectionEventService', () => {
         type: 'detection',
       });
 
-      // Mock image processing service
       mockDetectionImageProcessingService.processImage.mockResolvedValue({
         hasAnimals: true,
         crowCount: 1,
@@ -466,20 +446,16 @@ describe('DetectionEventService', () => {
         processingDuration: 1200,
       });
 
-      // Mock S3 object size service to fail
       mockS3MetadataService.getObjectSize.mockRejectedValue(
         new Error('S3 object not found'),
       );
 
-      // Mock repository updates
       mockRepository.update.mockResolvedValue({ affected: 1 });
 
-      // Call the private method and expect it to throw
       await expect(
         (service as any).processImageAsync(eventId, imageUrl),
       ).rejects.toThrow('S3 object not found');
 
-      // Verify error handling
       expect(mockRepository.update).toHaveBeenCalledWith(eventId, {
         processingStatus: 'FAILED',
         processingError: 'S3 object not found',
