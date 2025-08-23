@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   Param,
   Patch,
   Post,
@@ -21,8 +22,15 @@ export class FeedController {
 
   @Post()
   @UseGuards(EcdsaAuthGuard)
-  async feedEvent(@Body() createFeedDTO: CreateFeedDTO): Promise<FeedResponse> {
-    const event = await this.feedEventService.create(createFeedDTO);
+  async feedEvent(
+    @Body() createFeedDTO: CreateFeedDTO,
+    @Headers('x-skip-cooldown') skipCooldown?: string,
+  ): Promise<FeedResponse> {
+    const shouldSkipCooldown = skipCooldown === 'true';
+    const event = await this.feedEventService.create(
+      createFeedDTO,
+      shouldSkipCooldown,
+    );
     return {
       data: event,
       message: 'Feeder event created successfully!',

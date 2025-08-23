@@ -9,6 +9,7 @@ import { S3MetadataService } from './s3-metadata.service';
 import { Source, Status, ProcessingStatus } from '../../common/types';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { ConfigService } from '@nestjs/config';
 
 describe('FeedEventService', () => {
   let service: FeedEventService;
@@ -63,6 +64,15 @@ describe('FeedEventService', () => {
             getObjectSize: jest.fn().mockResolvedValue(1024),
           },
         },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn((key: string) => {
+              if (key === 'FEED_COOLDOWN_HOURS') return 4;
+              return undefined;
+            }),
+          },
+        },
       ],
     }).compile();
 
@@ -95,6 +105,80 @@ describe('FeedEventService', () => {
         }),
       );
       expect(repository.save).toHaveBeenCalled();
+      expect(result).toEqual(createdEvent);
+    });
+
+    it('should reject feed event during cooldown period', async () => {
+      const createFeedDTO: CreateFeedDTO = {
+        imageUrl: 'https://example.com/image.jpg',
+      };
+
+      // Mock a recent feed event (within cooldown period)
+      const recentFeedEvent = {
+        ...mockFeedEvent,
+        createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
+      };
+      mockRepository.findOne.mockResolvedValue(recentFeedEvent);
+
+      await expect(service.create(createFeedDTO)).rejects.toThrow(
+        'Feed cooldown active. Please wait 2 hour(s) before feeding again.',
+      );
+    });
+
+    it('should allow feed event after cooldown period', async () => {
+      const createFeedDTO: CreateFeedDTO = {
+        imageUrl: 'https://example.com/image.jpg',
+      };
+
+      // Mock an old feed event (outside cooldown period)
+      const oldFeedEvent = {
+        ...mockFeedEvent,
+        createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000), // 5 hours ago
+      };
+      mockRepository.findOne.mockResolvedValue(oldFeedEvent);
+
+      const createdEvent = { ...mockFeedEvent, ...createFeedDTO };
+      mockRepository.create.mockReturnValue(createdEvent);
+      mockRepository.save.mockResolvedValue(createdEvent);
+
+      const result = await service.create(createFeedDTO);
+      expect(result).toEqual(createdEvent);
+    });
+
+    it('should skip cooldown check when skipCooldown is true', async () => {
+      const createFeedDTO: CreateFeedDTO = {
+        imageUrl: 'https://example.com/image.jpg',
+      };
+
+      // Mock a recent feed event (within cooldown period)
+      const recentFeedEvent = {
+        ...mockFeedEvent,
+        createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
+      };
+      mockRepository.findOne.mockResolvedValue(recentFeedEvent);
+
+      const createdEvent = { ...mockFeedEvent, ...createFeedDTO };
+      mockRepository.create.mockReturnValue(createdEvent);
+      mockRepository.save.mockResolvedValue(createdEvent);
+
+      // Should succeed even with recent feed due to skipCooldown
+      const result = await service.create(createFeedDTO, true);
+      expect(result).toEqual(createdEvent);
+    });
+
+    it('should allow first feed event (no cooldown check)', async () => {
+      const createFeedDTO: CreateFeedDTO = {
+        imageUrl: 'https://example.com/image.jpg',
+      };
+
+      // Mock no previous feed events
+      mockRepository.findOne.mockResolvedValue(null);
+
+      const createdEvent = { ...mockFeedEvent, ...createFeedDTO };
+      mockRepository.create.mockReturnValue(createdEvent);
+      mockRepository.save.mockResolvedValue(createdEvent);
+
+      const result = await service.create(createFeedDTO);
       expect(result).toEqual(createdEvent);
     });
 
