@@ -491,9 +491,17 @@ components:
           description: Error message if processing failed
           example: "Image processing timeout"
         detectedAnimals:
-          type: string
-          description: JSON string of detected animals
-          example: '["Crow", "Squirrel", "Bird"]'
+          type: array
+          description: Array of detected animals with confidence scores and counts
+          items:
+            $ref: '#/components/schemas/DetectedAnimal'
+          example:
+            - name: "Crow"
+              confidence: 99.1
+              count: 2
+            - name: "Squirrel"
+              confidence: 87.5
+              count: 1
         originalImageSize:
           type: integer
           description: Size of the original image in bytes
@@ -659,9 +667,17 @@ components:
           description: Error message if processing failed
           example: "Image processing timeout"
         detectedAnimals:
-          type: string
-          description: JSON string of detected animals
-          example: '["Crow", "Squirrel", "Bird"]'
+          type: array
+          description: Array of detected animals with confidence scores and counts
+          items:
+            $ref: '#/components/schemas/DetectedAnimal'
+          example:
+            - name: "Crow"
+              confidence: 99.1
+              count: 2
+            - name: "Pig"
+              confidence: 99.2
+              count: 1
         originalImageSize:
           type: integer
           description: Size of the original image in bytes
@@ -764,6 +780,31 @@ components:
           items:
             $ref: '#/components/schemas/DetectionEvent'
           description: Associated detection events
+
+    DetectedAnimal:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Name of the detected animal species
+          example: "Crow"
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+          description: Confidence score of the detection (0-100)
+          example: 99.1
+        count:
+          type: integer
+          minimum: 1
+          description: Number of individual instances detected
+          example: 2
+      required:
+        - name
+        - confidence
+        - count
+      description: Represents a detected animal with confidence score and instance count
 
     DetectionResponse:
       type: object

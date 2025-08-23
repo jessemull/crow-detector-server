@@ -157,9 +157,9 @@ The **Crow Detector Server** is built using modern technologies to ensure reliab
 
 ### AI & Machine Learning
 
-- **Claude AI**: Anthropic's Claude for advanced animal species classification
-- **Fallback Processing**: Local detection algorithms when AI services are unavailable
-- **Confidence Scoring**: Multi-level confidence assessment for detection accuracy
+- **Claude AI**: Anthropic's Claude for advanced animal species classification.
+- **Fallback Processing**: Local detection algorithms when AI services are unavailable.
+- **Confidence Scoring**: Multi-level confidence assessment for detection accuracy.
 
 ## Setup Instructions
 
@@ -239,11 +239,11 @@ The project includes database management scripts for development and testing:
 
 - **Feed Events**: Records of user interactions and feeding activities.
 - **Detection Events**: Comprehensive animal detection data including:
-  - Processing status (PENDING → PROCESSING → COMPLETED/FAILED)
-  - Animal and crow counts with confidence scores
-  - Processing duration and error tracking
-  - AI analysis results and detected species
-  - Image metadata and processing history
+  - Processing status (PENDING → PROCESSING → COMPLETED/FAILED).
+  - Animal and crow counts with confidence scores.
+  - Processing duration and error tracking.
+  - AI analysis results and detected species.
+  - Image metadata and processing history.
 - **User Sessions**: User interaction tracking and cooldown management.
 
 ## Authentication
