@@ -175,7 +175,6 @@ describe('UrlsService', () => {
         contentType: 'image/png',
       };
 
-      // Mock the latest feed event
       const mockFeedEvent = { id: 'feed-123', createdAt: new Date() };
       mockFeedEventRepository.find.mockResolvedValue([mockFeedEvent]);
 
@@ -204,7 +203,6 @@ describe('UrlsService', () => {
         format: ImageFormat.JPG,
       };
 
-      // Mock the latest feed event
       const mockFeedEvent = { id: 'feed-123', createdAt: new Date() };
       mockFeedEventRepository.find.mockResolvedValue([mockFeedEvent]);
 
@@ -223,7 +221,6 @@ describe('UrlsService', () => {
         format: ImageFormat.PNG,
       };
 
-      // Mock the latest feed event
       const mockFeedEvent = { id: 'feed-123', createdAt: new Date() };
       mockFeedEventRepository.find.mockResolvedValue([mockFeedEvent]);
 
@@ -241,7 +238,6 @@ describe('UrlsService', () => {
         format: ImageFormat.PNG,
       };
 
-      // Mock no feed events
       mockFeedEventRepository.find.mockResolvedValue([]);
 
       await expect(
@@ -314,7 +310,6 @@ describe('UrlsService', () => {
         format: ImageFormat.PNG,
       };
 
-      // Mock the latest feed event
       const mockFeedEvent = { id: 'feed-123', createdAt: new Date() };
       mockFeedEventRepository.find.mockResolvedValue([mockFeedEvent]);
 

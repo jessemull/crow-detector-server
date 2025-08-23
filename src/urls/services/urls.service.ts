@@ -1,16 +1,16 @@
-import { ConfigService } from '@nestjs/config';
-import { CreateFeedImageUrlDto, CreateDetectionImageUrlDto } from '../dto';
 import {
-  Injectable,
   BadRequestException,
+  Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { CreateFeedImageUrlDto, CreateDetectionImageUrlDto } from '../dto';
+import { FeedEvent } from '../../feed/entity/feed-event.entity';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { logger } from 'src/common/logger/logger.config';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { FeedEvent } from '../../feed/entity/feed-event.entity';
 
 @Injectable()
 export class UrlsService {
@@ -88,7 +88,8 @@ export class UrlsService {
   ) {
     const { fileName, format, contentType } = createDetectionImageUrlDto;
 
-    // Get the latest feed event ID from the database
+    // Get the latest feed event ID from the database...
+
     const latestFeedEvents = await this.feedEventRepository.find({
       order: { createdAt: 'DESC' },
       take: 1,
