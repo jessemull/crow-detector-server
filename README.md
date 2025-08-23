@@ -200,6 +200,7 @@ To clone the repository, install dependencies, and run the project locally follo
 
    # AI Configuration
    CLAUDE_API_KEY=your_claude_api_key
+   CLAUDE_MODEL=claude-3-opus-20240229
 
    # Private Key Paths (for token generation)
    PI_USER_PRIVATE_KEY_PATH=/path/to/pi-user-private.pem

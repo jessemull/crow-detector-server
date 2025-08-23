@@ -26,6 +26,12 @@ export class ClaudeService {
     });
   }
 
+  private getClaudeModel(): string {
+    return (
+      this.configService.get<string>('CLAUDE_MODEL') || 'claude-3-opus-20240229'
+    );
+  }
+
   async analyzeAnimalDetection(
     labels: RekognitionLabel[],
   ): Promise<AnimalAnalysisResult> {
@@ -48,7 +54,9 @@ Labels: ${labelsText}
 
 CRITICAL: Count individual animals using the Instances data, not just label names.
 
-Return ONLY valid JSON with this exact structure:
+IMPORTANT: You must respond with ONLY valid JSON. No additional text, explanations, or markdown formatting.
+
+Required JSON structure:
 {
   "hasAnimals": boolean,
   "crowCount": number,
@@ -71,22 +79,29 @@ Example: Bird with 2 instances + Pig with 1 instance = 3 total animals, 2 crows.
 detectedAnimals: [{"name": "Bird", "confidence": 99.1, "count": 2}, {"name": "Pig", "confidence": 99.2, "count": 1}]`;
 
       const message = await this.anthropic.messages.create({
-        model: 'claude-3-5-sonnet-20241022',
+        model: this.getClaudeModel(),
         max_tokens: 1000,
+        temperature: 0.1, // Low temperature for consistent JSON responses
         messages: [
           {
             role: 'user',
             content: prompt,
           },
         ],
+        system:
+          'You are an expert at analyzing image detection results and counting animals. Always respond with valid JSON in the exact format requested.',
       });
 
       const content = message.content[0];
       if (content.type !== 'text') {
+        this.logger.error(
+          `Unexpected response type from Claude: ${content.type}`,
+        );
         throw new Error('Unexpected response type from Claude');
       }
 
       const responseText = content.text.trim();
+      this.logger.info(`Raw Claude response: ${responseText}`);
 
       // Try to extract JSON from the response...
 
