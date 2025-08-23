@@ -6,7 +6,7 @@ import {
 import { DeleteObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { Injectable } from '@nestjs/common';
 import { createLogger } from 'src/common/logger/logger.config';
-import { ClaudeService, AnimalAnalysisResult } from './claude.service';
+import { ClaudeService } from './claude.service';
 
 export interface AnimalDetectionResult {
   hasAnimals: boolean;
@@ -148,19 +148,26 @@ export class DetectionImageProcessingService {
         maxConfidence = Math.max(maxConfidence, label.Confidence);
         const labelName = label.Name.toLowerCase();
 
+        // Check if it's a crow first (crows are always animals)
+        const isCrow = crowTerms.some((term) => labelName.includes(term));
+
         // Check if it's an animal using general categories
-        if (
+        const isAnimal =
           generalAnimalCategories.some((cat) =>
             labelName.includes(cat.toLowerCase()),
           ) ||
           birdCategories.some((cat) => labelName.includes(cat.toLowerCase())) ||
-          mammalCategories.some((cat) => labelName.includes(cat.toLowerCase()))
-        ) {
+          mammalCategories.some((cat) =>
+            labelName.includes(cat.toLowerCase()),
+          ) ||
+          isCrow; // Crows are animals too
+
+        if (isAnimal) {
           detectedAnimals.push(label.Name);
           animalCount++;
 
           // Count crows specifically
-          if (crowTerms.some((term) => labelName.includes(term))) {
+          if (isCrow) {
             crowCount++;
           }
         }
