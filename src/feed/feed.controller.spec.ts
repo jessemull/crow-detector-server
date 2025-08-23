@@ -3,7 +3,7 @@ import { FeedController } from './feed.controller';
 import { FeedEvent } from './entity/feed-event.entity';
 import { FeedEventService } from './services/feed-event.service';
 import { PatchFeedDTO } from './dto/patch-feed.dto';
-import { Source, Status } from '../common/types';
+import { Source, Status, ProcessingStatus } from '../common/types';
 import { Test, TestingModule } from '@nestjs/testing';
 
 describe('FeedController', () => {
@@ -19,6 +19,8 @@ describe('FeedController', () => {
     source: Source.API,
     status: Status.ACCEPTED,
     updatedAt: new Date(),
+    processingStatus: ProcessingStatus.COMPLETED,
+    faceDetected: false,
   };
 
   const mockFeedEventService = {
@@ -84,7 +86,6 @@ describe('FeedController', () => {
     it('should create a feed event successfully', async () => {
       const createFeedDTO: CreateFeedDTO = {
         imageUrl: 'https://example.com/image.jpg',
-        source: Source.API,
       };
 
       mockFeedEventService.create.mockResolvedValue(mockFeedEvent);
@@ -101,7 +102,6 @@ describe('FeedController', () => {
     it('should handle service errors', async () => {
       const createFeedDTO: CreateFeedDTO = {
         imageUrl: 'https://example.com/image.jpg',
-        source: Source.API,
       };
 
       const error = new Error('Service error');

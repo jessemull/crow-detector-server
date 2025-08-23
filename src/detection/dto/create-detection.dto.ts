@@ -1,9 +1,6 @@
-import { IsUrl, IsUUID } from 'class-validator';
+import { IsUrl } from 'class-validator';
 
 export class CreateDetectionDTO {
-  @IsUUID()
-  feedEvent: string;
-
   @IsUrl()
   imageUrl: string;
 }

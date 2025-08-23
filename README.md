@@ -47,6 +47,7 @@ The **Crow Detector Server** manages the core backend logic for the **Crow Detec
 The **Crow Detector** is an interactive system that allows users to feed crows through multiple interfaces:
 
 ### Physical Device Interaction
+
 - **User Pi Device**: Battery-powered Raspberry Pi with camera and LCD display:
   - Shows countdown timer before capturing user image.
   - Displays captcha for website access.
@@ -59,21 +60,27 @@ The **Crow Detector** is an interactive system that allows users to feed crows t
   - Uploads detection images to S3.
 
 ### Web Interface
+
 - **Feed Button**: Users can feed crows directly from the website.
 - **Image Gallery**: Displays user images alongside detection images.
 - **Cooldown System**: Prevents spam feeding with configurable cooldown periods.
 
 ### Image Processing Pipeline
+
 - **Content Moderation**: AWS Rekognition filters inappropriate content.
 - **Face Detection**: AWS Rekognition detects faces and provides bounding box coordinates.
 - **Image Cropping**: Sharp library crops images to focus on detected faces with padding.
 - **Image Storage**: Organized S3 storage with separate directories for original and processed images.
+- **Animal Detection**: AWS Rekognition identifies animals and provides confidence scores.
+- **AI Classification**: Claude AI analyzes detected animals for species identification and crow detection.
+- **Processing Workflow**: Comprehensive status tracking from upload to completion.
 
 ## System Architecture
 
 The system employs a **microservices architecture** with the following key components:
 
 ### Backend Services
+
 - **NestJS Server**: RESTful API endpoints for device communication and web interface.
 - **PostgreSQL Database**: Stores feed events, detection events, and user interactions.
 - **AWS S3**: Secure image storage with organized directory structure.
@@ -82,6 +89,7 @@ The system employs a **microservices architecture** with the following key compo
 - **ECDSA Authentication**: Device-level security using cryptographic signatures.
 
 ### Data Flow
+
 1. **Device Registration**: Raspberry Pi devices authenticate using ECDSA signatures.
 2. **Image Upload**: Devices upload images via pre-signed S3 URLs.
 3. **Event Processing**: Server processes images and creates database records.
@@ -89,6 +97,7 @@ The system employs a **microservices architecture** with the following key compo
 5. **Cooldown Management**: System enforces feeding limits and cooldown periods.
 
 ### Security Features
+
 - **ECDSA Authentication**: Each device type has unique cryptographic keys.
 - **Pre-signed URLs**: Secure S3 uploads without exposing AWS credentials.
 - **Request Validation**: Timestamp-based replay attack prevention.
@@ -99,12 +108,14 @@ The system employs a **microservices architecture** with the following key compo
 The **Crow Detector** operates in multiple environments to ensure smooth development, testing, and production workflows.
 
 ### Development Environment
+
 - **Local Development**: `https://api-dev.crittercanteen.com`
 - **Database**: PostgreSQL via SSH tunnel to AWS RDS.
 - **S3**: Development bucket with test images.
 - **Authentication**: Development mode bypass available.
 
 ### Production Environment
+
 - **API Endpoint**: `https://api.crittercanteen.com`
 - **Database**: AWS RDS PostgreSQL instance.
 - **S3**: Production bucket with organized image storage.
@@ -115,19 +126,23 @@ The **Crow Detector** operates in multiple environments to ensure smooth develop
 The **Crow Detector Server** is built using modern technologies to ensure reliability, scalability, and maintainability.
 
 ### Backend Framework
+
 - **NestJS**: Progressive Node.js framework for building efficient, scalable server-side applications.
 - **TypeScript**: Provides type safety and enhanced developer experience.
 - **TypeORM**: Object-Relational Mapping for database interactions.
 - **PostgreSQL**: Robust, open-source relational database.
 
 ### AWS Infrastructure
+
 - **AWS RDS**: Managed PostgreSQL database service.
 - **AWS S3**: Object storage for image uploads and management.
 - **AWS ECS**: Container orchestration for server deployment.
 - **AWS CloudFormation**: Infrastructure as Code for resource management.
 - **AWS IAM**: Identity and access management for secure resource access.
+- **AWS Rekognition**: AI-powered image analysis and animal detection.
 
 ### Development Tools
+
 - **Jest**: JavaScript testing framework for unit and integration testing.
 - **ESLint**: Code quality enforcement and static analysis.
 - **Prettier**: Code formatting for consistent style.
@@ -135,31 +150,42 @@ The **Crow Detector Server** is built using modern technologies to ensure reliab
 - **Husky**: Git hooks for pre-commit validation.
 
 ### Security & Authentication
+
 - **ECDSA**: Elliptic Curve Digital Signature Algorithm for device authentication.
 - **Crypto**: Node.js cryptographic functions for signature verification.
 - **Environment Variables**: Secure configuration management.
+
+### AI & Machine Learning
+
+- **Claude AI**: Anthropic's Claude for advanced animal species classification.
+- **Fallback Processing**: Local detection algorithms when AI services are unavailable.
+- **Confidence Scoring**: Multi-level confidence assessment for detection accuracy.
 
 ## Setup Instructions
 
 To clone the repository, install dependencies, and run the project locally follow these steps:
 
 1. **Clone the repository:**
+
    ```bash
    git clone https://github.com/jessemull/crow-detector-server.git
    ```
 
 2. **Navigate into the project directory:**
+
    ```bash
    cd crow-detector-server
    ```
 
 3. **Install dependencies:**
+
    ```bash
    npm install
    ```
 
 4. **Set up environment variables:**
    Create a `.env` file in the root directory with the following variables:
+
    ```
    # Database Configuration
    DB_HOST=localhost
@@ -167,11 +193,14 @@ To clone the repository, install dependencies, and run the project locally follo
    DB_USERNAME=your_username
    DB_PASSWORD=your_password
    DB_DATABASE=crow_detector_dev
-   
+
    # AWS Configuration
    AWS_REGION=us-west-2
    S3_BUCKET_NAME=crow-detector-images-dev
-   
+
+   # AI Configuration
+   CLAUDE_API_KEY=your_claude_api_key
+
    # Private Key Paths (for token generation)
    PI_USER_PRIVATE_KEY_PATH=/path/to/pi-user-private.pem
    PI_MOTION_PRIVATE_KEY_PATH=/path/to/pi-motion-private.pem
@@ -179,11 +208,13 @@ To clone the repository, install dependencies, and run the project locally follo
    ```
 
 5. **Set up SSH tunnel to database:**
+
    ```bash
    npm run start:tunnel
    ```
 
 6. **Start the development server:**
+
    ```bash
    npm run start:watch
    ```
@@ -198,14 +229,21 @@ To clone the repository, install dependencies, and run the project locally follo
 The project includes database management scripts for development and testing:
 
 ### Database Scripts
+
 - **Test Connection**: `npm run db:test` - Verify database connectivity.
 - **Synchronize Schema**: `npm run db:synchronize` - Update database schema.
 - **Seed Data**: `npm run db:seed` - Populate database with test data.
 - **Reset Database**: `npm run db:reset` - Clear all data and reset schema.
 
 ### Database Schema
+
 - **Feed Events**: Records of user interactions and feeding activities.
-- **Detection Events**: Animal detection images and metadata.
+- **Detection Events**: Comprehensive animal detection data including:
+  - Processing status (PENDING → PROCESSING → COMPLETED/FAILED).
+  - Animal and crow counts with confidence scores.
+  - Processing duration and error tracking.
+  - AI analysis results and detected species.
+  - Image metadata and processing history.
 - **User Sessions**: User interaction tracking and cooldown management.
 
 ## Authentication
@@ -213,18 +251,22 @@ The project includes database management scripts for development and testing:
 The system uses ECDSA (Elliptic Curve Digital Signature Algorithm) for device authentication:
 
 ### Device Types
+
 - **pi-user**: User interaction device (camera, LCD, feed button).
 - **pi-motion**: Motion detection device (PIR sensor, night vision camera).
 - **pi-feeder**: Automated feeder device (relay control, feed dispensing).
 
 ### Authentication Flow
+
 1. **Device Identification**: Device sends `x-device-id` header.
 2. **Timestamp Validation**: `x-timestamp` prevents replay attacks (5-minute window).
 3. **Signature Verification**: `x-signature` validates request authenticity.
 4. **Request Validation**: Signature covers method, path, body, and timestamp.
 
 ### Testing Authentication
+
 Use the included authentication token generator:
+
 ```bash
 # Generate token for feed URL endpoint
 npm run auth:token POST /urls/feed '{"fileName":"test.jpg","format":"jpg","source":"motion","contentType":"image/jpeg"}'
@@ -238,28 +280,67 @@ npm run auth:token POST /urls/detection '{"fileName":"detection.jpg","format":"j
 The system provides secure image upload capabilities through pre-signed S3 URLs:
 
 ### Upload Endpoints
+
 - **`POST /urls/feed`**: Generate signed URL for user interaction images.
 - **`POST /urls/detection`**: Generate signed URL for motion detection images.
 
 ### S3 Organization
+
 - **Feed Images**: `feed/{timestamp}-{filename}.{format}` (triggers processing)
 - **Detection Images**: `detection/{feedEventId}/{timestamp}-{filename}.{format}` (triggers processing)
 - **Processed Images**: `processed/{filename}_cropped.{format}` (safe from reprocessing)
 
 ### Image Processing Flow
-1. **Upload**: Image uploaded to `feed/` or `detection/` directory
-2. **Processing**: Lambda function triggers image processing pipeline
-3. **Storage**: Processed images stored in separate `processed/` directory
-4. **Safety**: Processed images don't trigger reprocessing (prevents infinite loops)
+
+1. **Upload**: Image uploaded to `feed/` or `detection/` directory.
+2. **Processing**: Lambda function triggers image processing pipeline.
+3. **Storage**: Processed images stored in separate `processed/` directory.
+4. **Safety**: Processed images don't trigger reprocessing (prevents infinite loops).
+
+#### Detection Event Processing Workflow
+
+1. **Initial Status**: Detection events start with `PENDING` status.
+2. **Processing Phase**: Status changes to `PROCESSING` during analysis.
+3. **AI Analysis**: AWS Rekognition detects animals, Claude AI classifies species.
+4. **Completion**: Status updates to `COMPLETED` with results or `FAILED` with errors.
+5. **Metadata Storage**: Processing duration, error details, and analysis results saved.
 
 ### Image Metadata
+
 - **Timestamp**: When the image was captured.
 - **Source**: Device type and location information.
 - **Feed Event ID**: Links detection images to feeding events.
 - **Content Type**: Image format and encoding information.
 - **Processing Status**: Current state of image processing pipeline.
 
+## Detection Event Processing
+
+The system provides comprehensive animal detection and analysis capabilities through a multi-stage processing pipeline:
+
+### Processing Stages
+
+- **PENDING**: Initial state when detection event is created.
+- **PROCESSING**: Active analysis phase using AWS services.
+- **COMPLETED**: Successful processing with results stored.
+- **FAILED**: Processing error with detailed error information.
+
+### Analysis Components
+
+- **AWS Rekognition**: Primary animal detection with confidence scores.
+- **Claude AI**: Advanced species classification and crow identification.
+- **Fallback Detection**: Local processing when external services are unavailable.
+- **Error Handling**: Comprehensive error tracking and retry mechanisms.
+
+### Data Captured
+
+- **Animal Counts**: Total animals and specific crow counts.
+- **Species Detection**: Identified animal types and classifications.
+- **Processing Metrics**: Duration, file sizes, and performance data.
+- **Error Details**: Specific failure reasons for debugging.
+- **Temporal Data**: Timestamps for processing and completion.
+
 ### Security Features
+
 - **Pre-signed URLs**: Time-limited upload permissions.
 - **Encryption**: Server-side encryption (AES256).
 - **Access Control**: IAM-based permissions for S3 operations.
@@ -284,6 +365,7 @@ This project uses **ESLint** and **Prettier** for code quality enforcement. Lint
 ### Linting Commands
 
 Run linting:
+
 ```bash
 npm run lint
 ```
@@ -291,6 +373,7 @@ npm run lint
 ### Formatting Commands
 
 Format using prettier:
+
 ```bash
 npm run format
 ```
@@ -306,16 +389,19 @@ npm run format
 This project uses **Jest** for testing. Code coverage is enforced during every CI/CD pipeline. The build will fail if any tests fail or coverage drops below **80%**.
 
 Run tests:
+
 ```bash
 npm run test
 ```
 
 Run tests with coverage:
+
 ```bash
 npm run test:cov
 ```
 
 Run tests in watch mode:
+
 ```bash
 npm run test:watch
 ```
@@ -381,6 +467,7 @@ The deployment process ensures reliability and consistency through:
 This pipeline automates the validation process for pull requests targeting the `main` branch. It ensures that new changes are properly built, linted, tested, and evaluated before merging.
 
 The pipeline performs the following steps:
+
 1. **Build Application** – Checks out the code, installs dependencies, and builds the NestJS application.
 2. **Lint Code** – Runs ESLint to check for syntax and style issues.
 3. **Run Unit Tests** – Executes Jest tests and ensures test coverage meets the required threshold.
@@ -390,6 +477,7 @@ The pipeline performs the following steps:
 This pipeline automates the deployment of the NestJS application to AWS ECS. It supports deployment to either the dev or production environment based on user input.
 
 The pipeline performs the following steps:
+
 1. **Build Application** – Builds the NestJS application and creates a Docker container.
 2. **Run Unit Tests** – Executes Jest tests and ensures test coverage.
 3. **Deploy to ECS** – Updates the ECS task definition and deploys the new container.
@@ -397,8 +485,6 @@ The pipeline performs the following steps:
 ### Deploy On Merge
 
 This workflow runs automatically when changes are pushed to the `main` branch. It builds, tests, and deploys the NestJS application to ECS.
-
-
 
 ## Infrastructure
 
@@ -413,24 +499,50 @@ Infrastructure is managed using AWS CloudFormation templates with environment-sp
 - **`crow-detector-rds.yaml`**: RDS PostgreSQL database configuration.
 - **`crow-detector-s3.yaml`**: S3 bucket configuration for image storage.
 
+### External AI Services
+
+The system integrates with external AI services for advanced image analysis:
+
+- **Anthropic Claude**: AI-powered animal species classification and crow detection.
+- **API Integration**: Secure communication with Claude's API for image analysis.
+- **Fallback Processing**: Local detection algorithms when AI services are unavailable.
+
+### Required AWS Secrets
+
+The following secrets must be configured in AWS Secrets Manager:
+
+- **`crow-detector-keys`**: Contains device public keys for authentication
+  - `pi-user-public-key`
+  - `pi-motion-public-key` 
+  - `pi-feeder-public-key`
+  - `lambda-s3-public-key`
+- **`crow-detector-db-{environment}`**: Database credentials
+  - `username`
+  - `password`
+- **`crow-detector-claude-api-key`**: Claude AI API key
+  - `claude-api-key`
+
 ### ECS Task Definition
 
 The ECS task definition includes:
+
 - **Container Configuration**: NestJS application with environment variables.
 - **Resource Allocation**: CPU and memory specifications.
-- **Environment Variables**: Database connection, S3 configuration, and device keys.
+- **Environment Variables**: Database connection, S3 configuration, device keys, and Claude API configuration.
 - **IAM Roles**: Permissions for S3, RDS, and other AWS services.
+- **AI Service Configuration**: Claude API key (from AWS Secrets Manager) and endpoint configuration for animal detection.
 
 ### S3 Bucket Configuration
 
 The S3 bucket is configured with:
+
 - **Versioning**: Maintains multiple versions of uploaded images.
 - **Encryption**: Server-side encryption (AES256) for all objects.
 - **Lifecycle Rules**: Automatic cleanup of old images and versions.
 - **CORS Configuration**: Cross-origin resource sharing for web interface.
 - **Bucket Policies**: Enforces encryption and access controls.
 - **Event Notifications**: Smart triggers only on `feed/` and `detection/` directories.
-- **Directory Structure**: 
+- **Directory Structure**:
   - `feed/` - User interaction images (triggers processing)
   - `detection/` - Motion detection images (triggers processing)
   - `processed/` - Cropped/processed images (safe from reprocessing)

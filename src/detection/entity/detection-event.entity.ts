@@ -1,4 +1,5 @@
 import { FeedEvent } from 'src/feed/entity/feed-event.entity';
+import { ProcessingStatus, DetectedAnimal } from 'src/common/types';
 import {
   Column,
   CreateDateColumn,
@@ -31,8 +32,28 @@ export class DetectionEvent {
   @Column({ nullable: true })
   crowCount?: number;
 
-  @ManyToOne(() => FeedEvent, (feedEvent) => feedEvent.detectionEvents)
-  feedEvent: FeedEvent;
+  @Column({ nullable: true })
+  animalCount?: number;
+
+  @Column({ nullable: true })
+  processingStatus?: ProcessingStatus;
+
+  @Column({ nullable: true })
+  processingError?: string;
+
+  @Column({ nullable: true, type: 'json' })
+  detectedAnimals?: DetectedAnimal[];
+
+  @Column({ nullable: true })
+  originalImageSize?: number;
+
+  @Column({ nullable: true })
+  processingDuration?: number;
+
+  @ManyToOne(() => FeedEvent, (feedEvent) => feedEvent.detectionEvents, {
+    nullable: true,
+  })
+  feedEvent?: FeedEvent;
 
   @Column()
   imageUrl: string;

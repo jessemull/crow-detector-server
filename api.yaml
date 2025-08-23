@@ -55,7 +55,7 @@ paths:
   /detection:
     post:
       summary: Create detection event
-      description: Record a new crow detection event
+      description: Record a new detection event with image processing pipeline
       tags:
         - Detection
       security:
@@ -125,13 +125,51 @@ paths:
         '500':
           description: Internal server error
 
-    patch:
-      summary: Update detection event
-      description: Update an existing detection event with confidence and crow count
+  /detection/{id}:
+    get:
+      summary: Get detection event by ID
+      description: Retrieve a specific detection event by its unique identifier
       tags:
         - Detection
       security:
         - ECDSA: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Unique identifier of the detection event
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Detection event retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetectionEvent'
+        '404':
+          description: Detection event not found
+        '401':
+          description: Unauthorized - invalid authentication
+        '500':
+          description: Internal server error
+
+    patch:
+      summary: Update detection event
+      description: Update an existing detection event with flexible field updates
+      tags:
+        - Detection
+      security:
+        - ECDSA: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Unique identifier of the detection event
+          schema:
+            type: string
+            format: uuid
       requestBody:
         required: true
         content:
@@ -415,14 +453,8 @@ components:
     CreateDetectionDTO:
       type: object
       required:
-        - feedEvent
         - imageUrl
       properties:
-        feedEvent:
-          type: string
-          format: uuid
-          description: UUID of the associated feed event
-          example: "123e4567-e89b-12d3-a456-426614174000"
         imageUrl:
           type: string
           format: uri
@@ -431,16 +463,7 @@ components:
 
     PatchDetectionDTO:
       type: object
-      required:
-        - id
-        - confidence
-        - crowCount
       properties:
-        id:
-          type: string
-          format: uuid
-          description: UUID of the detection event to update
-          example: "123e4567-e89b-12d3-a456-426614174000"
         confidence:
           type: number
           format: float
@@ -453,6 +476,40 @@ components:
           minimum: 0
           description: Number of crows detected in the image
           example: 3
+        animalCount:
+          type: integer
+          minimum: 0
+          description: Total number of animals detected in the image
+          example: 5
+        processingStatus:
+          type: string
+          enum: [PENDING, PROCESSING, COMPLETED, FAILED]
+          description: Current processing status of the image
+          example: "COMPLETED"
+        processingError:
+          type: string
+          description: Error message if processing failed
+          example: "Image processing timeout"
+        detectedAnimals:
+          type: array
+          description: Array of detected animals with confidence scores and counts
+          items:
+            $ref: '#/components/schemas/DetectedAnimal'
+          example:
+            - name: "Crow"
+              confidence: 99.1
+              count: 2
+            - name: "Squirrel"
+              confidence: 87.5
+              count: 1
+        originalImageSize:
+          type: integer
+          description: Size of the original image in bytes
+          example: 156789
+        processingDuration:
+          type: integer
+          description: Time taken to process the image in milliseconds
+          example: 2340
 
     CreateFeedDTO:
       type: object
@@ -590,11 +647,45 @@ components:
           minimum: 0
           description: Number of crows detected
           example: 3
+        animalCount:
+          type: integer
+          minimum: 0
+          description: Total number of animals detected
+          example: 5
         imageUrl:
           type: string
           format: uri
           description: URL of the detection image
           example: "https://example.com/images/detection.jpg"
+        processingStatus:
+          type: string
+          enum: [PENDING, PROCESSING, COMPLETED, FAILED]
+          description: Current processing status of the image
+          example: "COMPLETED"
+        processingError:
+          type: string
+          description: Error message if processing failed
+          example: "Image processing timeout"
+        detectedAnimals:
+          type: array
+          description: Array of detected animals with confidence scores and counts
+          items:
+            $ref: '#/components/schemas/DetectedAnimal'
+          example:
+            - name: "Crow"
+              confidence: 99.1
+              count: 2
+            - name: "Pig"
+              confidence: 99.2
+              count: 1
+        originalImageSize:
+          type: integer
+          description: Size of the original image in bytes
+          example: 156789
+        processingDuration:
+          type: integer
+          description: Time taken to process the image in milliseconds
+          example: 2340
         createdAt:
           type: string
           format: date-time
@@ -689,6 +780,31 @@ components:
           items:
             $ref: '#/components/schemas/DetectionEvent'
           description: Associated detection events
+
+    DetectedAnimal:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Name of the detected animal species
+          example: "Crow"
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+          description: Confidence score of the detection (0-100)
+          example: 99.1
+        count:
+          type: integer
+          minimum: 1
+          description: Number of individual instances detected
+          example: 2
+      required:
+        - name
+        - confidence
+        - count
+      description: Represents a detected animal with confidence score and instance count
 
     DetectionResponse:
       type: object

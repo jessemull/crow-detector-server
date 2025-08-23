@@ -1,6 +1,7 @@
 import { BaseSeeder } from './base-seeder';
 import { DetectionEvent } from '../../../src/detection/entity/detection-event.entity';
 import { FeedEvent } from '../../../src/feed/entity/feed-event.entity';
+import { ProcessingStatus } from '../../../src/common/types';
 import { createLogger } from '../../../src/common/logger/logger.config';
 
 export class DetectionEventSeeder extends BaseSeeder {
@@ -29,14 +30,46 @@ export class DetectionEventSeeder extends BaseSeeder {
       const detectionCount = this.getRandomNumber(1, 5);
 
       for (let i = 0; i < detectionCount; i++) {
+        const processingStatus = this.getRandomEnumValue(ProcessingStatus);
+        const hasAnimals = this.getRandomBoolean();
+        const originalImageSize = this.getRandomNumber(500000, 5000000); // 500KB - 5MB
+        const processingDuration = this.getRandomNumber(1000, 8000); // 1-8 seconds
+
         const detectionEvent: Partial<DetectionEvent> = {
           id: this.getRandomUuid(),
           confidence: this.getRandomFloat(0.1, 1.0, 3),
           createdAt: this.getRandomDate(),
           updatedAt: new Date(),
           crowCount: this.getRandomNumber(1, 20),
+          animalCount: hasAnimals ? this.getRandomNumber(1, 10) : 0,
           imageUrl: this.getRandomImageUrl(),
           feedEvent: feedEvent,
+          processingStatus,
+          processingError:
+            processingStatus === ProcessingStatus.FAILED
+              ? 'Mock processing error for testing'
+              : undefined,
+          detectedAnimals: hasAnimals
+            ? [
+                {
+                  name: 'Crow',
+                  confidence: 95.5,
+                  count: this.getRandomNumber(1, 3),
+                },
+                {
+                  name: 'Bird',
+                  confidence: 92.1,
+                  count: this.getRandomNumber(1, 2),
+                },
+                {
+                  name: 'Squirrel',
+                  confidence: 88.7,
+                  count: this.getRandomNumber(1, 2),
+                },
+              ].slice(0, this.getRandomNumber(1, 3))
+            : undefined,
+          originalImageSize,
+          processingDuration,
         };
 
         detectionEvents.push(detectionEvent);

@@ -1,5 +1,5 @@
 export interface ApiCallResult {
-  success: boolean;
   message: string;
+  success: boolean;
   timestamp: string;
 }

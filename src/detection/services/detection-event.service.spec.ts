@@ -1,11 +1,13 @@
 import { CreateDetectionDTO } from '../dto/create-detection.dto';
 import { DetectionEvent } from '../entity/detection-event.entity';
 import { DetectionEventService } from './detection-event.service';
+import { DetectionImageProcessingService } from './detection-image-processing.service';
 import { FeedEvent } from '../../feed/entity/feed-event.entity';
 import { NotFoundException } from '@nestjs/common';
 import { PatchDetectionDTO } from '../dto/patch-detection.dto';
 import { Repository, Between } from 'typeorm';
-import { Source, Status } from '../../common/types';
+import { S3MetadataService } from '../../feed/services/s3-metadata.service';
+import { Source, Status, ProcessingStatus } from '../../common/types';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 
@@ -22,6 +24,8 @@ describe('DetectionEventService', () => {
     source: Source.API,
     status: Status.ACCEPTED,
     updatedAt: new Date(),
+    processingStatus: ProcessingStatus.COMPLETED,
+    faceDetected: false,
   };
 
   const mockDetectionEvent: DetectionEvent = {
@@ -40,6 +44,16 @@ describe('DetectionEventService', () => {
     find: jest.fn(),
     findOne: jest.fn(),
     update: jest.fn(),
+    delete: jest.fn(),
+  };
+
+  const mockDetectionImageProcessingService = {
+    processImage: jest.fn(),
+  };
+
+  const mockS3MetadataService = {
+    extractMetadataFromUrl: jest.fn(),
+    getObjectSize: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -53,6 +67,14 @@ describe('DetectionEventService', () => {
         {
           provide: getRepositoryToken(FeedEvent),
           useValue: mockRepository,
+        },
+        {
+          provide: DetectionImageProcessingService,
+          useValue: mockDetectionImageProcessingService,
+        },
+        {
+          provide: S3MetadataService,
+          useValue: mockS3MetadataService,
         },
       ],
     }).compile();
@@ -70,50 +92,34 @@ describe('DetectionEventService', () => {
   describe('create', () => {
     it('should create a detection event successfully', async () => {
       const createDetectionDTO: CreateDetectionDTO = {
-        feedEvent: 'feed-uuid',
         imageUrl: 'https://example.com/detection-image.jpg',
       };
 
-      const createdEvent = { ...mockDetectionEvent, ...createDetectionDTO };
+      const createdEvent = {
+        ...mockDetectionEvent,
+        ...createDetectionDTO,
+        processingStatus: ProcessingStatus.PENDING,
+        feedEvent: undefined,
+      };
       mockRepository.create.mockReturnValue(createdEvent);
       mockRepository.save.mockResolvedValue(createdEvent);
-
-      mockRepository.findOne.mockResolvedValueOnce(mockFeedEvent);
 
       const result = await service.create(createDetectionDTO);
 
       expect(repository.create).toHaveBeenCalledWith({
-        feedEvent: mockFeedEvent,
         imageUrl: createDetectionDTO.imageUrl,
+        processingStatus: ProcessingStatus.PENDING,
       });
       expect(repository.save).toHaveBeenCalledWith(createdEvent);
       expect(result).toEqual(createdEvent);
     });
 
-    it('should throw NotFoundException when feed event not found', async () => {
-      const createDetectionDTO: CreateDetectionDTO = {
-        feedEvent: 'non-existent-feed-uuid',
-        imageUrl: 'https://example.com/detection-image.jpg',
-      };
-
-      mockRepository.findOne.mockResolvedValueOnce(null);
-
-      await expect(service.create(createDetectionDTO)).rejects.toThrow(
-        NotFoundException,
-      );
-      expect(repository.findOne).toHaveBeenCalledWith({
-        where: { id: createDetectionDTO.feedEvent },
-      });
-    });
-
     it('should handle repository errors', async () => {
       const createDetectionDTO: CreateDetectionDTO = {
-        feedEvent: 'feed-uuid',
         imageUrl: 'https://example.com/detection-image.jpg',
       };
 
       const error = new Error('Repository error');
-      mockRepository.findOne.mockResolvedValue(mockFeedEvent);
       mockRepository.create.mockReturnValue({});
       mockRepository.save.mockRejectedValue(error);
 
@@ -216,13 +222,11 @@ describe('DetectionEventService', () => {
       expect(result).toEqual(mockDetectionEvent);
     });
 
-    it('should return null when detection event not found', async () => {
+    it('should throw NotFoundException when detection event not found', async () => {
       const id = 'non-existent-uuid';
       mockRepository.findOne.mockResolvedValue(null);
 
-      const result = await service.findById(id);
-
-      expect(result).toBeNull();
+      await expect(service.findById(id)).rejects.toThrow(NotFoundException);
     });
 
     it('should handle repository errors', async () => {
@@ -236,8 +240,8 @@ describe('DetectionEventService', () => {
 
   describe('update', () => {
     it('should update a detection event successfully', async () => {
+      const id = 'test-uuid';
       const patchDetectionDTO: PatchDetectionDTO = {
-        id: 'test-uuid',
         confidence: 0.98,
         crowCount: 8,
       };
@@ -251,38 +255,35 @@ describe('DetectionEventService', () => {
           ...patchDetectionDTO,
         });
 
-      const result = await service.update(patchDetectionDTO);
+      const result = await service.update(id, patchDetectionDTO);
 
       expect(repository.findOne).toHaveBeenCalledWith({
-        where: { id: patchDetectionDTO.id },
+        where: { id },
       });
-      expect(repository.update).toHaveBeenCalledWith(patchDetectionDTO.id, {
-        confidence: patchDetectionDTO.confidence,
-        crowCount: patchDetectionDTO.crowCount,
-      });
+      expect(repository.update).toHaveBeenCalledWith(id, patchDetectionDTO);
       expect(result).toBeDefined();
     });
 
     it('should throw NotFoundException when detection event not found', async () => {
+      const id = 'non-existent-uuid';
       const patchDetectionDTO: PatchDetectionDTO = {
-        id: 'non-existent-uuid',
         confidence: 0.98,
         crowCount: 8,
       };
 
       mockRepository.findOne.mockResolvedValue(null);
 
-      await expect(service.update(patchDetectionDTO)).rejects.toThrow(
+      await expect(service.update(id, patchDetectionDTO)).rejects.toThrow(
         NotFoundException,
       );
       expect(repository.findOne).toHaveBeenCalledWith({
-        where: { id: patchDetectionDTO.id },
+        where: { id },
       });
     });
 
     it('should handle repository errors', async () => {
+      const id = 'test-uuid';
       const patchDetectionDTO: PatchDetectionDTO = {
-        id: 'test-uuid',
         confidence: 0.98,
         crowCount: 8,
       };
@@ -290,9 +291,183 @@ describe('DetectionEventService', () => {
       const error = new Error('Repository error');
       mockRepository.findOne.mockRejectedValue(error);
 
-      await expect(service.update(patchDetectionDTO)).rejects.toThrow(
+      await expect(service.update(id, patchDetectionDTO)).rejects.toThrow(
         'Repository error',
       );
+    });
+  });
+
+  describe('processImageAsync', () => {
+    beforeEach(() => {
+      jest.spyOn(service as any, 'processImageAsync');
+    });
+
+    it('should process image successfully when animals are detected', async () => {
+      const eventId = 'test-uuid';
+      const imageUrl = 'https://example.com/image.jpg';
+
+      mockS3MetadataService.extractMetadataFromUrl.mockResolvedValue({
+        bucket: 'test-bucket',
+        key: 'test-key',
+        source: Source.API,
+        timestamp: Date.now(),
+        type: 'detection',
+      });
+
+      mockS3MetadataService.getObjectSize.mockResolvedValue(1024);
+
+      mockDetectionImageProcessingService.processImage.mockResolvedValue({
+        hasAnimals: true,
+        crowCount: 2,
+        animalCount: 3,
+        detectedAnimals: [
+          { name: 'Crow', confidence: 95.5, count: 1 },
+          { name: 'Bird', confidence: 92.1, count: 1 },
+          { name: 'Squirrel', confidence: 88.7, count: 1 },
+        ],
+        processingDuration: 1500,
+      });
+
+      mockRepository.update.mockResolvedValue({ affected: 1 });
+
+      await (service as any).processImageAsync(eventId, imageUrl);
+
+      expect(mockRepository.update).toHaveBeenCalledWith(eventId, {
+        processingStatus: ProcessingStatus.PROCESSING,
+      });
+
+      expect(
+        mockDetectionImageProcessingService.processImage,
+      ).toHaveBeenCalledWith('test-bucket', 'test-key');
+
+      expect(mockRepository.update).toHaveBeenCalledWith(eventId, {
+        processingStatus: ProcessingStatus.COMPLETED,
+        processingDuration: 1500,
+        originalImageSize: 1024,
+        detectedAnimals: [
+          { name: 'Crow', confidence: 95.5, count: 1 },
+          { name: 'Bird', confidence: 92.1, count: 1 },
+          { name: 'Squirrel', confidence: 88.7, count: 1 },
+        ],
+        crowCount: 2,
+        animalCount: 3,
+      });
+    });
+
+    it('should delete detection event when no animals are detected', async () => {
+      const eventId = 'test-uuid';
+      const imageUrl = 'https://example.com/image.jpg';
+
+      mockS3MetadataService.extractMetadataFromUrl.mockResolvedValue({
+        bucket: 'test-bucket',
+        key: 'test-key',
+        source: Source.API,
+        timestamp: Date.now(),
+        type: 'detection',
+      });
+
+      mockDetectionImageProcessingService.processImage.mockResolvedValue({
+        hasAnimals: false,
+        crowCount: 0,
+        animalCount: 0,
+        detectedAnimals: [],
+        processingDuration: 800,
+      });
+
+      mockRepository.update.mockResolvedValue({ affected: 1 });
+      mockRepository.delete.mockResolvedValue({ affected: 1 });
+
+      await (service as any).processImageAsync(eventId, imageUrl);
+
+      expect(mockRepository.update).toHaveBeenCalledWith(eventId, {
+        processingStatus: ProcessingStatus.PROCESSING,
+      });
+
+      expect(mockRepository.delete).toHaveBeenCalledWith(eventId);
+    });
+
+    it('should handle image processing errors and mark as failed', async () => {
+      const eventId = 'test-uuid';
+      const imageUrl = 'https://example.com/image.jpg';
+
+      mockS3MetadataService.extractMetadataFromUrl.mockResolvedValue({
+        bucket: 'test-bucket',
+        key: 'test-key',
+        source: Source.API,
+        timestamp: Date.now(),
+        type: 'detection',
+      });
+
+      mockDetectionImageProcessingService.processImage.mockRejectedValue(
+        new Error('AWS service unavailable'),
+      );
+
+      mockRepository.update.mockResolvedValue({ affected: 1 });
+
+      await expect(
+        (service as any).processImageAsync(eventId, imageUrl),
+      ).rejects.toThrow('AWS service unavailable');
+
+      expect(mockRepository.update).toHaveBeenCalledWith(eventId, {
+        processingStatus: ProcessingStatus.FAILED,
+        processingError: 'AWS service unavailable',
+      });
+    });
+
+    it('should handle S3 metadata extraction errors', async () => {
+      const eventId = 'test-uuid';
+      const imageUrl = 'https://example.com/image.jpg';
+
+      mockS3MetadataService.extractMetadataFromUrl.mockRejectedValue(
+        new Error('Invalid S3 URL format'),
+      );
+
+      mockRepository.update.mockResolvedValue({ affected: 1 });
+
+      await expect(
+        (service as any).processImageAsync(eventId, imageUrl),
+      ).rejects.toThrow('Invalid S3 URL format');
+
+      expect(mockRepository.update).toHaveBeenCalledWith(eventId, {
+        processingStatus: ProcessingStatus.FAILED,
+        processingError: 'Invalid S3 URL format',
+      });
+    });
+
+    it('should handle S3 object size retrieval errors', async () => {
+      const eventId = 'test-uuid';
+      const imageUrl = 'https://example.com/image.jpg';
+
+      mockS3MetadataService.extractMetadataFromUrl.mockResolvedValue({
+        bucket: 'test-bucket',
+        key: 'test-key',
+        source: Source.API,
+        timestamp: Date.now(),
+        type: 'detection',
+      });
+
+      mockDetectionImageProcessingService.processImage.mockResolvedValue({
+        hasAnimals: true,
+        crowCount: 1,
+        animalCount: 1,
+        detectedAnimals: ['Crow'],
+        processingDuration: 1200,
+      });
+
+      mockS3MetadataService.getObjectSize.mockRejectedValue(
+        new Error('S3 object not found'),
+      );
+
+      mockRepository.update.mockResolvedValue({ affected: 1 });
+
+      await expect(
+        (service as any).processImageAsync(eventId, imageUrl),
+      ).rejects.toThrow('S3 object not found');
+
+      expect(mockRepository.update).toHaveBeenCalledWith(eventId, {
+        processingStatus: ProcessingStatus.FAILED,
+        processingError: 'S3 object not found',
+      });
     });
   });
 });

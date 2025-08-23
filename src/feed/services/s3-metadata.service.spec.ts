@@ -52,7 +52,7 @@ describe('S3MetadataService', () => {
 
   describe('extractMetadataFromUrl', () => {
     const validUrl =
-      'https://test-bucket.s3.us-west-2.amazonaws.com/feed/1234567890-test-image.jpg';
+      'https://test-bucket.s3.us-west-2.amazonaws.com/feed/test-feed-123/1234567890-test-image.jpg';
 
     beforeEach(() => {
       mockS3Send.mockResolvedValue({
@@ -70,7 +70,7 @@ describe('S3MetadataService', () => {
 
       expect(result).toEqual({
         bucket: 'test-bucket',
-        key: 'feed/1234567890-test-image.jpg',
+        key: 'feed/test-feed-123/1234567890-test-image.jpg',
         source: Source.API,
         timestamp: 1234567890,
         type: 'feed',
@@ -81,12 +81,14 @@ describe('S3MetadataService', () => {
 
     it('should handle URL with different bucket name', async () => {
       const differentUrl =
-        'https://my-custom-bucket.s3.us-east-1.amazonaws.com/detection/9876543210-another-image.jpg';
+        'https://my-custom-bucket.s3.us-east-1.amazonaws.com/detection/test-feed-456/9876543210-another-image.jpg';
 
       const result = await service.extractMetadataFromUrl(differentUrl);
 
       expect(result.bucket).toBe('my-custom-bucket');
-      expect(result.key).toBe('detection/9876543210-another-image.jpg');
+      expect(result.key).toBe(
+        'detection/test-feed-456/9876543210-another-image.jpg',
+      );
       expect(result.type).toBe('detection');
       expect(result.timestamp).toBe(9876543210);
     });
@@ -148,7 +150,7 @@ describe('S3MetadataService', () => {
 
     it('should throw error for invalid S3 key format', async () => {
       const urlWithInvalidKey =
-        'https://test-bucket.s3.us-west-2.amazonaws.com/invalid-key';
+        'https://test-bucket.s3.us-west-2.amazonaws.com/invalid/key/format';
 
       await expect(
         service.extractMetadataFromUrl(urlWithInvalidKey),
@@ -157,7 +159,7 @@ describe('S3MetadataService', () => {
 
     it('should throw error when filename lacks timestamp', async () => {
       const urlWithInvalidFilename =
-        'https://test-bucket.s3.us-west-2.amazonaws.com/feed/no-timestamp-image.jpg';
+        'https://test-bucket.s3.us-west-2.amazonaws.com/feed/test-feed-123/no-timestamp-image.jpg';
 
       await expect(
         service.extractMetadataFromUrl(urlWithInvalidFilename),
@@ -264,7 +266,7 @@ describe('S3MetadataService', () => {
 
   describe('extractMetadataFromS3Object', () => {
     const bucket = 'test-bucket';
-    const key = 'feed/1234567890-test-image.jpg';
+    const key = 'feed/test-feed-123/1234567890-test-image.jpg';
 
     it('should extract metadata from S3 object successfully', async () => {
       mockS3Send.mockResolvedValue({
@@ -281,7 +283,7 @@ describe('S3MetadataService', () => {
 
       expect(result).toEqual({
         bucket: 'test-bucket',
-        key: 'feed/1234567890-test-image.jpg',
+        key: 'feed/test-feed-123/1234567890-test-image.jpg',
         source: Source.API,
         timestamp: 1234567890,
         type: 'feed',
@@ -296,7 +298,8 @@ describe('S3MetadataService', () => {
         },
       });
 
-      const detectionKey = 'detection/9876543210-detection-image.jpg';
+      const detectionKey =
+        'detection/test-feed-456/9876543210-detection-image.jpg';
       const result = await (service as any).extractMetadataFromS3Object(
         bucket,
         detectionKey,

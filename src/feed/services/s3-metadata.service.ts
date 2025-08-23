@@ -19,15 +19,25 @@ export class S3MetadataService {
     try {
       // Parse S3 URL: https://bucket-name.s3.region.amazonaws.com/key...
 
+      this.logger.info(`Parsing S3 URL: ${imageUrl}`);
+
       const url = new URL(imageUrl);
+      this.logger.info(`URL parsed successfully: ${url.hostname}`);
+
       const hostnameParts = url.hostname.split('.');
+      this.logger.info(`Hostname parts: ${JSON.stringify(hostnameParts)}`);
 
       if (hostnameParts.length < 4 || !hostnameParts[1].startsWith('s3')) {
+        this.logger.error(
+          `Invalid hostname format: length=${hostnameParts.length}, s3 part=${hostnameParts[1]}`,
+        );
         throw new Error('Invalid S3 URL format');
       }
 
       const bucket = hostnameParts[0];
       const key = url.pathname.substring(1); // Remove leading slash
+
+      this.logger.info(`Extracted bucket: ${bucket}, key: ${key}`);
 
       // Extract metadata from S3 object and key path...
 
@@ -46,26 +56,46 @@ export class S3MetadataService {
   ): Promise<S3Metadata> {
     // Get S3 object metadata first...
 
+    this.logger.info(
+      `Getting S3 object metadata for bucket: ${bucket}, key: ${key}`,
+    );
     const s3Metadata = await this.getObjectMetadata(bucket, key);
+    this.logger.info(
+      `S3 metadata retrieved: ${JSON.stringify(s3Metadata.Metadata)}`,
+    );
 
     // Extract from key for path type and timestamp...
 
     const pathParts = key.split('/');
-    if (pathParts.length < 2) {
+    this.logger.info(`Path parts: ${JSON.stringify(pathParts)}`);
+
+    if (pathParts.length < 3) {
+      this.logger.error(
+        `Invalid key format: ${key}, parts: ${pathParts.length}`,
+      );
       throw new Error('Invalid S3 key format');
     }
 
     const type = pathParts[0] as 'feed' | 'detection';
-    const filename = pathParts[1];
+    const feedEventId = pathParts[1]; // For detection events, this is the feedEventId
+    const filename = pathParts[2]; // The actual filename with timestamp
+
+    this.logger.info(
+      `Extracted type: ${type}, feedEventId: ${feedEventId}, filename: ${filename}`,
+    );
 
     // Extract timestamp from filename: 1755884038592-test-image.jpg...
 
     const timestampMatch = filename.match(/^(\d+)-/);
     if (!timestampMatch) {
+      this.logger.error(
+        `Could not extract timestamp from filename: ${filename}`,
+      );
       throw new Error('Could not extract timestamp from filename');
     }
 
     const timestamp = parseInt(timestampMatch[1], 10);
+    this.logger.info(`Extracted timestamp: ${timestamp}`);
 
     // Extract source from S3 metadata (uploaded with the image)...
 
@@ -78,6 +108,10 @@ export class S3MetadataService {
         source = sourceFromMeta as Source;
       }
     }
+
+    this.logger.info(
+      `Final result: bucket=${bucket}, key=${key}, source=${source}, timestamp=${timestamp}, type=${type}`,
+    );
 
     return {
       bucket,
