@@ -68,6 +68,9 @@ The **Crow Detector** is an interactive system that allows users to feed crows t
 - **Face Detection**: AWS Rekognition detects faces and provides bounding box coordinates.
 - **Image Cropping**: Sharp library crops images to focus on detected faces with padding.
 - **Image Storage**: Organized S3 storage with separate directories for original and processed images.
+- **Animal Detection**: AWS Rekognition identifies animals and provides confidence scores.
+- **AI Classification**: Claude AI analyzes detected animals for species identification and crow detection.
+- **Processing Workflow**: Comprehensive status tracking from upload to completion.
 
 ## System Architecture
 
@@ -126,6 +129,7 @@ The **Crow Detector Server** is built using modern technologies to ensure reliab
 - **AWS ECS**: Container orchestration for server deployment.
 - **AWS CloudFormation**: Infrastructure as Code for resource management.
 - **AWS IAM**: Identity and access management for secure resource access.
+- **AWS Rekognition**: AI-powered image analysis and animal detection.
 
 ### Development Tools
 - **Jest**: JavaScript testing framework for unit and integration testing.
@@ -138,6 +142,11 @@ The **Crow Detector Server** is built using modern technologies to ensure reliab
 - **ECDSA**: Elliptic Curve Digital Signature Algorithm for device authentication.
 - **Crypto**: Node.js cryptographic functions for signature verification.
 - **Environment Variables**: Secure configuration management.
+
+### AI & Machine Learning
+- **Claude AI**: Anthropic's Claude for advanced animal species classification
+- **Fallback Processing**: Local detection algorithms when AI services are unavailable
+- **Confidence Scoring**: Multi-level confidence assessment for detection accuracy
 
 ## Setup Instructions
 
@@ -205,7 +214,12 @@ The project includes database management scripts for development and testing:
 
 ### Database Schema
 - **Feed Events**: Records of user interactions and feeding activities.
-- **Detection Events**: Animal detection images and metadata.
+- **Detection Events**: Comprehensive animal detection data including:
+  - Processing status (PENDING → PROCESSING → COMPLETED/FAILED)
+  - Animal and crow counts with confidence scores
+  - Processing duration and error tracking
+  - AI analysis results and detected species
+  - Image metadata and processing history
 - **User Sessions**: User interaction tracking and cooldown management.
 
 ## Authentication
@@ -252,12 +266,42 @@ The system provides secure image upload capabilities through pre-signed S3 URLs:
 3. **Storage**: Processed images stored in separate `processed/` directory
 4. **Safety**: Processed images don't trigger reprocessing (prevents infinite loops)
 
+#### Detection Event Processing Workflow
+1. **Initial Status**: Detection events start with `PENDING` status
+2. **Processing Phase**: Status changes to `PROCESSING` during analysis
+3. **AI Analysis**: AWS Rekognition detects animals, Claude AI classifies species
+4. **Completion**: Status updates to `COMPLETED` with results or `FAILED` with errors
+5. **Metadata Storage**: Processing duration, error details, and analysis results saved
+
 ### Image Metadata
 - **Timestamp**: When the image was captured.
 - **Source**: Device type and location information.
 - **Feed Event ID**: Links detection images to feeding events.
 - **Content Type**: Image format and encoding information.
 - **Processing Status**: Current state of image processing pipeline.
+
+## Detection Event Processing
+
+The system provides comprehensive animal detection and analysis capabilities through a multi-stage processing pipeline:
+
+### Processing Stages
+- **PENDING**: Initial state when detection event is created
+- **PROCESSING**: Active analysis phase using AWS services
+- **COMPLETED**: Successful processing with results stored
+- **FAILED**: Processing error with detailed error information
+
+### Analysis Components
+- **AWS Rekognition**: Primary animal detection with confidence scores
+- **Claude AI**: Advanced species classification and crow identification
+- **Fallback Detection**: Local processing when external services are unavailable
+- **Error Handling**: Comprehensive error tracking and retry mechanisms
+
+### Data Captured
+- **Animal Counts**: Total animals and specific crow counts
+- **Species Detection**: Identified animal types and classifications
+- **Processing Metrics**: Duration, file sizes, and performance data
+- **Error Details**: Specific failure reasons for debugging
+- **Temporal Data**: Timestamps for processing and completion
 
 ### Security Features
 - **Pre-signed URLs**: Time-limited upload permissions.
