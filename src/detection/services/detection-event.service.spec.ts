@@ -320,7 +320,11 @@ describe('DetectionEventService', () => {
         hasAnimals: true,
         crowCount: 2,
         animalCount: 3,
-        detectedAnimals: ['Crow', 'Bird', 'Squirrel'],
+        detectedAnimals: [
+          { name: 'Crow', confidence: 95.5, count: 1 },
+          { name: 'Bird', confidence: 92.1, count: 1 },
+          { name: 'Squirrel', confidence: 88.7, count: 1 },
+        ],
         processingDuration: 1500,
       });
 
@@ -340,7 +344,11 @@ describe('DetectionEventService', () => {
         processingStatus: ProcessingStatus.COMPLETED,
         processingDuration: 1500,
         originalImageSize: 1024,
-        detectedAnimals: '["Crow","Bird","Squirrel"]',
+        detectedAnimals: [
+          { name: 'Crow', confidence: 95.5, count: 1 },
+          { name: 'Bird', confidence: 92.1, count: 1 },
+          { name: 'Squirrel', confidence: 88.7, count: 1 },
+        ],
         crowCount: 2,
         animalCount: 3,
       });

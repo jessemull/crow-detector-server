@@ -151,7 +151,10 @@ describe('DetectionImageProcessingService', () => {
       expect(result.hasAnimals).toBe(true);
       expect(result.crowCount).toBe(1);
       expect(result.animalCount).toBe(2);
-      expect(result.detectedAnimals).toEqual(['Bird', 'Crow']);
+      expect(result.detectedAnimals).toEqual([
+        { name: 'Bird', confidence: 95, count: 1 },
+        { name: 'Crow', confidence: 87, count: 1 },
+      ]);
     });
 
     it('should delete image when no animals detected', async () => {
@@ -287,14 +290,18 @@ describe('DetectionImageProcessingService', () => {
 
       expect(result.hasAnimals).toBe(true);
       expect(result.animalCount).toBe(8);
-      expect(result.detectedAnimals).toContain('Animal');
-      expect(result.detectedAnimals).toContain('Wildlife');
-      expect(result.detectedAnimals).toContain('Pet');
-      expect(result.detectedAnimals).toContain('Farm Animal');
-      expect(result.detectedAnimals).toContain('Bird');
-      expect(result.detectedAnimals).toContain('Avian');
-      expect(result.detectedAnimals).toContain('Mammal');
-      expect(result.detectedAnimals).toContain('Furry Animal');
+      expect(result.detectedAnimals).toEqual(
+        expect.arrayContaining([
+          { name: 'Animal', confidence: 95, count: 1 },
+          { name: 'Wildlife', confidence: 87, count: 1 },
+          { name: 'Pet', confidence: 92, count: 1 },
+          { name: 'Farm Animal', confidence: 88, count: 1 },
+          { name: 'Bird', confidence: 90, count: 1 },
+          { name: 'Avian', confidence: 85, count: 1 },
+          { name: 'Mammal', confidence: 89, count: 1 },
+          { name: 'Furry Animal', confidence: 86, count: 1 },
+        ]),
+      );
     });
 
     it('should handle fallback detection with crow-specific terms', async () => {
@@ -317,10 +324,14 @@ describe('DetectionImageProcessingService', () => {
       expect(result.hasAnimals).toBe(true);
       expect(result.crowCount).toBe(4);
       expect(result.animalCount).toBe(4);
-      expect(result.detectedAnimals).toContain('crow');
-      expect(result.detectedAnimals).toContain('raven');
-      expect(result.detectedAnimals).toContain('blackbird');
-      expect(result.detectedAnimals).toContain('corvid');
+      expect(result.detectedAnimals).toEqual(
+        expect.arrayContaining([
+          { name: 'crow', confidence: 95, count: 1 },
+          { name: 'raven', confidence: 87, count: 1 },
+          { name: 'blackbird', confidence: 92, count: 1 },
+          { name: 'corvid', confidence: 88, count: 1 },
+        ]),
+      );
     });
 
     it('should handle fallback detection with mixed case labels', async () => {
@@ -341,9 +352,13 @@ describe('DetectionImageProcessingService', () => {
 
       expect(result.hasAnimals).toBe(true);
       expect(result.animalCount).toBe(3);
-      expect(result.detectedAnimals).toContain('BIRD');
-      expect(result.detectedAnimals).toContain('Mammal');
-      expect(result.detectedAnimals).toContain('wildlife');
+      expect(result.detectedAnimals).toEqual(
+        expect.arrayContaining([
+          { name: 'BIRD', confidence: 95, count: 1 },
+          { name: 'Mammal', confidence: 87, count: 1 },
+          { name: 'wildlife', confidence: 92, count: 1 },
+        ]),
+      );
     });
   });
 });
