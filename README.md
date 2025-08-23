@@ -64,10 +64,10 @@ The **Crow Detector** is an interactive system that allows users to feed crows t
 - **Cooldown System**: Prevents spam feeding with configurable cooldown periods.
 
 ### Image Processing Pipeline
-- **Content Moderation**: Filters inappropriate content.
-- **Face Detection**: Crops and focuses on user faces.
-- **Animal Detection**: Identifies animals in feeding images.
-- **Image Storage**: Organized S3 storage with metadata.
+- **Content Moderation**: AWS Rekognition filters inappropriate content.
+- **Face Detection**: AWS Rekognition detects faces and provides bounding box coordinates.
+- **Image Cropping**: Sharp library crops images to focus on detected faces with padding.
+- **Image Storage**: Organized S3 storage with separate directories for original and processed images.
 
 ## System Architecture
 
@@ -77,6 +77,8 @@ The system employs a **microservices architecture** with the following key compo
 - **NestJS Server**: RESTful API endpoints for device communication and web interface.
 - **PostgreSQL Database**: Stores feed events, detection events, and user interactions.
 - **AWS S3**: Secure image storage with organized directory structure.
+- **AWS Rekognition**: AI-powered content moderation and face detection.
+- **AWS SDK v3**: Modern, modular AWS SDK for improved performance.
 - **ECDSA Authentication**: Device-level security using cryptographic signatures.
 
 ### Data Flow
@@ -240,14 +242,22 @@ The system provides secure image upload capabilities through pre-signed S3 URLs:
 - **`POST /urls/detection`**: Generate signed URL for motion detection images.
 
 ### S3 Organization
-- **Feed Images**: `feed/{timestamp}-{filename}.{format}`
-- **Detection Images**: `detection/{feedEventId}/{timestamp}-{filename}.{format}`
+- **Feed Images**: `feed/{timestamp}-{filename}.{format}` (triggers processing)
+- **Detection Images**: `detection/{feedEventId}/{timestamp}-{filename}.{format}` (triggers processing)
+- **Processed Images**: `processed/{filename}_cropped.{format}` (safe from reprocessing)
+
+### Image Processing Flow
+1. **Upload**: Image uploaded to `feed/` or `detection/` directory
+2. **Processing**: Lambda function triggers image processing pipeline
+3. **Storage**: Processed images stored in separate `processed/` directory
+4. **Safety**: Processed images don't trigger reprocessing (prevents infinite loops)
 
 ### Image Metadata
 - **Timestamp**: When the image was captured.
 - **Source**: Device type and location information.
 - **Feed Event ID**: Links detection images to feeding events.
 - **Content Type**: Image format and encoding information.
+- **Processing Status**: Current state of image processing pipeline.
 
 ### Security Features
 - **Pre-signed URLs**: Time-limited upload permissions.
@@ -388,6 +398,8 @@ The pipeline performs the following steps:
 
 This workflow runs automatically when changes are pushed to the `main` branch. It builds, tests, and deploys the NestJS application to ECS.
 
+
+
 ## Infrastructure
 
 ### CloudFormation Templates
@@ -417,6 +429,11 @@ The S3 bucket is configured with:
 - **Lifecycle Rules**: Automatic cleanup of old images and versions.
 - **CORS Configuration**: Cross-origin resource sharing for web interface.
 - **Bucket Policies**: Enforces encryption and access controls.
+- **Event Notifications**: Smart triggers only on `feed/` and `detection/` directories.
+- **Directory Structure**: 
+  - `feed/` - User interaction images (triggers processing)
+  - `detection/` - Motion detection images (triggers processing)
+  - `processed/` - Cropped/processed images (safe from reprocessing)
 
 ## License
 

@@ -1,4 +1,13 @@
-import * as AWS from 'aws-sdk';
+import {
+  RekognitionClient,
+  DetectModerationLabelsCommand,
+  DetectFacesCommand,
+} from '@aws-sdk/client-rekognition';
+import {
+  S3Client,
+  GetObjectCommand,
+  PutObjectCommand,
+} from '@aws-sdk/client-s3';
 import sharp from 'sharp';
 import { ConfigService } from '@nestjs/config';
 import { Injectable } from '@nestjs/common';
@@ -12,16 +21,18 @@ import { createLogger } from 'src/common/logger/logger.config';
 @Injectable()
 export class ImageProcessingService {
   private readonly logger = createLogger(ImageProcessingService.name);
-  private readonly rekognition: AWS.Rekognition;
-  private readonly s3: AWS.S3;
+  private readonly rekognition: RekognitionClient;
+  private readonly s3: S3Client;
 
   constructor(private readonly configService: ConfigService) {
-    this.rekognition = new AWS.Rekognition({
-      region: this.configService.get('AWS_REGION', 'us-west-2'),
+    const region = this.configService.get<string>('AWS_REGION') || 'us-west-2';
+
+    this.rekognition = new RekognitionClient({
+      region,
     });
 
-    this.s3 = new AWS.S3({
-      region: this.configService.get('AWS_REGION', 'us-west-2'),
+    this.s3 = new S3Client({
+      region,
     });
   }
 
@@ -30,6 +41,21 @@ export class ImageProcessingService {
     key: string,
   ): Promise<ImageProcessingResult> {
     const startTime = Date.now();
+
+    if (key.startsWith('processed/')) {
+      this.logger.warn(
+        `Skipping processing for already processed image: ${key}`,
+      );
+      return {
+        faceDetection: { faceDetected: false },
+        contentModeration: {
+          isAppropriate: true,
+          labels: [],
+          confidence: 0,
+        },
+        processingDuration: Date.now() - startTime,
+      };
+    }
 
     this.logger.info(`Starting image processing for s3://${bucket}/${key}`);
 
@@ -87,7 +113,7 @@ export class ImageProcessingService {
     bucket: string,
     key: string,
   ): Promise<ContentModerationResult> {
-    const params = {
+    const command = new DetectModerationLabelsCommand({
       Image: {
         S3Object: {
           Bucket: bucket,
@@ -95,12 +121,10 @@ export class ImageProcessingService {
         },
       },
       MinConfidence: 70,
-    };
+    });
 
     try {
-      const result = await this.rekognition
-        .detectModerationLabels(params)
-        .promise();
+      const result = await this.rekognition.send(command);
 
       const inappropriateLabels = [
         'Explicit Nudity',
@@ -141,7 +165,7 @@ export class ImageProcessingService {
     bucket: string,
     key: string,
   ): Promise<FaceDetectionResult> {
-    const params = {
+    const command = new DetectFacesCommand({
       Image: {
         S3Object: {
           Bucket: bucket,
@@ -149,10 +173,10 @@ export class ImageProcessingService {
         },
       },
       Attributes: ['DEFAULT'],
-    };
+    });
 
     try {
-      const result = await this.rekognition.detectFaces(params).promise();
+      const result = await this.rekognition.send(command);
 
       if (result.FaceDetails && result.FaceDetails.length > 0) {
         const face = result.FaceDetails[0];
@@ -199,10 +223,11 @@ export class ImageProcessingService {
     try {
       // Download image from S3...
 
-      const s3Object = await this.s3
-        .getObject({ Bucket: bucket, Key: key })
-        .promise();
-      const imageBuffer = s3Object.Body as Buffer;
+      const command = new GetObjectCommand({ Bucket: bucket, Key: key });
+      const s3Object = await this.s3.send(command);
+      const imageBuffer = Buffer.from(
+        await s3Object.Body!.transformToByteArray(),
+      );
 
       // Get image metadata...
 
@@ -260,20 +285,29 @@ export class ImageProcessingService {
     key: string,
     imageBuffer: Buffer,
   ): Promise<string> {
-    const processedKey = key.replace('.jpg', '_cropped.jpg');
+    // Extract the base filename without extension...
+
+    const pathParts = key.split('/');
+    const filename = pathParts[pathParts.length - 1];
+    const baseName = filename.replace(/\.[^/.]+$/, ''); // Remove file extension
+
+    // Create processed key in a separate 'processed' directory...
+
+    const processedKey = `processed/${baseName}_cropped.jpg`;
 
     try {
-      await this.s3
-        .putObject({
-          Bucket: bucket,
-          Key: processedKey,
-          Body: imageBuffer,
-          ContentType: 'image/jpeg',
-          ServerSideEncryption: 'AES256',
-        })
-        .promise();
+      const command = new PutObjectCommand({
+        Bucket: bucket,
+        Key: processedKey,
+        Body: imageBuffer,
+        ContentType: 'image/jpeg',
+        ServerSideEncryption: 'AES256',
+      });
+      await this.s3.send(command);
 
-      const processedUrl = `https://${bucket}.s3.${this.configService.get('AWS_REGION', 'us-west-2')}.amazonaws.com/${processedKey}`;
+      const region =
+        this.configService.get<string>('AWS_REGION') || 'us-west-2';
+      const processedUrl = `https://${bucket}.s3.${region}.amazonaws.com/${processedKey}`;
       this.logger.info(`Processed image uploaded: ${processedUrl}`);
 
       return processedUrl;

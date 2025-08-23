@@ -49,6 +49,8 @@ Resources:
             Filter:
               S3Key:
                 Rules:
+                  - Name: prefix
+                    Value: feed/
                   - Name: suffix
                     Value: .jpg
           - Event: s3:ObjectCreated:Put
@@ -57,6 +59,8 @@ Resources:
             Filter:
               S3Key:
                 Rules:
+                  - Name: prefix
+                    Value: feed/
                   - Name: suffix
                     Value: .jpeg
           - Event: s3:ObjectCreated:Put
@@ -65,6 +69,8 @@ Resources:
             Filter:
               S3Key:
                 Rules:
+                  - Name: prefix
+                    Value: feed/
                   - Name: suffix
                     Value: .png
           - Event: s3:ObjectCreated:Put
@@ -73,6 +79,8 @@ Resources:
             Filter:
               S3Key:
                 Rules:
+                  - Name: prefix
+                    Value: feed/
                   - Name: suffix
                     Value: .gif
           - Event: s3:ObjectCreated:Put
@@ -81,6 +89,8 @@ Resources:
             Filter:
               S3Key:
                 Rules:
+                  - Name: prefix
+                    Value: feed/
                   - Name: suffix
                     Value: .bmp
           - Event: s3:ObjectCreated:Put
@@ -89,54 +99,68 @@ Resources:
             Filter:
               S3Key:
                 Rules:
+                  - Name: prefix
+                    Value: feed/
                   - Name: suffix
                     Value: .webp
-          - Event: s3:ObjectCreated:Post
+          - Event: s3:ObjectCreated:Put
             Queue: !ImportValue 
               Fn::Sub: "CrowDetectorSQSQueueArn-${Environment}"
             Filter:
               S3Key:
                 Rules:
+                  - Name: prefix
+                    Value: detection/
                   - Name: suffix
                     Value: .jpg
-          - Event: s3:ObjectCreated:Post
+          - Event: s3:ObjectCreated:Put
             Queue: !ImportValue 
               Fn::Sub: "CrowDetectorSQSQueueArn-${Environment}"
             Filter:
               S3Key:
                 Rules:
+                  - Name: prefix
+                    Value: detection/
                   - Name: suffix
                     Value: .jpeg
-          - Event: s3:ObjectCreated:Post
+          - Event: s3:ObjectCreated:Put
             Queue: !ImportValue 
               Fn::Sub: "CrowDetectorSQSQueueArn-${Environment}"
             Filter:
               S3Key:
                 Rules:
+                  - Name: prefix
+                    Value: detection/
                   - Name: suffix
                     Value: .png
-          - Event: s3:ObjectCreated:Post
+          - Event: s3:ObjectCreated:Put
             Queue: !ImportValue 
               Fn::Sub: "CrowDetectorSQSQueueArn-${Environment}"
             Filter:
               S3Key:
                 Rules:
+                  - Name: prefix
+                    Value: detection/
                   - Name: suffix
                     Value: .gif
-          - Event: s3:ObjectCreated:Post
+          - Event: s3:ObjectCreated:Put
             Queue: !ImportValue 
               Fn::Sub: "CrowDetectorSQSQueueArn-${Environment}"
             Filter:
               S3Key:
                 Rules:
+                  - Name: prefix
+                    Value: detection/
                   - Name: suffix
                     Value: .bmp
-          - Event: s3:ObjectCreated:Post
+          - Event: s3:ObjectCreated:Put
             Queue: !ImportValue 
               Fn::Sub: "CrowDetectorSQSQueueArn-${Environment}"
             Filter:
               S3Key:
                 Rules:
+                  - Name: prefix
+                    Value: detection/
                   - Name: suffix
                     Value: .webp
 

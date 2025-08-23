@@ -117,7 +117,11 @@ export class FeedEventService {
 
         // Get processed image size...
 
-        const processedKey = key.replace('.jpg', '_cropped.jpg');
+        const pathParts = key.split('/');
+        const filename = pathParts[pathParts.length - 1];
+        const baseName = filename.replace(/\.[^/.]+$/, ''); // Remove file extension
+        const processedKey = `processed/${baseName}_cropped.jpg`;
+
         updateData.processedImageSize =
           await this.s3MetadataService.getObjectSize(bucket, processedKey);
       }
