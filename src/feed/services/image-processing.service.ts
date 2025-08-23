@@ -42,6 +42,21 @@ export class ImageProcessingService {
   ): Promise<ImageProcessingResult> {
     const startTime = Date.now();
 
+    if (key.startsWith('processed/')) {
+      this.logger.warn(
+        `Skipping processing for already processed image: ${key}`,
+      );
+      return {
+        faceDetection: { faceDetected: false },
+        contentModeration: {
+          isAppropriate: true,
+          labels: [],
+          confidence: 0,
+        },
+        processingDuration: Date.now() - startTime,
+      };
+    }
+
     this.logger.info(`Starting image processing for s3://${bucket}/${key}`);
 
     try {
@@ -270,7 +285,13 @@ export class ImageProcessingService {
     key: string,
     imageBuffer: Buffer,
   ): Promise<string> {
-    const processedKey = key.replace('.jpg', '_cropped.jpg');
+    // Extract the base filename without extension
+    const pathParts = key.split('/');
+    const filename = pathParts[pathParts.length - 1];
+    const baseName = filename.replace(/\.[^/.]+$/, ''); // Remove file extension
+
+    // Create processed key in a separate 'processed' directory
+    const processedKey = `processed/${baseName}_cropped.jpg`;
 
     try {
       const command = new PutObjectCommand({
@@ -282,7 +303,9 @@ export class ImageProcessingService {
       });
       await this.s3.send(command);
 
-      const processedUrl = `https://${bucket}.s3.${this.configService.get('AWS_REGION', 'us-west-2')}.amazonaws.com/${processedKey}`;
+      const region =
+        this.configService.get<string>('AWS_REGION') || 'us-west-2';
+      const processedUrl = `https://${bucket}.s3.${region}.amazonaws.com/${processedKey}`;
       this.logger.info(`Processed image uploaded: ${processedUrl}`);
 
       return processedUrl;
