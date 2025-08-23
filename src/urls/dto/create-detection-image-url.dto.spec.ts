@@ -67,25 +67,13 @@ describe('CreateDetectionImageUrlDto', () => {
       expect(errors[0].constraints?.isEnum).toBeDefined();
     });
 
-    it('should fail validation when feedEventId is missing', async () => {
+    it('should pass validation when only required fields are provided', async () => {
       const dto = new CreateDetectionImageUrlDto();
       dto.fileName = 'motion-detected';
       dto.format = ImageFormat.PNG;
 
       const errors = await validate(dto);
-      expect(errors).toHaveLength(1);
-      expect(errors[0].constraints?.isNotEmpty).toBeDefined();
-    });
-
-    it('should fail validation when feedEventId is empty string', async () => {
-      const dto = new CreateDetectionImageUrlDto();
-      dto.fileName = 'motion-detected';
-      dto.format = ImageFormat.PNG;
-      dto.feedEventId = '';
-
-      const errors = await validate(dto);
-      expect(errors).toHaveLength(1);
-      expect(errors[0].constraints?.isNotEmpty).toBeDefined();
+      expect(errors).toHaveLength(0);
     });
 
     it('should accept valid ImageFormat values', async () => {
@@ -102,7 +90,6 @@ describe('CreateDetectionImageUrlDto', () => {
         const dto = new CreateDetectionImageUrlDto();
         dto.fileName = 'motion-detected';
         dto.format = format;
-        dto.feedEventId = 'feed-123';
 
         const errors = await validate(dto);
         expect(errors).toHaveLength(0);
@@ -121,28 +108,7 @@ describe('CreateDetectionImageUrlDto', () => {
         const dto = new CreateDetectionImageUrlDto();
         dto.fileName = 'motion-detected';
         dto.format = ImageFormat.JPG;
-        dto.feedEventId = 'feed-123';
         dto.contentType = contentType;
-
-        const errors = await validate(dto);
-        expect(errors).toHaveLength(0);
-      }
-    });
-
-    it('should accept various feedEventId formats', async () => {
-      const validFeedEventIds = [
-        'feed-123',
-        'feed_456',
-        'feed789',
-        '12345',
-        'uuid-123e4567-e89b-12d3-a456-426614174000',
-      ];
-
-      for (const feedEventId of validFeedEventIds) {
-        const dto = new CreateDetectionImageUrlDto();
-        dto.fileName = 'motion-detected';
-        dto.format = ImageFormat.JPG;
-        dto.feedEventId = feedEventId;
 
         const errors = await validate(dto);
         expect(errors).toHaveLength(0);
@@ -159,11 +125,6 @@ describe('CreateDetectionImageUrlDto', () => {
     it('should have format property', () => {
       const dto = new CreateDetectionImageUrlDto();
       expect(dto).toHaveProperty('format');
-    });
-
-    it('should have feedEventId property', () => {
-      const dto = new CreateDetectionImageUrlDto();
-      expect(dto).toHaveProperty('feedEventId');
     });
 
     it('should have optional contentType property', () => {

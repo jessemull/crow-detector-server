@@ -11,10 +11,6 @@ export class CreateDetectionImageUrlDto {
   format: ImageFormat;
 
   @IsString()
-  @IsNotEmpty()
-  feedEventId: string;
-
-  @IsString()
   @IsOptional()
   contentType?: string;
 }

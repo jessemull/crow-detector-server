@@ -609,7 +609,6 @@ components:
       required:
         - fileName
         - format
-        - feedEventId
       properties:
         fileName:
           type: string
@@ -617,11 +616,6 @@ components:
           example: "detection-2024-01-15.jpg"
         format:
           $ref: '#/components/schemas/ImageFormat'
-        feedEventId:
-          type: string
-          format: uuid
-          description: UUID of the associated feed event
-          example: "123e4567-e89b-12d3-a456-426614174000"
         contentType:
           type: string
           description: MIME type of the image (optional)

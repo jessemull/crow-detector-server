@@ -6,6 +6,8 @@ import { S3Client } from '@aws-sdk/client-s3';
 import { Test, TestingModule } from '@nestjs/testing';
 import { UrlsService } from './urls.service';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { FeedEvent } from '../../feed/entity/feed-event.entity';
 
 jest.mock('@aws-sdk/client-s3');
 jest.mock('@aws-sdk/s3-request-presigner');
@@ -20,6 +22,11 @@ describe('UrlsService', () => {
 
   const mockConfigService = {
     get: jest.fn(),
+  };
+
+  const mockFeedEventRepository = {
+    findOne: jest.fn(),
+    find: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -43,6 +50,10 @@ describe('UrlsService', () => {
         {
           provide: ConfigService,
           useValue: mockConfigService,
+        },
+        {
+          provide: getRepositoryToken(FeedEvent),
+          useValue: mockFeedEventRepository,
         },
       ],
     }).compile();
@@ -78,7 +89,7 @@ describe('UrlsService', () => {
         return undefined;
       });
 
-      new UrlsService(mockConfigService as any);
+      new UrlsService(mockConfigService as any, mockFeedEventRepository as any);
 
       expect(mockS3Client).toHaveBeenCalledWith({
         region: 'us-west-2',
@@ -88,9 +99,13 @@ describe('UrlsService', () => {
     it('should throw error when S3_BUCKET_NAME is not set', () => {
       mockConfigService.get.mockReturnValue(undefined);
 
-      expect(() => new UrlsService(mockConfigService as any)).toThrow(
-        'S3_BUCKET_NAME environment variable is required',
-      );
+      expect(
+        () =>
+          new UrlsService(
+            mockConfigService as any,
+            mockFeedEventRepository as any,
+          ),
+      ).toThrow('S3_BUCKET_NAME environment variable is required');
     });
   });
 
@@ -157,9 +172,11 @@ describe('UrlsService', () => {
       const createDetectionImageUrlDto: CreateDetectionImageUrlDto = {
         fileName: 'motion-detected',
         format: ImageFormat.PNG,
-        feedEventId: 'feed-123',
         contentType: 'image/png',
       };
+
+      const mockFeedEvent = { id: 'feed-123', createdAt: new Date() };
+      mockFeedEventRepository.find.mockResolvedValue([mockFeedEvent]);
 
       const result = await service.createDetectionImageSignedUrl(
         createDetectionImageUrlDto,
@@ -184,8 +201,10 @@ describe('UrlsService', () => {
       const createDetectionImageUrlDto: CreateDetectionImageUrlDto = {
         fileName: 'motion-detected',
         format: ImageFormat.JPG,
-        feedEventId: 'feed-123',
       };
+
+      const mockFeedEvent = { id: 'feed-123', createdAt: new Date() };
+      mockFeedEventRepository.find.mockResolvedValue([mockFeedEvent]);
 
       await service.createDetectionImageSignedUrl(createDetectionImageUrlDto);
 
@@ -200,8 +219,10 @@ describe('UrlsService', () => {
       const createDetectionImageUrlDto: CreateDetectionImageUrlDto = {
         fileName: 'motion-detected',
         format: ImageFormat.PNG,
-        feedEventId: 'feed-123',
       };
+
+      const mockFeedEvent = { id: 'feed-123', createdAt: new Date() };
+      mockFeedEventRepository.find.mockResolvedValue([mockFeedEvent]);
 
       const error = new Error('S3 error');
       mockGetSignedUrl.mockRejectedValue(error);
@@ -209,6 +230,21 @@ describe('UrlsService', () => {
       await expect(
         service.createDetectionImageSignedUrl(createDetectionImageUrlDto),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw NotFoundException when no feed events exist', async () => {
+      const createDetectionImageUrlDto: CreateDetectionImageUrlDto = {
+        fileName: 'motion-detected',
+        format: ImageFormat.PNG,
+      };
+
+      mockFeedEventRepository.find.mockResolvedValue([]);
+
+      await expect(
+        service.createDetectionImageSignedUrl(createDetectionImageUrlDto),
+      ).rejects.toThrow(
+        'No feed events found. Please create a feed event first.',
+      );
     });
   });
 
@@ -272,8 +308,10 @@ describe('UrlsService', () => {
       const createDetectionImageUrlDto: CreateDetectionImageUrlDto = {
         fileName: 'motion-detected',
         format: ImageFormat.PNG,
-        feedEventId: 'feed-123',
       };
+
+      const mockFeedEvent = { id: 'feed-123', createdAt: new Date() };
+      mockFeedEventRepository.find.mockResolvedValue([mockFeedEvent]);
 
       await service.createDetectionImageSignedUrl(createDetectionImageUrlDto);
 
