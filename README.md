@@ -4,9 +4,10 @@ The **Crow Detector Server** is a NestJS-based backend service that powers an in
 
 The **Crow Detector Server** manages the core backend logic for the **Crow Detector Project** which includes the following components:
 
-- **[Crow Detector Server](https://github.com/jessemull/crow-detector-server)**: The **Crow Detector** NestJS backend server (this repository).
-- **[Crow Detector Client](https://github.com/jessemull/crow-detector-client)**: The **Crow Detector** NextJS client (planned).
-- **[Crow Detector Pi Devices](https://github.com/jessemull/crow-detector-pi)**: Raspberry Pi device software (planned).
+- **[Crow Detector Server](https://github.com/jessemull/crow-detector-server)**: The **Crow Detector** NestJS backend server.
+- **[Crow Detector Client](https://github.com/jessemull/crow-detector-client)**: The **Crow Detector** NextJS client.
+- **[Crow Detector Pi Devices](https://github.com/jessemull/crow-detector-pi)**: The **Crow Detector** Raspberry Pi device software.
+- **[Crow Detector Lambda@Edge](https://github.com/jessemull/crow-detector-lambda-at-edge)**: The **Crow Detector** Lambda@Edge for deep-linking.
 
 ## Table of Contents
 
