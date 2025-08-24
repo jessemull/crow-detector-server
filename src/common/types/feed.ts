@@ -12,6 +12,14 @@ export enum Status {
   REJECTED = 'REJECTED',
 }
 
+export enum FeedEventStatus {
+  PENDING = 'PENDING',
+  FEEDING = 'FEEDING',
+  FEEDING_COMPLETE = 'FEEDING_COMPLETE',
+  PHOTO_TAKEN = 'PHOTO_TAKEN',
+  COMPLETE = 'COMPLETE',
+}
+
 export enum ProcessingStatus {
   PENDING = 'PENDING',
   PROCESSING = 'PROCESSING',

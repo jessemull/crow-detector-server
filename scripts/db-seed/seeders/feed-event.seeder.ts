@@ -1,6 +1,11 @@
 import { BaseSeeder } from './base-seeder';
 import { FeedEvent } from '../../../src/feed/entity/feed-event.entity';
-import { Source, Status, ProcessingStatus } from '../../../src/common/types';
+import {
+  Source,
+  Status,
+  ProcessingStatus,
+  FeedEventStatus,
+} from '../../../src/common/types';
 import { createLogger } from '../../../src/common/logger/logger.config';
 
 export class FeedEventSeeder extends BaseSeeder {
@@ -61,6 +66,20 @@ export class FeedEventSeeder extends BaseSeeder {
         originalImageSize,
         processedImageSize,
         processingDuration,
+        // Feeder status fields
+        feedEventStatus: this.getRandomEnumValue(FeedEventStatus),
+        feederTriggeredAt: this.getRandomBoolean()
+          ? this.getRandomDate()
+          : undefined,
+        feedingCompletedAt: this.getRandomBoolean()
+          ? this.getRandomDate()
+          : undefined,
+        photoTakenAt: this.getRandomBoolean()
+          ? this.getRandomDate()
+          : undefined,
+        photoUrl: this.getRandomBoolean()
+          ? this.getRandomImageUrl()
+          : undefined,
       };
 
       feedEvents.push(feedEvent);

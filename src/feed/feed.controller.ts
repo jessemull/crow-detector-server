@@ -14,6 +14,7 @@ import { FeedEvent } from './entity/feed-event.entity';
 import { FeedEventService } from './services/feed-event.service';
 import { FeedResponse } from 'src/common/types';
 import { PatchFeedDTO } from './dto/patch-feed.dto';
+import { UpdateFeedStatusDto } from './dto/update-feed-status.dto';
 import { EcdsaAuthGuard } from '../auth/middleware/ecdsa-auth.guard';
 
 @Controller('feed')
@@ -71,6 +72,39 @@ export class FeedController {
     return {
       data: null,
       message: 'Image reprocessing started successfully!',
+    };
+  }
+
+  // Feeder status management endpoints
+  @Get('status/latest')
+  async getLatestFeedEventStatus() {
+    const status = await this.feedEventService.getLatestFeedEventStatus();
+    if (!status) {
+      return {
+        data: null,
+        message: 'No feed events found',
+      };
+    }
+    return {
+      data: status,
+      message: 'Latest feed event status retrieved successfully',
+    };
+  }
+
+  @Post('status/:id')
+  @UseGuards(EcdsaAuthGuard)
+  async updateFeedEventStatus(
+    @Param('id') id: string,
+    @Body() updateFeedStatusDto: UpdateFeedStatusDto,
+  ): Promise<FeedResponse> {
+    const event = await this.feedEventService.updateFeedEventStatus(
+      id,
+      updateFeedStatusDto.status,
+      updateFeedStatusDto.photoUrl,
+    );
+    return {
+      data: event,
+      message: 'Feed event status updated successfully!',
     };
   }
 }

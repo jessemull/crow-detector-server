@@ -362,6 +362,81 @@ paths:
         '500':
           description: Internal server error
 
+  /feed/status/latest:
+    get:
+      summary: Get latest feed event status
+      description: Retrieve the status of the most recent feed event for feeder control
+      tags:
+        - Feed
+      responses:
+        '200':
+          description: Latest feed event status retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                        description: Feed event ID
+                      status:
+                        type: string
+                        enum: [PENDING, FEEDING, FEEDING_COMPLETE, PHOTO_TAKEN, COMPLETE]
+                        description: Current feeder status
+                      createdAt:
+                        type: string
+                        format: date-time
+                        description: When the feed event was created
+                  message:
+                    type: string
+                    description: Response message
+        '404':
+          description: No feed events found
+        '500':
+          description: Internal server error
+
+  /feed/status/{id}:
+    post:
+      summary: Update feed event status
+      description: Update the feeder status of a specific feed event
+      tags:
+        - Feed
+      security:
+        - ECDSA: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Unique identifier of the feed event
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateFeedStatusDTO'
+      responses:
+        '200':
+          description: Feed event status updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedResponse'
+        '400':
+          description: Bad request - invalid input data
+        '401':
+          description: Unauthorized - invalid authentication
+        '404':
+          description: Feed event not found
+        '500':
+          description: Internal server error
+
   /urls/feed:
     post:
       summary: Create signed URL for feed image upload
@@ -542,6 +617,22 @@ components:
           example: "https://example.com/images/feed-cropped.jpg"
         status:
           $ref: '#/components/schemas/Status'
+
+    UpdateFeedStatusDTO:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [PENDING, FEEDING, FEEDING_COMPLETE, PHOTO_TAKEN, COMPLETE]
+          description: New feeder status for the feed event
+          example: "FEEDING"
+        photoUrl:
+          type: string
+          format: uri
+          description: URL of the verification photo (optional, used with PHOTO_TAKEN status)
+          example: "https://example.com/images/verification.jpg"
         isAppropriate:
           type: boolean
           description: Whether the feed image is appropriate
@@ -774,6 +865,32 @@ components:
           items:
             $ref: '#/components/schemas/DetectionEvent'
           description: Associated detection events
+        # Feeder control fields
+        feedEventStatus:
+          type: string
+          enum: [PENDING, FEEDING, FEEDING_COMPLETE, PHOTO_TAKEN, COMPLETE]
+          description: Current feeder status for the feed event
+          example: "PENDING"
+        feederTriggeredAt:
+          type: string
+          format: date-time
+          description: When the feeder was triggered
+          example: "2024-01-15T10:32:00Z"
+        feedingCompletedAt:
+          type: string
+          format: date-time
+          description: When the feeding was completed
+          example: "2024-01-15T10:33:00Z"
+        photoTakenAt:
+          type: string
+          format: date-time
+          description: When the verification photo was taken
+          example: "2024-01-15T10:34:00Z"
+        photoUrl:
+          type: string
+          format: uri
+          description: URL of the verification photo
+          example: "https://example.com/images/verification.jpg"
 
     DetectedAnimal:
       type: object

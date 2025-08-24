@@ -6,7 +6,12 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { Source, ProcessingStatus, Status } from 'src/common/types';
+import {
+  Source,
+  ProcessingStatus,
+  Status,
+  FeedEventStatus,
+} from 'src/common/types';
 import { DetectionEvent } from 'src/detection/entity/detection-event.entity';
 
 @Entity('feed_event')
@@ -91,4 +96,24 @@ export class FeedEvent {
 
   @Column({ nullable: true })
   processingDuration?: number; // Milliseconds
+
+  // Feeder control fields
+  @Column({
+    enum: FeedEventStatus,
+    default: FeedEventStatus.PENDING,
+    type: 'enum',
+  })
+  feedEventStatus: FeedEventStatus;
+
+  @Column({ nullable: true })
+  feederTriggeredAt?: Date;
+
+  @Column({ nullable: true })
+  feedingCompletedAt?: Date;
+
+  @Column({ nullable: true })
+  photoTakenAt?: Date;
+
+  @Column({ nullable: true })
+  photoUrl?: string; // URL of the verification photo
 }
