@@ -18,29 +18,30 @@ The **Crow Detector Server** manages the core backend logic for the **Crow Detec
 6. [Database Management](#database-management)
 7. [Authentication](#authentication)
 8. [Image Upload System](#image-upload-system)
-9. [Commits & Commitizen](#commits--commitizen)
+9. [Automated Feeder System](#automated-feeder-system)
+10. [Commits & Commitizen](#commits--commitizen)
    - [Making a Commit](#making-a-commit)
-10. [Linting & Formatting](#linting--formatting)
+11. [Linting & Formatting](#linting--formatting)
     - [Linting Commands](#linting-commands)
     - [Formatting Commands](#formatting-commands)
     - [Pre-Commit Hook](#pre-commit-hook)
-11. [Unit Tests & Code Coverage](#unit-tests--code-coverage)
+12. [Unit Tests & Code Coverage](#unit-tests--code-coverage)
     - [Unit Tests](#unit-tests)
     - [Code Coverage](#code-coverage)
-12. [Development Workflow](#development-workflow)
+13. [Development Workflow](#development-workflow)
     - [Running the Server](#running-the-server)
     - [SSH Tunnel Setup](#ssh-tunnel-setup)
-13. [Deployment Pipelines](#deployment-pipelines)
+14. [Deployment Pipelines](#deployment-pipelines)
     - [Deployment Strategy](#deployment-strategy)
     - [Tools Used](#tools-used)
     - [Pull Request](#pull-request)
     - [Deploy](#deploy)
     - [Deploy On Merge](#deploy-on-merge)
-14. [Infrastructure](#infrastructure)
+15. [Infrastructure](#infrastructure)
     - [CloudFormation Templates](#cloudformation-templates)
     - [ECS Task Definition](#ecs-task-definition)
     - [S3 Bucket Configuration](#s3-bucket-configuration)
-15. [License](#license)
+16. [License](#license)
 
 ## Project Overview
 
@@ -349,6 +350,124 @@ The system provides comprehensive animal detection and analysis capabilities thr
 - **Encryption**: Server-side encryption (AES256).
 - **Access Control**: IAM-based permissions for S3 operations.
 - **Lifecycle Management**: Automatic cleanup of old images.
+
+## Automated Feeder System
+
+The system provides comprehensive automation for physical crow feeding through Raspberry Pi devices with relay-controlled feeders:
+
+### Feeder Status Flow
+
+Feed events progress through the following automated status transitions:
+
+1. **PENDING**: Initial state when a feed event is created (user clicks feed button or device triggers)
+2. **FEEDING**: Feeder Pi activates relay and dispenses food
+3. **FEEDING_COMPLETE**: Feeding finished, waiting for verification photo
+4. **PHOTO_TAKEN**: Camera captures verification photo of the fed area
+5. **COMPLETE**: Full feeding cycle finished successfully
+
+### Device Coordination
+
+#### Feeder Pi Device (pi-feeder)
+- **Polling Interval**: Checks server every 30 seconds
+- **Status Monitoring**: `GET /feed/status/latest` - looks for `PENDING` status
+- **Trigger Feeding**: `POST /feed/status/{id}` with `{"status": "FEEDING"}`
+- **Complete Feeding**: `POST /feed/status/{id}` with `{"status": "FEEDING_COMPLETE"}`
+- **Hardware Control**: Activates relay to dispense crow feed
+
+#### Camera Pi Device (pi-motion or dedicated camera)
+- **Polling Interval**: Checks server every 30 seconds  
+- **Status Monitoring**: `GET /feed/status/latest` - looks for `FEEDING_COMPLETE` status
+- **Photo Capture**: Takes verification photo of feeding area
+- **Photo Upload**: Uploads image to S3 and updates status
+- **Status Update**: `POST /feed/status/{id}` with `{"status": "PHOTO_TAKEN", "photoUrl": "..."}`
+
+### API Endpoints
+
+#### Status Monitoring
+- **`GET /feed/status/latest`**: Returns latest feed event status for polling
+  ```json
+  {
+    "data": {
+      "id": "feed-event-uuid",
+      "status": "PENDING",
+      "createdAt": "2024-01-15T10:30:00Z"
+    },
+    "message": "Latest feed event status retrieved successfully"
+  }
+  ```
+
+#### Status Updates
+- **`POST /feed/status/{id}`**: Updates feeder status with automatic timestamp management
+  ```json
+  {
+    "status": "FEEDING",
+    "photoUrl": "https://example.com/verification.jpg" // Optional, used with PHOTO_TAKEN
+  }
+  ```
+
+### Automatic Timestamp Management
+
+The system automatically tracks timing for each stage:
+
+- **feederTriggeredAt**: Set when status becomes `FEEDING`
+- **feedingCompletedAt**: Set when status becomes `FEEDING_COMPLETE`
+- **photoTakenAt**: Set when status becomes `PHOTO_TAKEN`
+- **photoUrl**: Stored when verification photo is uploaded
+
+### Integration Example
+
+#### Python Polling Script (Feeder Pi)
+```python
+import requests
+import time
+import RPi.GPIO as GPIO
+
+RELAY_PIN = 18
+API_BASE = "https://api.crittercanteen.com"
+POLL_INTERVAL = 30  # seconds
+
+def check_feeding_needed():
+    response = requests.get(f"{API_BASE}/feed/status/latest")
+    data = response.json()
+    
+    if data['data'] and data['data']['status'] == 'PENDING':
+        return data['data']['id']
+    return None
+
+def trigger_feeder(feed_id):
+    # Update status to FEEDING
+    requests.post(f"{API_BASE}/feed/status/{feed_id}", 
+                 json={"status": "FEEDING"})
+    
+    # Activate relay
+    GPIO.output(RELAY_PIN, GPIO.HIGH)
+    time.sleep(5)  # Feed for 5 seconds
+    GPIO.output(RELAY_PIN, GPIO.LOW)
+    
+    # Update status to FEEDING_COMPLETE
+    requests.post(f"{API_BASE}/feed/status/{feed_id}", 
+                 json={"status": "FEEDING_COMPLETE"})
+
+# Main polling loop
+while True:
+    feed_id = check_feeding_needed()
+    if feed_id:
+        trigger_feeder(feed_id)
+    time.sleep(POLL_INTERVAL)
+```
+
+### Error Handling & Reliability
+
+- **Network Resilience**: Devices continue polling even if network is temporarily unavailable
+- **Status Persistence**: All status changes are persisted in the database
+- **Retry Logic**: Failed operations can be retried by checking latest status
+- **Cooldown Override**: System supports `x-skip-cooldown: true` header for testing/manual overrides
+
+### Configuration
+
+- **FEED_COOLDOWN_HOURS**: Configurable cooldown period between feeds (default: 4 hours)
+- **Poll Intervals**: Adjustable polling frequency for different device types
+- **Authentication**: All status updates require ECDSA authentication for security
 
 ## Commits & Commitizen
 
