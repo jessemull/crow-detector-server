@@ -19,8 +19,9 @@ The **Crow Detector Server** manages the core backend logic for the **Crow Detec
 6. [Database Management](#database-management)
 7. [Authentication](#authentication)
 8. [Image Upload System](#image-upload-system)
-9. [Automated Feeder System](#automated-feeder-system)
-10. [Commits & Commitizen](#commits--commitizen)
+9. [Lambda Function Integration](#lambda-function-integration)
+10. [Automated Feeder System](#automated-feeder-system)
+11. [Commits & Commitizen](#commits--commitizen)
    - [Making a Commit](#making-a-commit)
 11. [Linting & Formatting](#linting--formatting)
     - [Linting Commands](#linting-commands)
@@ -40,6 +41,7 @@ The **Crow Detector Server** manages the core backend logic for the **Crow Detec
     - [Deploy On Merge](#deploy-on-merge)
 15. [Infrastructure](#infrastructure)
     - [CloudFormation Templates](#cloudformation-templates)
+    - [Lambda Infrastructure](#lambda-infrastructure)
     - [ECS Task Definition](#ecs-task-definition)
     - [S3 Bucket Configuration](#s3-bucket-configuration)
 16. [License](#license)
@@ -86,17 +88,20 @@ The system employs a **microservices architecture** with the following key compo
 - **NestJS Server**: RESTful API endpoints for device communication and web interface.
 - **PostgreSQL Database**: Stores feed events, detection events, and user interactions.
 - **AWS S3**: Secure image storage with organized directory structure.
+- **AWS Lambda**: S3 event processing and API integration (see [Lambda Documentation](lambda/README.md)).
 - **AWS Rekognition**: AI-powered content moderation and face detection.
 - **AWS SDK v3**: Modern, modular AWS SDK for improved performance.
+- **Claude API**: AI analysis of detected animals for species identification and crow detection.
 - **ECDSA Authentication**: Device-level security using cryptographic signatures.
 
 ### Data Flow
 
 1. **Device Registration**: Raspberry Pi devices authenticate using ECDSA signatures.
 2. **Image Upload**: Devices upload images via pre-signed S3 URLs.
-3. **Event Processing**: Server processes images and creates database records.
-4. **Web Interface**: Users view results and interact with the system.
-5. **Cooldown Management**: System enforces feeding limits and cooldown periods.
+3. **Lambda Processing**: S3 events trigger Lambda function to call Crow Detector API.
+4. **Event Processing**: Server processes images and creates database records.
+5. **Web Interface**: Users view results and interact with the system.
+6. **Cooldown Management**: System enforces feeding limits and cooldown periods.
 
 ### Security Features
 
@@ -111,14 +116,14 @@ The **Crow Detector** operates in multiple environments to ensure smooth develop
 
 ### Development Environment
 
-- **Local Development**: `https://api-dev.crittercanteen.com`
+- **Local Development**: `https://api-dev.crittercanteen.com`.
 - **Database**: PostgreSQL via SSH tunnel to AWS RDS.
 - **S3**: Development bucket with test images.
 - **Authentication**: Development mode bypass available.
 
 ### Production Environment
 
-- **API Endpoint**: `https://api.crittercanteen.com`
+- **API Endpoint**: `https://api.crittercanteen.com`.
 - **Database**: AWS RDS PostgreSQL instance.
 - **S3**: Production bucket with organized image storage.
 - **Authentication**: Full ECDSA signature verification.
@@ -293,8 +298,8 @@ The system provides secure image upload capabilities through pre-signed S3 URLs:
 ### S3 Organization
 
 - **Feed Images**: `feed/{timestamp}-{filename}.{format}` (triggers processing)
-- **Detection Images**: `detection/{feedEventId}/{timestamp}-{filename}.{format}` (triggers processing)
-- **Processed Images**: `processed/{filename}_cropped.{format}` (safe from reprocessing)
+- **Detection Images**: `detection/{feedEventId}/{timestamp}-{filename}{format}` (triggers processing).
+- **Processed Images**: `processed/{filename}_cropped.{format}` (safe from reprocessing).
 
 ### Image Processing Flow
 
@@ -318,6 +323,26 @@ The system provides secure image upload capabilities through pre-signed S3 URLs:
 - **Feed Event ID**: Links detection images to feeding events.
 - **Content Type**: Image format and encoding information.
 - **Processing Status**: Current state of image processing pipeline.
+
+## Lambda Function Integration
+
+The **Crow Detector S3 Lambda** function automatically processes S3 image uploads and triggers the main server's image processing pipeline. For detailed information about the lambda function, see the [Lambda Documentation](lambda/README.md).
+
+### How Lambda Works
+
+1. **S3 Event Trigger**: When images are uploaded to `feed/` or `detection/` directories, S3 generates events
+2. **SQS Queue**: Events are queued in SQS for reliable processing
+3. **Lambda Execution**: Lambda function processes each event and calls the Crow Detector API
+4. **API Integration**: Lambda authenticates using ECDSA signatures and triggers image processing
+5. **Automatic Processing**: Server begins AI analysis pipeline without manual intervention
+
+### Lambda Benefits
+
+- **Automated Workflow**: Images are processed immediately upon upload
+- **Reliable Processing**: SQS ensures events are not lost during high traffic
+- **Scalable**: Handles multiple concurrent uploads efficiently
+- **Secure**: Uses ECDSA authentication for API communication
+- **Monitoring**: Comprehensive CloudWatch logging and metrics
 
 ## Detection Event Processing
 
@@ -368,16 +393,16 @@ Feed events progress through the following automated status transitions:
 
 ### Device Coordination
 
-#### Feeder Pi Device (pi-feeder)
+#### Feeder Pi Device (pi-feeder):
 - **Polling Interval**: Checks server every 30 seconds.
-- **Status Monitoring**: `GET /feed/status/latest` - looks for `PENDING` status.
+- **Status Monitoring**: `GET /feed/status/latest` looking for `PENDING` status.
 - **Trigger Feeding**: `PATCH /feed/status/{id}` with `{"status": "FEEDING"}`.
 - **Complete Feeding**: `PATCH /feed/status/{id}` with `{"status": "FEEDING_COMPLETE"}`.
 - **Hardware Control**: Activates relay to dispense crow feed.
 
-#### Camera Pi Device (pi-motion or dedicated camera)
+#### Camera Pi Device (pi-motion or dedicated camera):
 - **Polling Interval**: Checks server every 30 seconds.
-- **Status Monitoring**: `GET /feed/status/latest` - looks for `FEEDING_COMPLETE` status.
+- **Status Monitoring**: `GET /feed/status/latest` looking for `FEEDING_COMPLETE` status.
 - **Photo Capture**: Takes verification photo of feeding area.
 - **Photo Upload**: Uploads image to S3 and updates status.
 - **Status Update**: `PATCH /feed/status/{id}` with `{"status": "PHOTO_TAKEN", "photoUrl": "..."}`.
@@ -547,6 +572,16 @@ Infrastructure is managed using AWS CloudFormation templates with environment-sp
 - **`crow-detector-iam-roles.yaml`**: IAM roles and policies for ECS tasks.
 - **`crow-detector-rds.yaml`**: RDS PostgreSQL database configuration.
 - **`crow-detector-s3.yaml`**: S3 bucket configuration for image storage.
+
+### Lambda Infrastructure
+
+The lambda function infrastructure is managed separately in the `lambda/` directory:
+
+- **`lambda/cloudformation/crow-detector-s3-lambda.yaml`**: Lambda function, IAM roles, and SQS integration
+- **`lambda/cloudformation/crow-detector-lambda-s3.yaml`**: S3 event notification configuration
+- **`lambda/cloudformation/crow-detector-sqs.yaml`**: SQS queue and event source mapping
+
+For detailed lambda deployment and configuration, see the [Lambda Documentation](lambda/README.md).
 
 ### External AI Services
 
