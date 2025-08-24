@@ -66,7 +66,6 @@ export class FeedEventSeeder extends BaseSeeder {
         originalImageSize,
         processedImageSize,
         processingDuration,
-        // Feeder status fields
         feedEventStatus: this.getRandomEnumValue(FeedEventStatus),
         feederTriggeredAt: this.getRandomBoolean()
           ? this.getRandomDate()

@@ -91,7 +91,7 @@ export class FeedController {
     };
   }
 
-  @Post('status/:id')
+  @Patch('status/:id')
   @UseGuards(EcdsaAuthGuard)
   async updateFeedEventStatus(
     @Param('id') id: string,

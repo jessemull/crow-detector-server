@@ -97,7 +97,6 @@ export class FeedEvent {
   @Column({ nullable: true })
   processingDuration?: number; // Milliseconds
 
-  // Feeder control fields
   @Column({
     enum: FeedEventStatus,
     default: FeedEventStatus.PENDING,

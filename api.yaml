@@ -400,7 +400,7 @@ paths:
           description: Internal server error
 
   /feed/status/{id}:
-    post:
+    patch:
       summary: Update feed event status
       description: Update the feeder status of a specific feed event
       tags:
@@ -865,7 +865,6 @@ components:
           items:
             $ref: '#/components/schemas/DetectionEvent'
           description: Associated detection events
-        # Feeder control fields
         feedEventStatus:
           type: string
           enum: [PENDING, FEEDING, FEEDING_COMPLETE, PHOTO_TAKEN, COMPLETE]

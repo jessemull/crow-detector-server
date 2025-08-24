@@ -281,7 +281,6 @@ export class FeedEventService {
     void this.processImageAsync(eventId, s3Metadata.bucket, s3Metadata.key);
   }
 
-  // Feeder status management methods
   async getLatestFeedEventStatus(): Promise<{
     id: string;
     status: string;
@@ -310,13 +309,16 @@ export class FeedEventService {
     status: string,
     photoUrl?: string,
   ): Promise<FeedEvent> {
-    await this.findById(id); // Verify feed event exists
+    // Verify feed event exists...
+
+    await this.findById(id);
 
     const updateData: Partial<FeedEvent> = {
-      feedEventStatus: status as FeedEventStatus, // Type assertion for enum
+      feedEventStatus: status as FeedEventStatus,
     };
 
-    // Update timestamps based on status
+    // Update timestamps based on status...
+
     switch (status) {
       case 'FEEDING':
         updateData.feederTriggeredAt = new Date();
@@ -331,7 +333,6 @@ export class FeedEventService {
         }
         break;
       case 'COMPLETE':
-        // All timestamps already set
         break;
     }
 
