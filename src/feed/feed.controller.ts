@@ -75,7 +75,6 @@ export class FeedController {
     };
   }
 
-  // Feeder status management endpoints
   @Get('status/latest')
   async getLatestFeedEventStatus() {
     const status = await this.feedEventService.getLatestFeedEventStatus();

@@ -114,5 +114,5 @@ export class FeedEvent {
   photoTakenAt?: Date;
 
   @Column({ nullable: true })
-  photoUrl?: string; // URL of the verification photo
+  photoUrl?: string;
 }
