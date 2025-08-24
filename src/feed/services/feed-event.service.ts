@@ -8,7 +8,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import { ProcessingStatus } from 'src/common/types';
+import { ProcessingStatus, FeedEventStatus } from 'src/common/types';
 import { S3MetadataService } from './s3-metadata.service';
 import { createLogger } from 'src/common/logger/logger.config';
 import { ConfigService } from '@nestjs/config';
@@ -56,6 +56,7 @@ export class FeedEventService {
         imageUrl,
         source: s3Metadata.source, // Use extracted source from S3
         processingStatus: ProcessingStatus.PENDING,
+        feedEventStatus: FeedEventStatus.PENDING, // Initial feeder status
         originalImageSize,
         createdAt: new Date(s3Metadata.timestamp), // Use S3 timestamp
       });
@@ -278,5 +279,65 @@ export class FeedEventService {
     // Start async processing again...
 
     void this.processImageAsync(eventId, s3Metadata.bucket, s3Metadata.key);
+  }
+
+  async getLatestFeedEventStatus(): Promise<{
+    id: string;
+    status: string;
+    createdAt: Date;
+  } | null> {
+    const latestFeedEvents = await this.feedEventRepository.find({
+      order: { createdAt: 'DESC' },
+      select: ['id', 'feedEventStatus', 'createdAt'],
+      take: 1,
+    });
+
+    const latestFeedEvent = latestFeedEvents[0];
+    if (!latestFeedEvent) {
+      return null;
+    }
+
+    return {
+      id: latestFeedEvent.id,
+      status: latestFeedEvent.feedEventStatus,
+      createdAt: latestFeedEvent.createdAt,
+    };
+  }
+
+  async updateFeedEventStatus(
+    id: string,
+    status: string,
+    photoUrl?: string,
+  ): Promise<FeedEvent> {
+    // Verify feed event exists...
+
+    await this.findById(id);
+
+    const updateData: Partial<FeedEvent> = {
+      feedEventStatus: status as FeedEventStatus,
+    };
+
+    // Update timestamps based on status...
+
+    switch (status) {
+      case 'FEEDING':
+        updateData.feederTriggeredAt = new Date();
+        break;
+      case 'FEEDING_COMPLETE':
+        updateData.feedingCompletedAt = new Date();
+        break;
+      case 'PHOTO_TAKEN':
+        updateData.photoTakenAt = new Date();
+        if (photoUrl) {
+          updateData.photoUrl = photoUrl;
+        }
+        break;
+      case 'COMPLETE':
+        break;
+    }
+
+    await this.feedEventRepository.update(id, updateData);
+
+    return this.findById(id);
   }
 }
