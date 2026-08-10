@@ -72,6 +72,7 @@ Prefer `make` targets. Run **`make`** or **`make help`** for a compact list.
 | `make test-cov`       | Root Jest with coverage                          |
 | `make build`          | Nest production build                            |
 | `make lambda-lint`    | Lambda ESLint                                    |
+| `make lambda-format-check` | Lambda Prettier check                       |
 | `make lambda-test`    | Lambda Jest                                      |
 | `make lambda-build`   | Lambda webpack build + zip package               |
 | `make preflight`      | Root + lambda lint/format/test/build             |
@@ -155,7 +156,7 @@ controller → service → TypeORM repository / AWS SDK / Claude SDK
 
 - Lives under `lambda/` with its own `package.json`, Jest, ESLint, webpack.
 - Responsibility: consume S3/SQS events, sign ECDSA requests, call Nest API.
-- Keep runtime Node **20** documented until an intentional upgrade; API uses Node **22**.
+- Keep runtime Node **24** (AWS Lambda max managed runtime; Node 26 not offered yet). API / ECS uses Node **26**.
 - Do not import Nest source from Lambda (or vice versa).
 
 ### CloudFormation
@@ -210,7 +211,7 @@ controller → service → TypeORM repository / AWS SDK / Claude SDK
 - Follow least-privilege IAM in CloudFormation.
 - Do not broaden security group or IAM permissions without human review.
 - Rekognition `Resource: '*'` may be required by AWS — do not invent a finding if AWS mandates it.
-- Prefer proper Postgres TLS CA verification; if `rejectUnauthorized: false` remains temporarily, document it in `docs/SECURITY.md`.
+- Prefer proper Postgres TLS CA verification. Production/prod always verifies; `SSL_REJECT_UNAUTHORIZED=false` is a non-prod temporary opt-out only (see `docs/SECURITY.md`).
 
 ### Dependencies
 

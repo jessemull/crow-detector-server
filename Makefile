@@ -1,5 +1,5 @@
 .PHONY: help lint format format-check test test-cov build clean commit \
-	lambda-lint lambda-test lambda-build preflight ci
+	lambda-lint lambda-format-check lambda-test lambda-build preflight ci
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -31,6 +31,9 @@ commit: ## Interactive Commitizen commit
 lambda-lint: ## Lambda ESLint
 	npm run lambda:lint
 
+lambda-format-check: ## Lambda Prettier check
+	npm run lambda:format:check
+
 lambda-test: ## Lambda Jest with coverage
 	npm run lambda:test:coverage
 
@@ -44,6 +47,7 @@ preflight: ## Root + lambda lint, format-check, test, build
 	npm test
 	npm run build
 	npm run lambda:lint
+	npm run lambda:format:check
 	npm run lambda:test:coverage
 	npm run lambda:build
 	npm run lambda:package

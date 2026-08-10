@@ -23,6 +23,7 @@
     "lambda:clean": "cd lambda && npm run clean",
     "lambda:test:coverage": "cd lambda && npm run test:coverage",
     "lambda:lint": "cd lambda && npm run lint",
+    "lambda:format:check": "cd lambda && npm run format:check",
     "lambda:package": "cd lambda && npm run package",
     "lambda:test": "cd lambda && npm test",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",

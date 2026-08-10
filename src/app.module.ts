@@ -30,7 +30,8 @@ validateAppConfig(appConfig);
       type: 'postgres',
       username: appConfig.rds.username,
       ssl: {
-        // Prefer verifying the RDS CA. Set SSL_REJECT_UNAUTHORIZED=false only temporarily.
+        // Prefer verifying the RDS CA. Production/prod always verifies;
+        // SSL_REJECT_UNAUTHORIZED=false is a non-prod temporary opt-out only.
         rejectUnauthorized: appConfig.rds.sslRejectUnauthorized,
       },
     }),
