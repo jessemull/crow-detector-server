@@ -14,7 +14,7 @@ This repository powers the **Crow Detector** interactive crow feeder backend:
 - **PostgreSQL** via **TypeORM 0.3** for feed/detection events
 - **S3** for images; **Rekognition** for moderation/labels; **Claude** for animal/crow classification
 - **ECDSA** device authentication for Raspberry Pi devices and the S3 Lambda
-- Nested **`lambda/`** package (Node 20 runtime, webpack-bundled) that turns S3→SQS events into signed API calls
+- Nested **`lambda/`** package (Node 24 runtime, webpack-bundled) that turns S3→SQS events into signed API calls
 
 Shared networking (VPC, subnets, security groups) comes from the **`aws-infra-*`** CloudFormation exports via `ImportValue`. Do **not** hardcode foreign subnet/SG IDs.
 
