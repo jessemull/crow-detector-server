@@ -8,7 +8,6 @@ Parameters:
     AllowedValues:
       - dev
       - prod
-      - prod
   
   ContainerImage:
     Type: String
