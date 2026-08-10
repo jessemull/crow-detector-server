@@ -1,0 +1,38 @@
+---
+description: "NestJS + Lambda architecture boundaries for Crow Detector Server."
+globs:
+  - "src/**/*.ts"
+  - "lambda/**/*.ts"
+  - "cloudformation/**/*.yaml"
+  - "lambda/cloudformation/**/*.yaml"
+alwaysApply: false
+---
+
+# Architecture Rules
+
+## Nest
+
+- Controllers: HTTP + DTO validation only
+- Services: business logic and orchestration
+- Provide shared services once; **export** from owning module (e.g. S3 metadata)
+- Avoid `common/types` importing TypeORM entities (cycle risk)
+- Config via `src/config/` — no new scattered `process.env` in feature code
+- Global `ValidationPipe` in `main.ts`
+
+## Lambda
+
+- Keep code under `lambda/` only
+- Do not import Nest `src/`
+- Structured logs; no full SQS/S3 payload dumps
+
+## CloudFormation
+
+- Use `ImportValue` for `aws-infra-*` networking
+- Env-specific DB/TG/IAM imports must match `Environment` (no prod→dev hardcoding)
+- Never paste foreign VPC/subnet IDs from other projects
+
+## MUST NOT
+
+- Duplicate Nest providers across modules instead of exporting
+- Cross-import Nest ↔ Lambda source trees
+- Hardcode RDS hostnames in npm scripts (use env)

@@ -1,0 +1,27 @@
+---
+description: "Jest testing conventions for Nest (*.spec.ts) and Lambda (*.test.ts)."
+globs:
+  - "**/*.spec.ts"
+  - "**/*.test.ts"
+  - "jest.config.js"
+  - "lambda/jest.config.js"
+  - "test/**/*"
+alwaysApply: false
+---
+
+# Testing Rules
+
+- Maintain 80% coverage thresholds (root + lambda)
+- Nest: co-locate `*.spec.ts`; Lambda: co-locate `*.test.ts`
+- Mock AWS SDK, Anthropic, TypeORM, and network I/O
+- Test ECDSA guard edges including prod bypass impossibility
+- Do not overtest empty Nest module boilerplate
+- Prefer regression tests for bug fixes
+
+## Commands
+
+```bash
+make test
+make test-cov
+make lambda-test
+```

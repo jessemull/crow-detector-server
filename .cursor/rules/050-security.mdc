@@ -1,0 +1,36 @@
+---
+description: "Security rules for secrets, ECDSA, logging, and IAM."
+globs:
+  - "src/**/*.ts"
+  - "lambda/**/*.ts"
+  - "cloudformation/**/*.yaml"
+  - "lambda/cloudformation/**/*.yaml"
+  - ".github/workflows/**/*"
+alwaysApply: false
+---
+
+# Security Rules
+
+## Secrets
+
+- Never hardcode keys/tokens/passwords
+- No dummy Claude/Anthropic keys on production paths
+- Never log API keys or key prefixes
+- Document new secrets in `docs/ENVIRONMENT.md` + `.env.example`
+
+## Auth
+
+- ECDSA headers required in non-dev
+- Dev bypass only when `NODE_ENV=development` AND `x-dev-mode: true`
+- Bypass must not work when `NODE_ENV=production`
+
+## Logging
+
+- Nest: bunyan only
+- Lambda: structured + redacted; no full event payload dumps
+
+## AWS
+
+- Least-privilege IAM; justify any `*` resources
+- Prefer RDS CA verification; document temporary `rejectUnauthorized: false`
+- Prefer OIDC for GitHub→AWS (SHOULD, non-blocking)

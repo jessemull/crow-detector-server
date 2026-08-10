@@ -1,0 +1,16 @@
+---
+description: "Comment policy for TypeScript in Crow Detector Server."
+globs:
+  - "**/*.ts"
+alwaysApply: false
+---
+
+# Comments
+
+Prefer self-documenting code. Comment **why**, not **what**.
+
+Add comments for: security constraints, AWS/Nest quirks, non-obvious status workflows, justified `any`.
+
+Spacing: blank line above/below mid-block standalone comments; JSDoc directly above symbols.
+
+See `docs/COMMENTS.md`.

@@ -1,0 +1,27 @@
+---
+description: "Import conventions for Nest modules and Lambda package."
+globs:
+  - "src/**/*.ts"
+  - "lambda/**/*.ts"
+alwaysApply: false
+---
+
+# Imports
+
+## Nest (`src/`)
+
+- Prefer path alias `src/...` consistent with existing files
+- Keep Nest module imports explicit; avoid circular module graphs
+- Do not import TypeORM entities into shared type barrels
+- Feature modules import shared services from the exporting module
+
+## Lambda (`lambda/src/`)
+
+- Relative imports within `lambda/src` only
+- Never import from repository-root `src/`
+
+## General
+
+- Prefer named exports
+- Group/order imports to match ESLint/Prettier output
+- Do not add unused imports

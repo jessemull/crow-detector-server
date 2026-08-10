@@ -10,38 +10,43 @@ The **Crow Detector Server** manages the core backend logic for the **Crow Detec
 
 ## Table of Contents
 
-1. [Project Overview](#project-overview)
-2. [System Architecture](#system-architecture)
-3. [Environments](#environments)
-4. [Tech Stack](#tech-stack)
-5. [Setup Instructions](#setup-instructions)
-6. [Database Management](#database-management)
-7. [Authentication](#authentication)
-8. [Image Upload System](#image-upload-system)
-9. [Automated Feeder System](#automated-feeder-system)
-10. [Commits & Commitizen](#commits--commitizen)
-   - [Making a Commit](#making-a-commit)
-11. [Linting & Formatting](#linting--formatting)
-    - [Linting Commands](#linting-commands)
-    - [Formatting Commands](#formatting-commands)
-    - [Pre-Commit Hook](#pre-commit-hook)
-12. [Unit Tests & Code Coverage](#unit-tests--code-coverage)
-    - [Unit Tests](#unit-tests)
-    - [Code Coverage](#code-coverage)
-13. [Development Workflow](#development-workflow)
-    - [Running the Server](#running-the-server)
-    - [SSH Tunnel Setup](#ssh-tunnel-setup)
-14. [Deployment Pipelines](#deployment-pipelines)
-    - [Deployment Strategy](#deployment-strategy)
-    - [Tools Used](#tools-used)
-    - [Pull Request](#pull-request)
-    - [Deploy](#deploy)
-    - [Deploy On Merge](#deploy-on-merge)
-15. [Infrastructure](#infrastructure)
-    - [CloudFormation Templates](#cloudformation-templates)
-    - [ECS Task Definition](#ecs-task-definition)
-    - [S3 Bucket Configuration](#s3-bucket-configuration)
-16. [License](#license)
+1. [AI Agents & Documentation](#ai-agents--documentation)
+2. [Project Overview](#project-overview)
+3. [System Architecture](#system-architecture)
+4. [Environments](#environments)
+5. [Tech Stack](#tech-stack)
+6. [Setup Instructions](#setup-instructions)
+7. [Database Management](#database-management)
+8. [Authentication](#authentication)
+9. [Image Upload System](#image-upload-system)
+10. [Automated Feeder System](#automated-feeder-system)
+11. [Commits & Commitizen](#commits--commitizen)
+12. [Linting & Formatting](#linting--formatting)
+13. [Unit Tests & Code Coverage](#unit-tests--code-coverage)
+14. [Development Workflow](#development-workflow)
+15. [Deployment Pipelines](#deployment-pipelines)
+16. [Infrastructure](#infrastructure)
+17. [License](#license)
+
+## AI Agents & Documentation
+
+AI agents and contributors **must** start with the governance chain:
+
+| Doc | Purpose |
+| --- | ------- |
+| [`CONTEXT.md`](./CONTEXT.md) | Primary entry — loading order, precedence, quality gates |
+| [`AGENTS.md`](./AGENTS.md) | Full development rules for Nest + Lambda |
+| [`CLAUDE.md`](./CLAUDE.md) / [`GEMINI.md`](./GEMINI.md) | Thin redirects to CONTEXT/AGENTS |
+| [`docs/GOVERNANCE.md`](./docs/GOVERNANCE.md) | Authority, escalation, enforcement |
+| [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) | Nest modules, Lambda, CloudFormation |
+| [`docs/TESTING.md`](./docs/TESTING.md) | Jest strategy and 80% coverage |
+| [`docs/SECURITY.md`](./docs/SECURITY.md) | ECDSA, secrets, IAM, logging |
+| [`docs/ENVIRONMENT.md`](./docs/ENVIRONMENT.md) | Environment variable reference |
+| [`docs/CONTRIBUTING.md`](./docs/CONTRIBUTING.md) | Branch / commit / PR workflow |
+| [`docs/REVIEW.md`](./docs/REVIEW.md) | Review severity (MUST/SHOULD) |
+| [`docs/COMMENTS.md`](./docs/COMMENTS.md) | Comment policy |
+
+Quality gates: `make preflight` (also run by Husky on `git push`). Conventional Commits via Commitizen + commitlint.
 
 ## Project Overview
 

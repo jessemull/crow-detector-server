@@ -1,0 +1,160 @@
+---
+description: "Mandatory governance context loading and non-negotiable constraints enforced before any repository changes."
+alwaysApply: true
+---
+
+# Repository Context Loading
+
+Context loading is **not optional** — it is the first step before any work in this repository.
+
+All agents and contributors must:
+- understand the governance chain
+- load required documentation
+- respect constraint boundaries
+- follow precedence rules
+
+---
+
+# 1. Mandatory Loading Order
+
+## Before ANY Changes
+
+Read these in order:
+
+1. `CONTEXT.md` — mandatory loading order and precedence chain
+2. `AGENTS.md` — complete development rules and constraints
+3. All mandatory `docs/` from CONTEXT.md:
+   - `docs/GOVERNANCE.md`
+   - `docs/ARCHITECTURE.md`
+   - `docs/TESTING.md`
+   - `docs/COMMENTS.md`
+   - `docs/SECURITY.md`
+   - `docs/ENVIRONMENT.md`
+   - `docs/CONTRIBUTING.md`
+   - `docs/REVIEW.md`
+
+---
+
+## MUST
+
+- [ ] read `CONTEXT.md` first
+- [ ] read `AGENTS.md` second
+- [ ] read ALL mandatory docs above, not only those that seem relevant
+
+---
+
+## MUST NOT
+
+- ❌ skip context loading
+- ❌ selectively read only "relevant" docs
+- ❌ assume familiarity replaces reading
+- ❌ begin changes before loading is complete
+
+---
+
+# 2. Source-of-Truth Precedence
+
+When documents conflict, higher-precedence wins:
+
+| Priority | Source |
+|----------|--------|
+| 1 | `CONTEXT.md` |
+| 2 | `docs/GOVERNANCE.md` |
+| 3 | `docs/ARCHITECTURE.md` |
+| 4 | Feature-specific documentation |
+| 5 | Inline code comments |
+
+---
+
+## Rule
+
+> If two sources disagree, follow the higher-precedence source and flag the conflict.
+
+---
+
+# 3. Non-Negotiable Constraints
+
+These constraints are **absolute** — no exceptions without human approval.
+
+## Type Safety
+
+- [ ] TypeScript strict mode always enabled
+- [ ] no `any` in production code without justification
+- [ ] named exports preferred; follow existing patterns
+
+## Architecture
+
+- [ ] Nest: controllers → services → TypeORM / AWS / Claude
+- [ ] Lambda package isolated under `lambda/`
+- [ ] config from environment via Nest config helpers
+- [ ] CloudFormation uses `aws-infra-*` ImportValues
+
+## Testing & Quality
+
+- [ ] 80% Jest coverage thresholds
+- [ ] co-located Nest `*.spec.ts` / Lambda `*.test.ts`
+- [ ] Conventional Commits enforced
+- [ ] never hardcode secrets
+
+---
+
+# 4. Quality Gate
+
+## Required Before Pushing
+
+```bash
+make preflight
+# or rely on: git push  (husky pre-push runs make preflight)
+```
+
+This validates:
+- root lint / format / test / build
+- lambda lint / test / build
+
+---
+
+## MUST NOT
+
+- ❌ commit without passing staged lint/format hooks
+- ❌ skip tests or analysis
+- ❌ bypass git hooks (`--no-verify`) unless the user explicitly requests it
+
+---
+
+# 5. Conditional Documentation
+
+| Document | When to Read |
+|----------|-------------|
+| `docs/ENVIRONMENT.md` | new or changed env vars |
+| `docs/ARCHITECTURE.md` | new modules, Lambda, CloudFormation |
+| `docs/TESTING.md` | new tests or coverage changes |
+| `docs/SECURITY.md` | secrets, ECDSA, IAM, logging |
+| `docs/REVIEW.md` | PR review severity |
+| `docs/CONTRIBUTING.md` | branch / commit / PR workflow |
+| `docs/COMMENTS.md` | adding non-obvious comments |
+
+---
+
+# 6. Anti-Patterns (DO NOT DO)
+
+## MUST NOT
+
+- begin work without reading governance docs
+- assume prior context is sufficient for new tasks
+- ignore precedence chain when conflicts arise
+- treat constraints as optional guidelines
+- push without passing quality gates
+- invent findings for intentional AWS constraints (e.g. Rekognition resource `*`)
+
+---
+
+# 7. Validation Checklist
+
+Before starting any work:
+
+- [ ] `CONTEXT.md` read
+- [ ] `AGENTS.md` read
+- [ ] all mandatory docs read
+- [ ] precedence chain understood
+- [ ] non-negotiable constraints acknowledged
+- [ ] quality gates will be run before push
