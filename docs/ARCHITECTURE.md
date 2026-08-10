@@ -10,7 +10,7 @@
 
 This repository powers the **Crow Detector** interactive crow feeder backend:
 
-- **NestJS 11 + Fastify** API on **ECS Fargate** (Node 22)
+- **NestJS 11 + Fastify** API on **ECS Fargate** (Node 26)
 - **PostgreSQL** via **TypeORM 0.3** for feed/detection events
 - **S3** for images; **Rekognition** for moderation/labels; **Claude** for animal/crow classification
 - **ECDSA** device authentication for Raspberry Pi devices and the S3 Lambda
@@ -73,7 +73,7 @@ Shared networking (VPC, subnets, security groups) comes from the **`aws-infra-*`
 | Concern     | Detail                                                      |
 | ----------- | ----------------------------------------------------------- |
 | Location    | `lambda/` nested npm package                                |
-| Runtime     | Node.js **20** (AWS Lambda); document separately from API 22 |
+| Runtime     | Node.js **24** (AWS Lambda max managed runtime; Node 26 not available yet) |
 | Build       | webpack → single bundle → zip                               |
 | Role        | Parse S3/SQS events, ECDSA sign, call Nest API              |
 | Isolation   | No imports from `../src` Nest tree                          |
@@ -82,7 +82,7 @@ Shared networking (VPC, subnets, security groups) comes from the **`aws-infra-*`
 
 ## Build & deploy shape
 
-- **API Docker** image: multi-stage Node 22 Alpine; Nest build; ECS Fargate.
+- **API Docker** image: multi-stage Node 26 Alpine; Nest build; ECS Fargate.
 - **Lambda**: `npm run build:package` in `lambda/`; deploy via lambda CloudFormation + GitHub workflows.
 - **CloudFormation** (`cloudformation/`, `lambda/cloudformation/`): RDS, ALB, ECS task/service, S3, IAM, Lambda.
 - Environments: `dev` / `prod` parameter mappings — env-specific imports must match (`crow-detector-db-${Environment}-*`), never hardcode `*-dev-*` in prod paths.

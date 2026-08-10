@@ -46,7 +46,7 @@ export class S3MetadataService {
       this.logger.error(
         `Failed to extract metadata from URL: ${error instanceof Error ? error.message : String(error)}`,
       );
-      throw new Error('Invalid S3 URL format');
+      throw new Error('Invalid S3 URL format', { cause: error });
     }
   }
 

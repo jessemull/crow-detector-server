@@ -11,7 +11,7 @@
 | ---------------- | ------------------------------------------------------------------ |
 | **Project**      | Crow Detector — interactive crow feeder backend                    |
 | **Architecture** | NestJS modular monolith (ECS Fargate) + nested `lambda/` package   |
-| **Language**     | TypeScript (strict) on Node.js 22 (API); Lambda runtime Node.js 20 |
+| **Language**     | TypeScript (strict) on Node.js 26 (API); Lambda runtime Node.js 24 |
 | **Storage**      | PostgreSQL (TypeORM) + S3                                          |
 | **Vision / AI**  | AWS Rekognition + Anthropic Claude                                 |
 | **Auth**         | ECDSA device authentication                                        |

@@ -10,8 +10,8 @@
 
 ### Prerequisites
 
-- Node.js 22+ (see `.nvmrc`) for the Nest API
-- Node.js 20-compatible tooling understanding for `lambda/` runtime target
+- Node.js 26+ (see `.nvmrc`) for the Nest API
+- Node.js 24 Lambda runtime target under `lambda/` (AWS managed max)
 - npm
 - AWS credentials (for deploy / tunnel workflows)
 - Docker (optional, for API image builds)

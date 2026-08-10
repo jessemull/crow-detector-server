@@ -21,7 +21,7 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: !Sub "crow-detector-s3-lambda-${Environment}"
-      Runtime: nodejs20.x
+      Runtime: nodejs24.x
       Role: !GetAtt CrowDetectorS3LambdaRole.Arn
       Handler: index.handler
       Code:

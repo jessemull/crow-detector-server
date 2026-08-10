@@ -1,13 +1,20 @@
-import { SQSEvent, Context, Callback } from 'aws-lambda';
+import { SQSEvent, Context } from 'aws-lambda';
 import { processSQSRecord } from './util';
 import { ApiCallResult } from './types';
 import { lambdaLogger } from './util/logger';
 
+export interface HandlerResult {
+  statusCode: number;
+  body: string;
+}
+
+/**
+ * Async handler (Node.js 24+ Lambda runtimes no longer support callback-style handlers).
+ */
 export const handler = async (
   event: SQSEvent,
   context: Context,
-  callback: Callback,
-): Promise<void> => {
+): Promise<HandlerResult> => {
   lambdaLogger.info('SQS event received', {
     recordCount: event.Records?.length ?? 0,
     requestId: context.awsRequestId,
@@ -29,25 +36,19 @@ export const handler = async (
     const allSuccessful = results.every((result) => result.success);
 
     if (allSuccessful) {
-      callback(null, {
+      return {
         statusCode: 200,
         body: JSON.stringify({
           message: 'All SQS events processed successfully',
           results,
         }),
-      });
-    } else {
-      callback(new Error('Some SQS events failed to process'), {
-        statusCode: 500,
-        body: JSON.stringify({
-          message: 'Some SQS events failed to process',
-          results,
-        }),
-      });
+      };
     }
+
+    throw new Error('Some SQS events failed to process');
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     lambdaLogger.error('Error processing SQS event', { error: errorMessage });
-    callback(new Error(errorMessage));
+    throw new Error(errorMessage, { cause: error });
   }
 };

@@ -30,7 +30,7 @@ describe('Logger Configuration', () => {
       debug: jest.fn(),
       trace: jest.fn(),
       fatal: jest.fn(),
-    } as unknown as Logger);
+    });
   });
 
   afterEach(() => {

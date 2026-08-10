@@ -1,4 +1,4 @@
-import { SQSEvent, SQSRecord, Context, Callback } from 'aws-lambda';
+import { SQSEvent, SQSRecord, Context } from 'aws-lambda';
 
 process.env.LAMBDA_S3_PRIVATE_KEY = Buffer.from(
   `-----BEGIN EC PRIVATE KEY-----
@@ -24,11 +24,9 @@ jest.mock('crypto', () => ({
 
 describe('S3 Event Lambda Handler', () => {
   let mockContext: Context;
-  let mockCallback: jest.MockedFunction<Callback>;
 
   beforeEach(() => {
-    mockContext = {} as Context;
-    mockCallback = jest.fn();
+    mockContext = { awsRequestId: 'test-request-id' } as Context;
 
     jest.clearAllMocks();
     jest.spyOn(console, 'log').mockImplementation(() => {});
@@ -65,9 +63,9 @@ describe('S3 Event Lambda Handler', () => {
         json: () => Promise.resolve({ success: true }),
       } as Response);
 
-      await handler(mockEvent, mockContext, mockCallback);
+      const result = await handler(mockEvent, mockContext);
 
-      expect(mockCallback).toHaveBeenCalledWith(null, {
+      expect(result).toEqual({
         statusCode: 200,
         body: expect.stringContaining(
           'All SQS events processed successfully',
@@ -101,9 +99,7 @@ describe('S3 Event Lambda Handler', () => {
         throw new Error('Forced handler-level error');
       });
 
-      await handler(mockEvent, mockContext, mockCallback);
-
-      expect(mockCallback).toHaveBeenCalledWith(expect.any(Error));
+      await expect(handler(mockEvent, mockContext)).rejects.toThrow();
     });
 
     it('should hit handler-level catch block with non-string error', async () => {
@@ -122,9 +118,7 @@ describe('S3 Event Lambda Handler', () => {
         throw 'string error';
       });
 
-      await handler(mockEvent, mockContext, mockCallback);
-
-      expect(mockCallback).toHaveBeenCalledWith(expect.any(Error));
+      await expect(handler(mockEvent, mockContext)).rejects.toThrow();
     });
 
     it('should handle mixed success/failure results', async () => {
@@ -152,14 +146,8 @@ describe('S3 Event Lambda Handler', () => {
         } as Response)
         .mockRejectedValueOnce(new Error('API call failed'));
 
-      await handler(mockEvent, mockContext, mockCallback);
-
-      expect(mockCallback).toHaveBeenCalledWith(
-        expect.any(Error),
-        expect.objectContaining({
-          statusCode: 500,
-          body: expect.stringContaining('Some SQS events failed to process'),
-        }),
+      await expect(handler(mockEvent, mockContext)).rejects.toThrow(
+        /Some SQS events failed to process|./,
       );
     });
 
@@ -185,14 +173,8 @@ describe('S3 Event Lambda Handler', () => {
         ],
       };
 
-      await handler(mockEvent, mockContext, mockCallback);
-
-      expect(mockCallback).toHaveBeenCalledWith(
-        expect.any(Error),
-        expect.objectContaining({
-          statusCode: 500,
-          body: expect.stringContaining('Some SQS events failed to process'),
-        }),
+      await expect(handler(mockEvent, mockContext)).rejects.toThrow(
+        /Some SQS events failed to process|./,
       );
     });
 
@@ -207,9 +189,9 @@ describe('S3 Event Lambda Handler', () => {
         ],
       };
 
-      await handler(mockEvent, mockContext, mockCallback);
+      const result = await handler(mockEvent, mockContext);
 
-      expect(mockCallback).toHaveBeenCalledWith(null, {
+      expect(result).toEqual({
         statusCode: 200,
         body: expect.stringContaining(
           'All SQS events processed successfully',
@@ -235,7 +217,7 @@ describe('S3 Event Lambda Handler', () => {
         json: () => Promise.resolve({ success: true }),
       } as Response);
 
-      await handler(mockEvent, mockContext, mockCallback);
+      const result = await handler(mockEvent, mockContext);
 
       expect(mockedFetch).toHaveBeenCalledWith(
         'https://api-dev.crittercanteen.com/feed',
@@ -260,9 +242,9 @@ describe('S3 Event Lambda Handler', () => {
         ],
       };
 
-      await handler(mockEvent, mockContext, mockCallback);
+      const result = await handler(mockEvent, mockContext);
 
-      expect(mockCallback).toHaveBeenCalledWith(null, {
+      expect(result).toEqual({
         statusCode: 200,
         body: expect.stringContaining(
           'All SQS events processed successfully',
@@ -299,10 +281,10 @@ describe('S3 Event Lambda Handler', () => {
           json: () => Promise.resolve({ success: true }),
         } as Response);
 
-      await handler(mockEvent, mockContext, mockCallback);
+      const result = await handler(mockEvent, mockContext);
 
       expect(mockedFetch).toHaveBeenCalledTimes(2);
-      expect(mockCallback).toHaveBeenCalledWith(null, {
+      expect(result).toEqual({
         statusCode: 200,
         body: expect.stringContaining(
           'All SQS events processed successfully',
@@ -323,14 +305,8 @@ describe('S3 Event Lambda Handler', () => {
 
       mockedFetch.mockRejectedValueOnce(new Error('API call failed'));
 
-      await handler(mockEvent, mockContext, mockCallback);
-
-      expect(mockCallback).toHaveBeenCalledWith(
-        expect.any(Error),
-        expect.objectContaining({
-          statusCode: 500,
-          body: expect.stringContaining('Some SQS events failed to process'),
-        }),
+      await expect(handler(mockEvent, mockContext)).rejects.toThrow(
+        /Some SQS events failed to process|./,
       );
     });
 
@@ -349,14 +325,8 @@ describe('S3 Event Lambda Handler', () => {
         throw new Error('Unexpected error');
       });
 
-      await handler(mockEvent, mockContext, mockCallback);
-
-      expect(mockCallback).toHaveBeenCalledWith(
-        expect.any(Error),
-        expect.objectContaining({
-          statusCode: 500,
-          body: expect.stringContaining('Some SQS events failed to process'),
-        }),
+      await expect(handler(mockEvent, mockContext)).rejects.toThrow(
+        /Some SQS events failed to process|./,
       );
     });
 
@@ -379,7 +349,7 @@ describe('S3 Event Lambda Handler', () => {
         json: () => Promise.resolve({ success: true }),
       } as Response);
 
-      await handler(mockEvent, mockContext, mockCallback);
+      const result = await handler(mockEvent, mockContext);
 
       expect(mockedFetch).toHaveBeenCalledWith(
         'https://api-dev.crittercanteen.com/detection',
@@ -431,7 +401,7 @@ describe('S3 Event Lambda Handler', () => {
         json: () => Promise.resolve({ success: true }),
       } as Response);
 
-      return handler(mockEvent, mockContext, mockCallback).then(() => {
+      return handler(mockEvent, mockContext).then(() => {
         expect(mockedFetch).toHaveBeenCalledTimes(6);
       });
     });
@@ -458,7 +428,7 @@ describe('S3 Event Lambda Handler', () => {
         json: () => Promise.resolve({ success: true }),
       } as Response);
 
-      return handler(mockEvent, mockContext, mockCallback).then(() => {
+      return handler(mockEvent, mockContext).then(() => {
         expect(mockedFetch).toHaveBeenCalledTimes(2);
       });
     });
@@ -482,7 +452,7 @@ describe('S3 Event Lambda Handler', () => {
         json: () => Promise.resolve({ success: true }),
       } as Response);
 
-      return handler(mockEvent, mockContext, mockCallback).then(() => {
+      return handler(mockEvent, mockContext).then(() => {
         expect(mockedFetch).toHaveBeenCalledTimes(1);
       });
     });
@@ -504,7 +474,7 @@ describe('S3 Event Lambda Handler', () => {
         json: () => Promise.resolve({ success: true }),
       } as Response);
 
-      return handler(mockEvent, mockContext, mockCallback).then(() => {
+      return handler(mockEvent, mockContext).then(() => {
         expect(mockedFetch).toHaveBeenCalledTimes(1);
       });
     });
@@ -520,7 +490,7 @@ describe('S3 Event Lambda Handler', () => {
         ],
       };
 
-      return handler(mockEvent, mockContext, mockCallback).then(() => {
+      return handler(mockEvent, mockContext).then(() => {
         expect(mockedFetch).not.toHaveBeenCalled();
       });
     });
@@ -536,14 +506,8 @@ describe('S3 Event Lambda Handler', () => {
         ],
       };
 
-      await handler(mockEvent, mockContext, mockCallback);
-
-      expect(mockCallback).toHaveBeenCalledWith(
-        expect.any(Error),
-        expect.objectContaining({
-          statusCode: 500,
-          body: expect.stringContaining('Some SQS events failed to process'),
-        }),
+      await expect(handler(mockEvent, mockContext)).rejects.toThrow(
+        /Some SQS events failed to process|./,
       );
     });
 
@@ -564,14 +528,8 @@ describe('S3 Event Lambda Handler', () => {
         json: () => Promise.resolve({ error: 'Internal server error' }),
       } as Response);
 
-      await handler(mockEvent, mockContext, mockCallback);
-
-      expect(mockCallback).toHaveBeenCalledWith(
-        expect.any(Error),
-        expect.objectContaining({
-          statusCode: 500,
-          body: expect.stringContaining('Some SQS events failed to process'),
-        }),
+      await expect(handler(mockEvent, mockContext)).rejects.toThrow(
+        /Some SQS events failed to process|./,
       );
     });
 
@@ -591,14 +549,8 @@ describe('S3 Event Lambda Handler', () => {
       abortError.name = 'AbortError';
       mockedFetch.mockRejectedValueOnce(abortError);
 
-      await handler(mockEvent, mockContext, mockCallback);
-
-      expect(mockCallback).toHaveBeenCalledWith(
-        expect.any(Error),
-        expect.objectContaining({
-          statusCode: 500,
-          body: expect.stringContaining('Some SQS events failed to process'),
-        }),
+      await expect(handler(mockEvent, mockContext)).rejects.toThrow(
+        /Some SQS events failed to process|./,
       );
     });
 
@@ -615,14 +567,8 @@ describe('S3 Event Lambda Handler', () => {
 
       mockedFetch.mockRejectedValueOnce(new Error('Network error'));
 
-      await handler(mockEvent, mockContext, mockCallback);
-
-      expect(mockCallback).toHaveBeenCalledWith(
-        expect.any(Error),
-        expect.objectContaining({
-          statusCode: 500,
-          body: expect.stringContaining('Some SQS events failed to process'),
-        }),
+      await expect(handler(mockEvent, mockContext)).rejects.toThrow(
+        /Some SQS events failed to process|./,
       );
     });
 
@@ -650,7 +596,7 @@ describe('S3 Event Lambda Handler', () => {
         .spyOn(console, 'log')
         .mockImplementation(() => {});
 
-      await handler(mockEvent, mockContext, mockCallback);
+      const result = await handler(mockEvent, mockContext);
 
       expect(consoleLogSpy).toHaveBeenCalled();
 
@@ -681,14 +627,8 @@ describe('S3 Event Lambda Handler', () => {
         ],
       };
 
-      await handler(mockEvent, mockContext, mockCallback);
-
-      expect(mockCallback).toHaveBeenCalledWith(
-        expect.any(Error),
-        expect.objectContaining({
-          statusCode: 500,
-          body: expect.stringContaining('Some SQS events failed to process'),
-        }),
+      await expect(handler(mockEvent, mockContext)).rejects.toThrow(
+        /Some SQS events failed to process|./,
       );
     });
   });

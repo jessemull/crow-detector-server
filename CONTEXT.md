@@ -172,7 +172,7 @@ Before implementing any changes, confirm you have read and understood:
 | ----------- | ------------------------------------------------------------- |
 | Project     | Crow Detector Server                                          |
 | Type        | NestJS 11 + Fastify TypeScript API + nested S3 Lambda         |
-| Runtime     | Node.js 22 (API / ECS); Node.js 20 (Lambda runtime — documented) |
+| Runtime     | Node.js 26 (API / ECS); Node.js 24 (Lambda runtime — AWS max; Node 26 not offered yet) |
 | Language    | TypeScript (strict)                                           |
 | Compute     | AWS ECS Fargate + Lambda                                      |
 | Storage     | PostgreSQL (TypeORM) + S3                                     |

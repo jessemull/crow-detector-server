@@ -22,6 +22,7 @@ export function generateSignature(data: string, privateKey: string): string {
     console.error('Error generating signature:', error);
     throw new Error(
       `Failed to generate signature: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      { cause: error },
     );
   }
 }

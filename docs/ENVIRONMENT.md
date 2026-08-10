@@ -98,8 +98,8 @@ Webpack may embed defaults for local packaging; runtime env in AWS should set re
 
 | Surface        | Node version | Notes                          |
 | -------------- | ------------ | ------------------------------ |
-| Nest API / ECS | **22**       | `.nvmrc` / `package.json` engines |
-| Lambda runtime | **20**       | Documented; upgrade separately |
+| Nest API / ECS | **26**       | `.nvmrc` / `package.json` engines |
+| Lambda runtime | **24**       | AWS Lambda max (`nodejs24.x`); Node 26 not offered yet |
 
 ---
 
