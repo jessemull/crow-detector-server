@@ -31,6 +31,14 @@ jobs:
         working-directory: lambda
         run: npm run lint
 
+      - name: Check Formatting
+        working-directory: lambda
+        run: npm run format:check
+
+      - name: npm audit (high+)
+        working-directory: lambda
+        run: npm audit --audit-level=high
+
       - name: Run Unit Tests
         working-directory: lambda
         run: npm run test:coverage

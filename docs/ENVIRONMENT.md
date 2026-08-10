@@ -25,7 +25,7 @@ Copy `.env.example` to `.env` for local development. **Never commit `.env`.**
 | `RDS_DATABASE`            | Database name                                    | Yes      | -       |
 | `RDS_USERNAME`            | Database user                                    | Yes      | -       |
 | `RDS_PASSWORD`            | Database password                                | Yes      | -       |
-| `SSL_REJECT_UNAUTHORIZED` | When `false`, disable TLS cert verify (temporary)| No       | prefer verify |
+| `SSL_REJECT_UNAUTHORIZED` | Opt out of RDS CA verify (`false` only). Ignored in `production`/`prod` (always verify). Non-prod temporary use only. | No | verify (`true`) |
 
 In ECS, username/password come from Secrets Manager; host/name from CloudFormation exports.
 

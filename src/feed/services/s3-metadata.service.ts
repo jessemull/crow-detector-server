@@ -11,7 +11,7 @@ export class S3MetadataService {
 
   constructor(private readonly configService: ConfigService) {
     this.s3 = new S3Client({
-      region: this.configService.get<string>('AWS_REGION') || 'us-west-2',
+      region: this.configService.get<string>('awsRegion') || 'us-west-2',
     });
   }
 

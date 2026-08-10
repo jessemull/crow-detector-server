@@ -112,6 +112,10 @@ jobs:
         working-directory: lambda
         run: npm ci
 
+      - name: Check Formatting
+        working-directory: lambda
+        run: npm run format:check
+
       - name: npm audit (high+)
         working-directory: lambda
         run: npm audit --audit-level=high

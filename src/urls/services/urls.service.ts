@@ -26,12 +26,10 @@ export class UrlsService {
       region: this.configService.get<string>('awsRegion') || 'us-west-2',
     });
 
-    const bucketName =
-      this.configService.get<string>('s3BucketName') ||
-      this.configService.get<string>('S3_BUCKET_NAME');
+    const bucketName = this.configService.get<string>('s3BucketName');
 
     if (!bucketName) {
-      throw new Error('S3_BUCKET_NAME environment variable is required');
+      throw new Error('s3BucketName (S3_BUCKET_NAME) is required');
     }
 
     this.bucketName = bucketName;

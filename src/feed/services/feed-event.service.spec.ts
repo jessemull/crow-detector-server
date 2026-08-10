@@ -68,7 +68,7 @@ describe('FeedEventService', () => {
           provide: ConfigService,
           useValue: {
             get: jest.fn((key: string) => {
-              if (key === 'FEED_COOLDOWN_HOURS') return 4;
+              if (key === 'feedCooldownHours') return 4;
               return undefined;
             }),
           },

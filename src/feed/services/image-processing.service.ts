@@ -25,7 +25,7 @@ export class ImageProcessingService {
   private readonly s3: S3Client;
 
   constructor(private readonly configService: ConfigService) {
-    const region = this.configService.get<string>('AWS_REGION') || 'us-west-2';
+    const region = this.configService.get<string>('awsRegion') || 'us-west-2';
 
     this.rekognition = new RekognitionClient({
       region,
@@ -305,8 +305,7 @@ export class ImageProcessingService {
       });
       await this.s3.send(command);
 
-      const region =
-        this.configService.get<string>('AWS_REGION') || 'us-west-2';
+      const region = this.configService.get<string>('awsRegion') || 'us-west-2';
       const processedUrl = `https://${bucket}.s3.${region}.amazonaws.com/${processedKey}`;
       this.logger.info(`Processed image uploaded: ${processedUrl}`);
 

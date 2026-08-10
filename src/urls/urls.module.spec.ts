@@ -17,8 +17,8 @@ describe('UrlsModule', () => {
           provide: ConfigService,
           useValue: {
             get: jest.fn((key: string) => {
-              if (key === 'AWS_REGION') return 'us-west-2';
-              if (key === 'S3_BUCKET_NAME') return 'test-bucket';
+              if (key === 'awsRegion') return 'us-west-2';
+              if (key === 's3BucketName') return 'test-bucket';
               return undefined;
             }),
           },

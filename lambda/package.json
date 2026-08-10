@@ -12,6 +12,7 @@
     "test:coverage": "jest --coverage",
     "lint": "eslint --ext .ts src/",
     "lint:fix": "eslint --ext .ts --fix src/",
+    "format:check": "prettier --check \"src/**/*.ts\"",
     "package": "cd dist && zip -rq crow-detector-s3-lambda.zip ./*",
     "build:package": "npm run build && npm run package"
   },
@@ -25,6 +26,7 @@
     "dotenv": "^17.4.2",
     "eslint": "^10.8.1",
     "jest": "^30.4.2",
+    "prettier": "^3.9.6",
     "terser-webpack-plugin": "^5.6.1",
     "ts-jest": "^29.4.12",
     "ts-loader": "^9.6.2",

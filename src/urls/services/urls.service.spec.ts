@@ -35,9 +35,9 @@ describe('UrlsService', () => {
 
     mockConfigService.get.mockImplementation((key: string) => {
       switch (key) {
-        case 'S3_BUCKET_NAME':
+        case 's3BucketName':
           return 'test-bucket';
-        case 'AWS_REGION':
+        case 'awsRegion':
           return 'us-west-2';
         default:
           return undefined;
@@ -80,10 +80,10 @@ describe('UrlsService', () => {
 
     it('should use default region when AWS_REGION is not set', () => {
       mockConfigService.get.mockImplementation((key: string) => {
-        if (key === 'S3_BUCKET_NAME') {
+        if (key === 's3BucketName') {
           return 'test-bucket';
         }
-        if (key === 'AWS_REGION') {
+        if (key === 'awsRegion') {
           return undefined;
         }
         return undefined;
@@ -105,7 +105,7 @@ describe('UrlsService', () => {
             mockConfigService as any,
             mockFeedEventRepository as any,
           ),
-      ).toThrow('S3_BUCKET_NAME environment variable is required');
+      ).toThrow('s3BucketName (S3_BUCKET_NAME) is required');
     });
   });
 

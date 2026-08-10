@@ -47,9 +47,16 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       host: env.RDS_HOST,
       password: env.RDS_PASSWORD,
       port: parseInt(env.RDS_PORT || '5432', 10),
-      // Prefer verifying the RDS CA. Set SSL_REJECT_UNAUTHORIZED=false only temporarily.
-      sslRejectUnauthorized:
-        env.SSL_REJECT_UNAUTHORIZED === 'false' ? false : true,
+      // Prefer verifying the RDS CA. Opt-out via SSL_REJECT_UNAUTHORIZED=false is
+      // allowed only outside production/prod (local tunnel / temporary diagnostics).
+      sslRejectUnauthorized: (() => {
+        const isProdLike =
+          env.NODE_ENV === 'production' || env.NODE_ENV === 'prod';
+        if (isProdLike) {
+          return true;
+        }
+        return env.SSL_REJECT_UNAUTHORIZED === 'false' ? false : true;
+      })(),
       username: env.RDS_USERNAME,
     },
     s3BucketName: env.S3_BUCKET_NAME,

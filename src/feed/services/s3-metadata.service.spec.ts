@@ -25,7 +25,7 @@ describe('S3MetadataService', () => {
           provide: ConfigService,
           useValue: {
             get: jest.fn((key: string, defaultValue?: string) => {
-              if (key === 'AWS_REGION') return 'us-west-2';
+              if (key === 'awsRegion') return 'us-west-2';
               return defaultValue;
             }),
           },
@@ -46,7 +46,7 @@ describe('S3MetadataService', () => {
       expect(S3Client).toHaveBeenCalledWith({
         region: 'us-west-2',
       });
-      expect(configService.get).toHaveBeenCalledWith('AWS_REGION');
+      expect(configService.get).toHaveBeenCalledWith('awsRegion');
     });
   });
 

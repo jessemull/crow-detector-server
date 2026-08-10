@@ -101,7 +101,7 @@ export class FeedEventService {
       // Get cooldown period from configuration (default 4 hours)...
 
       const cooldownHours =
-        this.configService.get<number>('FEED_COOLDOWN_HOURS') || 4;
+        this.configService.get<number>('feedCooldownHours') || 4;
       const cooldownMs = cooldownHours * 60 * 60 * 1000;
 
       // Calculate time since last feed...

@@ -51,9 +51,9 @@ When **both** are true:
 
 ## Database TLS
 
-TypeORM connects to RDS over SSL. Prefer verifying the AWS RDS CA (`rejectUnauthorized: true` with proper CA bundle).
+TypeORM connects to RDS over SSL and prefers verifying the AWS RDS CA (`rejectUnauthorized: true`).
 
-**Current temporary posture:** if `rejectUnauthorized: false` remains for RDS connectivity quirks, treat it as technical debt — document here and prefer enabling proper CA verification. Controlled via config / `SSL_REJECT_UNAUTHORIZED` where supported by seed scripts.
+In `production` / `prod`, CA verification is always on. Outside those environments, `SSL_REJECT_UNAUTHORIZED=false` is a temporary opt-out for local tunnels or diagnostics — do not rely on it in deployed stacks.
 
 ---
 

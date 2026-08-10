@@ -24,7 +24,7 @@ export class DetectionImageProcessingService {
     private readonly configService: ConfigService,
     private readonly claudeService: ClaudeService,
   ) {
-    const region = this.configService.get<string>('AWS_REGION') || 'us-west-2';
+    const region = this.configService.get<string>('awsRegion') || 'us-west-2';
 
     this.rekognition = new RekognitionClient({
       region,

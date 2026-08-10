@@ -14,12 +14,20 @@ describe('app.config', () => {
     expect(config.rds.port).toBe(5432);
   });
 
-  it('disables TLS verify only when SSL_REJECT_UNAUTHORIZED=false', () => {
+  it('disables TLS verify only outside production when SSL_REJECT_UNAUTHORIZED=false', () => {
     const config = loadAppConfig({
       ...baseEnv,
       SSL_REJECT_UNAUTHORIZED: 'false',
     });
     expect(config.rds.sslRejectUnauthorized).toBe(false);
+  });
+
+  it('forces RDS CA verification in production even if SSL_REJECT_UNAUTHORIZED=false', () => {
+    const config = loadAppConfig({
+      NODE_ENV: 'production',
+      SSL_REJECT_UNAUTHORIZED: 'false',
+    });
+    expect(config.rds.sslRejectUnauthorized).toBe(true);
   });
 
   it('does not fail validation in development when secrets are missing', () => {
