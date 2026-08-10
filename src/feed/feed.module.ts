@@ -8,7 +8,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 
 @Module({
   controllers: [FeedController],
-  exports: [FeedEventService],
+  exports: [FeedEventService, S3MetadataService],
   imports: [TypeOrmModule.forFeature([FeedEvent])],
   providers: [FeedEventService, ImageProcessingService, S3MetadataService],
 })

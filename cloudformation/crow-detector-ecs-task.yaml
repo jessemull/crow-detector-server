@@ -8,6 +8,7 @@ Parameters:
     AllowedValues:
       - dev
       - prod
+      - prod
   
   ContainerImage:
     Type: String
@@ -69,9 +70,11 @@ Resources:
             - Name: PORT
               Value: '3000'
             - Name: RDS_HOST
-              Value: !ImportValue 'crow-detector-db-dev-endpoint'
+              Value:
+                Fn::ImportValue: !Sub 'crow-detector-db-${Environment}-endpoint'
             - Name: RDS_DATABASE
-              Value: !ImportValue 'crow-detector-db-dev-name'
+              Value:
+                Fn::ImportValue: !Sub 'crow-detector-db-${Environment}-name'
             - Name: PI_USER_PUBLIC_KEY
               Value: '{{resolve:secretsmanager:crow-detector-keys:SecretString:pi-user-public-key}}'
             - Name: PI_MOTION_PUBLIC_KEY

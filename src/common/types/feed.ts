@@ -1,5 +1,3 @@
-import { FeedEvent } from 'src/feed';
-
 export enum Source {
   API = 'API',
   BUTTON = 'BUTTON',
@@ -27,7 +25,8 @@ export enum ProcessingStatus {
   FAILED = 'FAILED',
 }
 
+/** API envelope — keep entity-free to avoid common/types ↔ entity cycles. */
 export interface FeedResponse {
-  data: FeedEvent | null;
+  data: unknown;
   message: string;
 }

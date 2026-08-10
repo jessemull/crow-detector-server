@@ -5,23 +5,33 @@ import { HealthModule } from './health/health.module';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UrlsModule } from './urls/urls.module';
+import configuration, {
+  loadAppConfig,
+  validateAppConfig,
+} from './config/app.config';
+
+const appConfig = loadAppConfig();
+validateAppConfig(appConfig);
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      load: [configuration],
     }),
     TypeOrmModule.forRoot({
-      database: process.env.RDS_DATABASE,
+      database: appConfig.rds.database,
       entities: [__dirname + '/**/*.entity{.ts,.js}'],
-      host: process.env.RDS_HOST,
-      password: process.env.RDS_PASSWORD,
-      port: 5432,
-      synchronize: process.env.NODE_ENV !== 'production',
+      host: appConfig.rds.host,
+      password: appConfig.rds.password,
+      port: appConfig.rds.port,
+      synchronize:
+        appConfig.nodeEnv !== 'production' && appConfig.nodeEnv !== 'prod',
       type: 'postgres',
-      username: process.env.RDS_USERNAME,
+      username: appConfig.rds.username,
       ssl: {
-        rejectUnauthorized: false,
+        // Prefer verifying the RDS CA. Set SSL_REJECT_UNAUTHORIZED=false only temporarily.
+        rejectUnauthorized: appConfig.rds.sslRejectUnauthorized,
       },
     }),
     DetectionModule,

@@ -32,11 +32,11 @@ jest.mock('@nestjs/typeorm', () => {
       forRoot: jest.fn().mockReturnValue({
         module: class MockTypeOrmModule {},
         providers: [],
-      } as unknown as ReturnType<typeof original.TypeOrmModule.forRoot>),
+      }),
       forFeature: jest.fn().mockReturnValue({
         module: class MockTypeOrmFeatureModule {},
         providers: [],
-      } as unknown as ReturnType<typeof original.TypeOrmModule.forFeature>),
+      }),
     },
   };
 });

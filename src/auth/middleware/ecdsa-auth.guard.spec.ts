@@ -1,6 +1,6 @@
 import * as crypto from 'crypto';
 import { EcdsaAuthGuard } from './ecdsa-auth.guard';
-import { Request } from 'express';
+import { FastifyRequest } from 'fastify';
 import { Test, TestingModule } from '@nestjs/testing';
 import { UnauthorizedException, ExecutionContext } from '@nestjs/common';
 
@@ -19,9 +19,14 @@ import { logger } from 'src/common/logger/logger.config';
 
 describe('EcdsaAuthGuard', () => {
   let guard: EcdsaAuthGuard;
-  let mockRequest: Partial<Request> & { headers: Record<string, any> };
+  let mockRequest: Partial<FastifyRequest> & {
+    body?: Record<string, unknown>;
+    deviceId?: string;
+    headers: Record<string, unknown>;
+    requestTime?: number;
+  };
   let mockContext: ExecutionContext;
-  let mockCreateVerify: jest.MockedFunction<any>;
+  let mockCreateVerify: jest.MockedFunction<typeof crypto.createVerify>;
 
   beforeEach(async () => {
     delete process.env.NODE_ENV;
@@ -40,7 +45,7 @@ describe('EcdsaAuthGuard', () => {
       method: 'POST',
       url: '/detection',
       body: { confidence: 0.85, imageUrl: 'test.jpg' },
-      headers: {} as Record<string, any>,
+      headers: {},
     };
 
     mockContext = {
@@ -283,7 +288,8 @@ describe('EcdsaAuthGuard', () => {
 
       const result = guard.canActivate(mockContext);
 
-      const expectedData = `POST/detection{"confidence":0.85,"imageUrl":"test.jpg"}${mockRequest.headers['x-timestamp']}`;
+      const timestamp = String(mockRequest.headers['x-timestamp']);
+      const expectedData = `POST/detection{"confidence":0.85,"imageUrl":"test.jpg"}${timestamp}`;
       expect(mockVerifier.update).toHaveBeenCalledWith(expectedData);
       expect(result).toBe(true);
     });
@@ -299,7 +305,8 @@ describe('EcdsaAuthGuard', () => {
 
       const result = guard.canActivate(mockContext);
 
-      const expectedData = `POST/detection{}${mockRequest.headers['x-timestamp']}`;
+      const timestamp = String(mockRequest.headers['x-timestamp']);
+      const expectedData = `POST/detection{}${timestamp}`;
       expect(mockVerifier.update).toHaveBeenCalledWith(expectedData);
       expect(result).toBe(true);
     });
@@ -323,7 +330,10 @@ describe('EcdsaAuthGuard', () => {
         }),
       } as ExecutionContext);
 
-      const expectedData = `PATCH/feed{"confidence":0.85,"imageUrl":"test.jpg"}${mockRequestWithDifferentMethod.headers['x-timestamp']}`;
+      const timestamp = String(
+        mockRequestWithDifferentMethod.headers['x-timestamp'],
+      );
+      const expectedData = `PATCH/feed{"confidence":0.85,"imageUrl":"test.jpg"}${timestamp}`;
       expect(mockVerifier.update).toHaveBeenCalledWith(expectedData);
       expect(result).toBe(true);
     });

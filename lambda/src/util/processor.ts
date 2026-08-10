@@ -3,6 +3,7 @@ import { SQSRecord } from 'aws-lambda';
 import { callAPI } from './api';
 import { extractS3Info } from './s3';
 import { isImageFile, isRelevantEvent } from './images';
+import { lambdaLogger } from './logger';
 
 export async function processSQSRecord(
   record: SQSRecord,
@@ -10,9 +11,12 @@ export async function processSQSRecord(
   try {
     const s3Info = extractS3Info(record);
 
-    if (process.env.NODE_ENV !== 'test') {
-      console.log('Processing S3 object:', JSON.stringify(s3Info, null, 2));
-    }
+    lambdaLogger.info('Processing S3 object', {
+      bucket: s3Info.bucket,
+      eventName: s3Info.eventName,
+      key: s3Info.key,
+      size: s3Info.size,
+    });
 
     if (!isImageFile(s3Info.key)) {
       return {

@@ -11,24 +11,23 @@ export class ClaudeService {
   private readonly anthropic: Anthropic;
 
   constructor(private readonly configService: ConfigService) {
-    const apiKey = this.configService.get<string>('CLAUDE_API_KEY');
-    this.logger.info(`CLAUDE_API_KEY loaded: ${apiKey ? 'YES' : 'NO'}`);
-    if (apiKey) {
-      this.logger.info(`API key starts with: ${apiKey.substring(0, 10)}...`);
-    }
+    const apiKey = this.configService.get<string>('claudeApiKey');
 
     if (!apiKey) {
       this.logger.warn('CLAUDE_API_KEY not found in environment variables');
+    } else {
+      this.logger.info('CLAUDE_API_KEY loaded');
     }
 
+    // Do not construct the SDK with a dummy key — callers must check configuration.
     this.anthropic = new Anthropic({
-      apiKey: apiKey || 'dummy-key',
+      apiKey: apiKey || '',
     });
   }
 
   private getClaudeModel(): string {
     return (
-      this.configService.get<string>('CLAUDE_MODEL') || 'claude-3-opus-20240229'
+      this.configService.get<string>('claudeModel') || 'claude-3-opus-20240229'
     );
   }
 
@@ -36,7 +35,7 @@ export class ClaudeService {
     labels: RekognitionLabel[],
   ): Promise<AnimalAnalysisResult> {
     try {
-      if (!this.configService.get<string>('CLAUDE_API_KEY')) {
+      if (!this.configService.get<string>('claudeApiKey')) {
         throw new Error('Claude API key not configured');
       }
 

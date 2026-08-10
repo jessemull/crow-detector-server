@@ -1,5 +1,3 @@
-import { DetectionEvent } from 'src/detection';
-
 export interface DetectedAnimal {
   name: string;
   confidence: number;
@@ -24,14 +22,15 @@ export interface AnimalDetectionResult {
 export interface RekognitionLabel {
   Name?: string;
   Confidence?: number;
-  Instances?: Array<{ BoundingBox?: any; Confidence?: number }>;
+  Instances?: Array<{ BoundingBox?: unknown; Confidence?: number }>;
 }
 
 export interface RekognitionLabelsResult {
   Labels?: RekognitionLabel[];
 }
 
+/** API envelope — keep entity-free to avoid common/types ↔ entity cycles. */
 export interface DetectionResponse {
-  data: DetectionEvent | null;
+  data: unknown;
   message: string;
 }

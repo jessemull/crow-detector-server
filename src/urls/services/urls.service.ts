@@ -23,10 +23,12 @@ export class UrlsService {
     private readonly feedEventRepository: Repository<FeedEvent>,
   ) {
     this.s3Client = new S3Client({
-      region: this.configService.get<string>('AWS_REGION') || 'us-west-2',
+      region: this.configService.get<string>('awsRegion') || 'us-west-2',
     });
 
-    const bucketName = this.configService.get<string>('S3_BUCKET_NAME');
+    const bucketName =
+      this.configService.get<string>('s3BucketName') ||
+      this.configService.get<string>('S3_BUCKET_NAME');
 
     if (!bucketName) {
       throw new Error('S3_BUCKET_NAME environment variable is required');

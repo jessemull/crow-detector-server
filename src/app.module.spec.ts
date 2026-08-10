@@ -1,66 +1,27 @@
-describe('AppModule Configuration', () => {
-  let originalEnv: NodeJS.ProcessEnv;
+import { loadAppConfig } from './config/app.config';
 
-  beforeEach(() => {
-    originalEnv = { ...process.env };
+describe('AppModule configuration helpers', () => {
+  it('should configure SSL rejectUnauthorized as true by default', () => {
+    const config = loadAppConfig({});
+    expect(config.rds.sslRejectUnauthorized).toBe(true);
   });
 
-  afterEach(() => {
-    process.env = originalEnv;
+  it('should configure SSL rejectUnauthorized as false when SSL_REJECT_UNAUTHORIZED=false', () => {
+    const config = loadAppConfig({ SSL_REJECT_UNAUTHORIZED: 'false' });
+    expect(config.rds.sslRejectUnauthorized).toBe(false);
   });
 
-  describe('SSL Configuration', () => {
-    it('should configure SSL rejectUnauthorized as true when SSL_REJECT_UNAUTHORIZED is not set to false', () => {
-      delete process.env.SSL_REJECT_UNAUTHORIZED;
-
-      const sslRejectUnauthorized =
-        process.env.SSL_REJECT_UNAUTHORIZED === 'false' ? false : true;
-
-      expect(sslRejectUnauthorized).toBe(true);
-    });
-
-    it('should configure SSL rejectUnauthorized as false when SSL_REJECT_UNAUTHORIZED is set to false', () => {
-      process.env.SSL_REJECT_UNAUTHORIZED = 'false';
-
-      const sslRejectUnauthorized =
-        process.env.SSL_REJECT_UNAUTHORIZED === 'false' ? false : true;
-
-      expect(sslRejectUnauthorized).toBe(false);
-    });
-
-    it('should configure SSL rejectUnauthorized as true when SSL_REJECT_UNAUTHORIZED is set to other values', () => {
-      process.env.SSL_REJECT_UNAUTHORIZED = 'true';
-
-      const sslRejectUnauthorized =
-        process.env.SSL_REJECT_UNAUTHORIZED === 'false' ? false : true;
-
-      expect(sslRejectUnauthorized).toBe(true);
-    });
+  it('should enable synchronize outside production', () => {
+    const config = loadAppConfig({ NODE_ENV: 'development' });
+    const synchronize =
+      config.nodeEnv !== 'production' && config.nodeEnv !== 'prod';
+    expect(synchronize).toBe(true);
   });
 
-  describe('Synchronize Configuration', () => {
-    it('should configure synchronize as true in non-production environments', () => {
-      process.env.NODE_ENV = 'development';
-
-      const synchronize = process.env.NODE_ENV !== 'production';
-
-      expect(synchronize).toBe(true);
-    });
-
-    it('should configure synchronize as false in production environments', () => {
-      process.env.NODE_ENV = 'production';
-
-      const synchronize = process.env.NODE_ENV !== 'production';
-
-      expect(synchronize).toBe(false);
-    });
-
-    it('should configure synchronize as true when NODE_ENV is not set', () => {
-      delete process.env.NODE_ENV;
-
-      const synchronize = process.env.NODE_ENV !== 'production';
-
-      expect(synchronize).toBe(true);
-    });
+  it('should disable synchronize in production', () => {
+    const config = loadAppConfig({ NODE_ENV: 'production' });
+    const synchronize =
+      config.nodeEnv !== 'production' && config.nodeEnv !== 'prod';
+    expect(synchronize).toBe(false);
   });
 });

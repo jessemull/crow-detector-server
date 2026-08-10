@@ -10,10 +10,12 @@ describe('bootstrap', () => {
 
   beforeEach(() => {
     listenMock = jest.fn().mockResolvedValue(undefined);
+    process.env.NODE_ENV = 'test';
 
     jest.spyOn(NestFactory, 'create').mockResolvedValue({
       listen: listenMock,
-    } as unknown as ReturnType<typeof NestFactory.create>);
+      useGlobalPipes: jest.fn(),
+    } as unknown as Awaited<ReturnType<typeof NestFactory.create>>);
 
     jest.spyOn(process, 'exit').mockImplementation((code?: number) => {
       throw new Error(`process.exit called with code ${code}`);

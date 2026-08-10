@@ -8,6 +8,7 @@ import {
 import { S3ObjectInfo } from '../types';
 import { generateAuthHeaders } from './auth';
 import { getImageType } from './images';
+import { lambdaLogger } from './logger';
 
 export async function callAPI(s3Info: S3ObjectInfo): Promise<void> {
   const imageType = getImageType(s3Info.key);
@@ -39,11 +40,12 @@ export async function callAPI(s3Info: S3ObjectInfo): Promise<void> {
       throw new Error(`API call failed with status: ${response.status}`);
     }
 
-    const responseData = await response.json();
+    await response.json();
 
-    if (process.env.NODE_ENV !== 'test') {
-      console.log(`${imageType} API response:`, response.status, responseData);
-    }
+    lambdaLogger.info('API call succeeded', {
+      imageType,
+      status: response.status,
+    });
   } catch (error) {
     clearTimeout(timeoutId);
     throw error;

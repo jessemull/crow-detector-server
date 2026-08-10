@@ -1,15 +1,17 @@
 import { SQSEvent, Context, Callback } from 'aws-lambda';
 import { processSQSRecord } from './util';
 import { ApiCallResult } from './types';
+import { lambdaLogger } from './util/logger';
 
 export const handler = async (
   event: SQSEvent,
   context: Context,
   callback: Callback,
 ): Promise<void> => {
-  if (process.env.NODE_ENV !== 'test') {
-    console.log('SQS Event received:', JSON.stringify(event, null, 2));
-  }
+  lambdaLogger.info('SQS event received', {
+    recordCount: event.Records?.length ?? 0,
+    requestId: context.awsRequestId,
+  });
 
   try {
     const results: ApiCallResult[] = [];
@@ -19,9 +21,10 @@ export const handler = async (
       results.push(result);
     }
 
-    if (process.env.NODE_ENV !== 'test') {
-      console.log('Processing results:', JSON.stringify(results, null, 2));
-    }
+    lambdaLogger.info('SQS processing complete', {
+      failureCount: results.filter((result) => !result.success).length,
+      successCount: results.filter((result) => result.success).length,
+    });
 
     const allSuccessful = results.every((result) => result.success);
 
@@ -44,7 +47,7 @@ export const handler = async (
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error('Error processing SQS event:', errorMessage);
+    lambdaLogger.error('Error processing SQS event', { error: errorMessage });
     callback(new Error(errorMessage));
   }
 };

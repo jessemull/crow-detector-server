@@ -5,32 +5,42 @@ import {
   ExecutionContext,
   UnauthorizedException,
 } from '@nestjs/common';
-import { Request } from 'express';
+import { FastifyRequest } from 'fastify';
 import { logger } from 'src/common/logger/logger.config';
+import { loadAppConfig } from 'src/config/app.config';
+
+type AuthenticatedRequest = FastifyRequest & {
+  body?: Record<string, unknown>;
+  deviceId?: string;
+  requestTime?: number;
+};
+
 @Injectable()
 export class EcdsaAuthGuard implements CanActivate {
   private readonly devicePublicKeys: Record<string, string | undefined>;
+  private readonly nodeEnv: string;
 
   constructor() {
+    const config = loadAppConfig();
+    this.nodeEnv = config.nodeEnv;
     this.devicePublicKeys = {
-      'pi-user': this.decodePublicKey(process.env.PI_USER_PUBLIC_KEY),
-      'pi-motion': this.decodePublicKey(process.env.PI_MOTION_PUBLIC_KEY),
-      'pi-feeder': this.decodePublicKey(process.env.PI_FEEDER_PUBLIC_KEY),
-      'lambda-s3': this.decodePublicKey(process.env.LAMBDA_S3_PUBLIC_KEY),
+      'pi-user': this.decodePublicKey(config.devicePublicKeys.piUser),
+      'pi-motion': this.decodePublicKey(config.devicePublicKeys.piMotion),
+      'pi-feeder': this.decodePublicKey(config.devicePublicKeys.piFeeder),
+      'lambda-s3': this.decodePublicKey(config.devicePublicKeys.lambdaS3),
     };
   }
 
   canActivate(context: ExecutionContext): boolean {
-    const request = context.switchToHttp().getRequest<Request>();
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
 
-    // Development mode bypass...
+    // Development-only bypass — must never activate when NODE_ENV is production/prod.
+    // Read env at request time so local tests / hot-reload pick up NODE_ENV changes.
 
-    if (
-      process.env.NODE_ENV === 'development' &&
-      request.headers['x-dev-mode'] === 'true'
-    ) {
-      request['deviceId'] = 'dev-mode';
-      request['requestTime'] = Date.now();
+    const nodeEnv = process.env.NODE_ENV || this.nodeEnv;
+    if (nodeEnv === 'development' && request.headers['x-dev-mode'] === 'true') {
+      request.deviceId = 'dev-mode';
+      request.requestTime = Date.now();
       logger.info(
         { deviceId: 'dev-mode' },
         'Development mode: Skipping ECDSA authentication',
@@ -64,7 +74,7 @@ export class EcdsaAuthGuard implements CanActivate {
 
     // Verify timestamp (prevent replay attacks)...
 
-    const requestTime = parseInt(timestamp);
+    const requestTime = parseInt(timestamp, 10);
     const currentTime = Date.now();
     const timeWindow = 5 * 60 * 1000; // 5 minutes
 
@@ -76,7 +86,7 @@ export class EcdsaAuthGuard implements CanActivate {
 
     const method = request.method;
     const path = request.url;
-    const body = (request.body as Record<string, unknown>) || {};
+    const body = request.body || {};
 
     const dataToVerify = `${method}${path}${JSON.stringify(body)}${timestamp}`;
 
@@ -90,8 +100,8 @@ export class EcdsaAuthGuard implements CanActivate {
 
     // Add device info to request for controllers to use...
 
-    request['deviceId'] = deviceId;
-    request['requestTime'] = requestTime;
+    request.deviceId = deviceId;
+    request.requestTime = requestTime;
 
     return true;
   }

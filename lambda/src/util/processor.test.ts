@@ -85,19 +85,11 @@ describe('Processor Utility', () => {
 
       await processSQSRecord(mockRecord);
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        'Processing S3 object:',
-        JSON.stringify(
-          {
-            bucket: 'test-bucket',
-            key: 'feed/test-image.jpg',
-            size: 1024,
-            eventName: 'ObjectCreated:Put',
-          },
-          null,
-          2,
-        ),
-      );
+      expect(consoleLogSpy).toHaveBeenCalled();
+      const logged = String(consoleLogSpy.mock.calls[0][0]);
+      expect(logged).toContain('Processing S3 object');
+      expect(logged).toContain('feed/test-image.jpg');
+      expect(logged).not.toContain('Records');
 
       process.env.NODE_ENV = originalEnv;
     });

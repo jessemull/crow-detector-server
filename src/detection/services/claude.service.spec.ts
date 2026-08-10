@@ -129,7 +129,7 @@ describe('ClaudeService', () => {
 
       new ClaudeService(freshMockConfigService as any);
 
-      expect(freshMockConfigService.get).toHaveBeenCalledWith('CLAUDE_API_KEY');
+      expect(freshMockConfigService.get).toHaveBeenCalledWith('claudeApiKey');
     });
 
     it('should successfully analyze animal detection with valid response', async () => {
