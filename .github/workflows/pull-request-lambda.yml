@@ -93,3 +93,25 @@ jobs:
             echo "Code coverage is below threshold. Please update test coverage and try again."
             exit 1
           fi
+
+  security:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'lambda/package-lock.json'
+
+      - name: Install Dependencies
+        working-directory: lambda
+        run: npm ci
+
+      - name: npm audit (high+)
+        working-directory: lambda
+        run: npm audit --audit-level=high

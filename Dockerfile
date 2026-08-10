@@ -51,9 +51,7 @@ RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
 COPY --from=builder --chown=nestjs:nodejs /app/dist/src ./dist
 
-# Copy any additional files needed at runtime.
-
-COPY --chown=nestjs:nodejs .env* ./
+# Runtime config comes from ECS task env / Secrets Manager — do not bake .env into the image.
 
 # Switch to non-root user.
 

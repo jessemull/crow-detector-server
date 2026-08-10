@@ -1,5 +1,2 @@
-# Check if commit message follows conventional commit format
-if ! head -1 "$1" | grep -qE "^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?: .{1,}$"; then
-  echo "Please use npm run commit!"
-  exit 1
-fi
+#!/usr/bin/env sh
+npx --no-install commitlint --edit "$1"

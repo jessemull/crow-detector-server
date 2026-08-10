@@ -18,7 +18,7 @@ program
   .option('-p, --port <port>', 'SSH port', '22')
   .option('-l, --local-port <port>', 'Local port for forwarding')
   .option('-r, --remote-port <port>', 'Remote port for forwarding')
-  .option('-d, --destination <host>', 'Destination host for forwarding', process.env.DESTINATION_HOST)
+  .option('-d, --destination <host>', 'Destination host for forwarding', process.env.DESTINATION_HOST || process.env.RDS_HOST)
   .option('-t, --type <type>', 'Tunnel type (rds, ssh, custom)', 'ssh')
   .option('-v, --verbose', 'Verbose output', false)
   .option('--dry-run', 'Show command without executing', false);
@@ -32,6 +32,15 @@ const options = program.opts();
 if (!options.host) {
   console.error('Error: Bastion host is required. Set BASTION_HOST env var or use --host option.');
   process.exit(1);
+}
+
+if (options.type === 'rds' || (options.localPort && options.remotePort)) {
+  if (!options.destination) {
+    console.error(
+      'Error: Destination host is required for port forwarding. Set RDS_HOST or DESTINATION_HOST, or use --destination.',
+    );
+    process.exit(1);
+  }
 }
 
 function buildCommand() {
