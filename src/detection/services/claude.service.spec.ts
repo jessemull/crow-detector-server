@@ -128,6 +128,7 @@ describe('ClaudeService', () => {
       const request = (service as any).anthropic.messages.create.mock
         .calls[0][0];
       expect(request.model).toBe('claude-haiku-5-5');
+      expect(request.temperature).toBeUndefined();
       expect(request.messages[0].content[0]).toEqual({
         type: 'image',
         source: {

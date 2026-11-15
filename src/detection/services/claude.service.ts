@@ -68,7 +68,6 @@ Rules:
       const message = await this.anthropic.messages.create({
         model: this.getClaudeModel(),
         max_tokens: 1000,
-        temperature: 0,
         messages: [
           {
             role: 'user',
