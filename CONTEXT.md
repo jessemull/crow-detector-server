@@ -26,7 +26,7 @@ Read items 5–10 on every task. Do not skip them because the work “seems unre
 
 ## Source-of-Truth Precedence
 
-When instructions conflict, the **higher-numbered source wins**:
+When instructions conflict, the **higher-ranked source wins**:
 
 | Priority    | Source                                              | Scope                                         |
 | ----------- | --------------------------------------------------- | --------------------------------------------- |
