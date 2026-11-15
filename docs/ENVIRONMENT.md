@@ -64,6 +64,8 @@ Porch Pi recorder (device, not Nest):
 | `PORCH_API_BASE_URL`       | API base used by `pi/record-on-motion.py` | Yes (`npm run pi:sync` writes `~/porch.env`) |
 | `PI_PORCH_PRIVATE_KEY_PATH`| Path to porch private key on the Pi  | No (default `~/keys/pi-porch-private.pem`) |
 
+`npm run pi:sync` copies the recorder, writes `~/porch.env`, then restarts the process. `npm run pi:start` only restarts (no copy). The recorder runs under `nohup` and survives SSH disconnect; after a Pi reboot, run `pi:start` or `pi:sync` again.
+
 ---
 
 ## AWS / S3 / AI (Nest)
