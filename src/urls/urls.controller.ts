@@ -1,5 +1,9 @@
 import { Controller, Post, Body, UseGuards } from '@nestjs/common';
-import { CreateFeedImageUrlDto, CreateDetectionImageUrlDto } from './dto';
+import {
+  CreateFeedImageUrlDto,
+  CreateDetectionImageUrlDto,
+  CreatePorchClipUrlDto,
+} from './dto';
 import { UrlsService } from './services/urls.service';
 import { EcdsaAuthGuard } from '../auth/middleware/ecdsa-auth.guard';
 
@@ -23,5 +27,13 @@ export class UrlsController {
     return this.urlsService.createDetectionImageSignedUrl(
       createDetectionImageUrlDto,
     );
+  }
+
+  @Post('porch')
+  @UseGuards(EcdsaAuthGuard)
+  async createPorchClipSignedUrl(
+    @Body() createPorchClipUrlDto: CreatePorchClipUrlDto,
+  ) {
+    return this.urlsService.createPorchClipSignedUrl(createPorchClipUrlDto);
   }
 }

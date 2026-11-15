@@ -80,6 +80,8 @@ Resources:
               Value: '{{resolve:secretsmanager:crow-detector-keys:SecretString:pi-motion-public-key}}'
             - Name: PI_FEEDER_PUBLIC_KEY
               Value: '{{resolve:secretsmanager:crow-detector-keys:SecretString:pi-feeder-public-key}}'
+            - Name: PI_PORCH_PUBLIC_KEY
+              Value: '{{resolve:secretsmanager:crow-detector-keys:SecretString:pi-porch-public-key}}'
             - Name: LAMBDA_S3_PUBLIC_KEY
               Value: '{{resolve:secretsmanager:crow-detector-keys:SecretString:lambda-s3-public-key}}'
             - Name: S3_BUCKET_NAME

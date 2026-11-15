@@ -30,7 +30,7 @@
 
 Devices authenticate with headers:
 
-- `x-device-id` — one of `pi-user`, `pi-motion`, `pi-feeder`, `lambda-s3`
+- `x-device-id` — one of `pi-user`, `pi-motion`, `pi-feeder`, `pi-porch`, `lambda-s3`
 - `x-signature` — base64 ECDSA signature
 - `x-timestamp` — ms epoch (replay window enforced)
 

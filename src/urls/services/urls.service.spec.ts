@@ -248,6 +248,32 @@ describe('UrlsService', () => {
     });
   });
 
+  describe('createPorchClipSignedUrl', () => {
+    it('should create a porch clip signed URL under porch/', async () => {
+      const result = await service.createPorchClipSignedUrl({
+        fileName: 'clip-20261114-210000',
+        contentType: 'video/mp4',
+      });
+
+      expect(result.key).toMatch(/^porch\/\d+-clip-20261114-210000\.mp4$/);
+      expect(result.metadata.type).toBe('porch');
+      expect(result.bucket).toBe('test-bucket');
+    });
+
+    it('should reject an empty sanitized file name', async () => {
+      await expect(
+        service.createPorchClipSignedUrl({ fileName: '!!!' }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException when signing fails', async () => {
+      mockGetSignedUrl.mockRejectedValue(new Error('S3 error'));
+      await expect(
+        service.createPorchClipSignedUrl({ fileName: 'clip-1' }),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
   describe('getContentType', () => {
     it('should return correct content type for JPG', () => {
       const result = (service as any).getContentType(ImageFormat.JPG);

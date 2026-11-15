@@ -24,6 +24,19 @@ export async function bootstrap() {
       }),
     );
 
+    // The unlinked porch page on the Critter Canteen site calls the public clip list.
+    app.enableCors({
+      origin: config.corsAllowedOrigins,
+      methods: ['GET', 'HEAD', 'PUT', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: [
+        'Content-Type',
+        'x-device-id',
+        'x-signature',
+        'x-timestamp',
+        'x-dev-mode',
+      ],
+    });
+
     await app.listen(config.port, '0.0.0.0');
     logger.info({ port: config.port }, 'Application started successfully');
     return app;

@@ -3,6 +3,7 @@ import { DetectionModule } from './detection/detection.module';
 import { FeedModule } from './feed/feed.module';
 import { HealthModule } from './health/health.module';
 import { Module } from '@nestjs/common';
+import { PorchModule } from './porch/porch.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UrlsModule } from './urls/urls.module';
 import configuration, {
@@ -37,6 +38,7 @@ export const typeOrmSynchronize = false;
     DetectionModule,
     FeedModule,
     HealthModule,
+    PorchModule,
     UrlsModule,
   ],
 })

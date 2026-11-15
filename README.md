@@ -64,6 +64,9 @@ The **Crow Detector** is an interactive system that allows users to feed crows t
 - **Motion Pi Device**: Raspberry Pi with PIR motion sensor and night vision camera:
   - Detects motion and captures images of feeding animals.
   - Uploads detection images to S3.
+- **Porch Pi Device**: Raspberry Pi with PIR sensor and porch camera:
+  - Records 20–30s mp4 clips during a visit (about 2 minutes max).
+  - Uploads clips to the private `porch/` prefix (no animal naming).
 
 ### Web Interface
 
@@ -263,6 +266,7 @@ The system uses ECDSA (Elliptic Curve Digital Signature Algorithm) for device au
 
 - **pi-user**: User interaction device (camera, LCD, feed button).
 - **pi-motion**: Motion detection device (PIR sensor, night vision camera).
+- **pi-porch**: Porch camera device (motion clips under `porch/`).
 - **pi-feeder**: Automated feeder device (relay control, feed dispensing).
 
 ### Authentication Flow
@@ -292,6 +296,8 @@ The system provides secure image upload capabilities through pre-signed S3 URLs:
 
 - **`POST /urls/feed`**: Generate signed URL for user interaction images.
 - **`POST /urls/detection`**: Generate signed URL for motion detection images.
+- **`POST /urls/porch`**: Generate signed URL for porch-camera mp4 uploads.
+- **`GET /porch/clips`**: Public list of porch clips with short-lived playback URLs.
 
 ### S3 Organization
 
@@ -596,6 +602,7 @@ The S3 bucket is configured with:
 - **Directory Structure**:
   - `feed/` - User interaction images (triggers processing)
   - `detection/` - Motion detection images (triggers processing)
+  - `porch/` - Porch camera clips (no notification; deleted after about 30 days)
   - `processed/` - Cropped/processed images (safe from reprocessing)
 
 ## License

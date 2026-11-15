@@ -77,7 +77,9 @@ function main() {
       '  ts-node generate-auth-token.ts POST /urls/detection \'{"fileName":"detection.jpg","format":"jpg","feedEventId":"123","contentType":"image/jpeg"}\' pi-motion',
     );
     logger.info('  ts-node generate-auth-token.ts GET /health');
-    logger.info('Available device IDs: pi-user, pi-motion, pi-feeder');
+    logger.info(
+      'Available device IDs: pi-user, pi-motion, pi-feeder, pi-porch',
+    );
     logger.info('Required environment variables:');
     logger.info(
       '  PI_USER_PRIVATE_KEY_PATH - Path to pi-user private key file',
@@ -87,6 +89,9 @@ function main() {
     );
     logger.info(
       '  PI_FEEDER_PRIVATE_KEY_PATH - Path to pi-feeder private key file',
+    );
+    logger.info(
+      '  PI_PORCH_PRIVATE_KEY_PATH - Path to pi-porch private key file',
     );
     return;
   }

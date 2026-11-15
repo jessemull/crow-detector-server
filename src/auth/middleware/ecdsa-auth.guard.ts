@@ -27,6 +27,7 @@ export class EcdsaAuthGuard implements CanActivate {
       'pi-user': this.decodePublicKey(config.devicePublicKeys.piUser),
       'pi-motion': this.decodePublicKey(config.devicePublicKeys.piMotion),
       'pi-feeder': this.decodePublicKey(config.devicePublicKeys.piFeeder),
+      'pi-porch': this.decodePublicKey(config.devicePublicKeys.piPorch),
       'lambda-s3': this.decodePublicKey(config.devicePublicKeys.lambdaS3),
     };
   }

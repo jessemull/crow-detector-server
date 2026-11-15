@@ -8,6 +8,7 @@ module.exports = {
         'auth',
         'feed',
         'detection',
+        'porch',
         'urls',
         'health',
         'common',
