@@ -24,7 +24,26 @@ HEIGHT = 720
 # About 1.75 Mbps — clear enough for a porch visit without huge files.
 BITRATE = 1_750_000
 DEVICE_ID = "pi-porch"
-# Required. Example: export PORCH_API_BASE_URL=https://api-dev.crittercanteen.com
+PORCH_ENV_PATH = Path.home() / "porch.env"
+
+
+def load_porch_env(path: Path = PORCH_ENV_PATH) -> None:
+    """Load public porch settings from ~/porch.env when the shell did not export them."""
+    if not path.is_file():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, value = stripped.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
+load_porch_env()
+
 API_BASE_URL = os.environ.get("PORCH_API_BASE_URL", "").rstrip("/")
 PRIVATE_KEY_PATH = Path(
     os.environ.get(
