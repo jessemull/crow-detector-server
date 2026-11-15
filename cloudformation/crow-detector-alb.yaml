@@ -13,6 +13,18 @@ Parameters:
     Type: String
     Description: ARN of the SSL certificate from ACM for the domain
 
+  HostedZoneId:
+    Type: String
+    Default: Z02984141OVTEXLNAHHLH
+    Description: Route 53 zone that owns the API hostname
+
+Mappings:
+  ApiHostname:
+    dev:
+      Name: api-dev.crittercanteen.com
+    prod:
+      Name: api.crittercanteen.com
+
 Resources:
   ApplicationLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
@@ -72,6 +84,17 @@ Resources:
       LoadBalancerArn: !Ref ApplicationLoadBalancer
       Port: 80
       Protocol: HTTP
+
+  ApiAliasRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !FindInMap [ApiHostname, !Ref Environment, Name]
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt ApplicationLoadBalancer.DNSName
+        HostedZoneId: !GetAtt ApplicationLoadBalancer.CanonicalHostedZoneID
+        EvaluateTargetHealth: true
 
 Outputs:
   LoadBalancerDNS:
