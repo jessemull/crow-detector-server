@@ -9,6 +9,7 @@ import configuration, {
   loadAppConfig,
   validateAppConfig,
 } from './config/app.config';
+import { buildRdsSslOptions } from './config/rds-ca';
 
 const appConfig = loadAppConfig();
 validateAppConfig(appConfig);
@@ -29,11 +30,7 @@ validateAppConfig(appConfig);
         appConfig.nodeEnv !== 'production' && appConfig.nodeEnv !== 'prod',
       type: 'postgres',
       username: appConfig.rds.username,
-      ssl: {
-        // Prefer verifying the RDS CA. Production/prod always verifies;
-        // SSL_REJECT_UNAUTHORIZED=false is a non-prod temporary opt-out only.
-        rejectUnauthorized: appConfig.rds.sslRejectUnauthorized,
-      },
+      ssl: buildRdsSslOptions(appConfig.rds.sslRejectUnauthorized),
     }),
     DetectionModule,
     FeedModule,
