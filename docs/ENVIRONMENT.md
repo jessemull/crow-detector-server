@@ -61,7 +61,7 @@ Porch Pi recorder (device, not Nest):
 
 | Variable                   | Description                          | Required |
 | -------------------------- | ------------------------------------ | -------- |
-| `PORCH_API_BASE_URL`       | API base used by `pi/record-on-motion.py` | Yes |
+| `PORCH_API_BASE_URL`       | API base used by `pi/record-on-motion.py` | Yes (`npm run pi:sync` writes `~/porch.env`) |
 | `PI_PORCH_PRIVATE_KEY_PATH`| Path to porch private key on the Pi  | No (default `~/keys/pi-porch-private.pem`) |
 
 ---
