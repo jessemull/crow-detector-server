@@ -358,6 +358,49 @@ describe('DetectionImageProcessingService', () => {
       ]);
     });
 
+    it('should name one body from the most confident specific label', async () => {
+      mockRekognitionClient.send.mockResolvedValue({
+        Labels: [
+          {
+            Name: 'Rodent',
+            Confidence: 99.2,
+            Parents: [{ Name: 'Mammal' }, { Name: 'Animal' }],
+          },
+          {
+            Name: 'Squirrel',
+            Confidence: 98.1,
+            Parents: [
+              { Name: 'Rodent' },
+              { Name: 'Mammal' },
+              { Name: 'Animal' },
+            ],
+          },
+          {
+            Name: 'Rat',
+            Confidence: 97.9,
+            Instances: [
+              {
+                BoundingBox: { Left: 0.2, Top: 0.2, Width: 0.4, Height: 0.5 },
+              },
+            ],
+            Parents: [
+              { Name: 'Rodent' },
+              { Name: 'Mammal' },
+              { Name: 'Animal' },
+            ],
+          },
+        ],
+      });
+
+      const result = await service.processImage('test-bucket', 'test-key');
+
+      expect(result.animalCount).toBe(1);
+      expect(result.crowCount).toBe(0);
+      expect(result.detectedAnimals).toEqual([
+        { name: 'Squirrel', confidence: 98.1, count: 1 },
+      ]);
+    });
+
     it('should count overlapping boxes as one animal', async () => {
       const box = { Left: 0.2, Top: 0.2, Width: 0.4, Height: 0.5 };
       mockRekognitionClient.send.mockResolvedValue({

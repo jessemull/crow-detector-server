@@ -167,6 +167,15 @@ export class DetectionImageProcessingService {
 
     return clusters.map((cluster) => {
       const labelsInCluster = cluster.map((entry) => entry.label);
+
+      // One body means every animal name describes that body. The stored
+      // name is the specific label Amazon was most sure about, even when
+      // the box itself was drawn on a weaker guess such as Rat.
+      if (clusters.length === 1) {
+        labelsInCluster.push(...unboxed);
+        return this.describeBody(labelsInCluster);
+      }
+
       for (const label of unboxed) {
         const matchesOneCluster =
           clusters.filter((candidate) =>
