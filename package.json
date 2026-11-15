@@ -39,6 +39,7 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "test:watch": "jest --watch",
+    "pi:start": "bash scripts/pi-start.sh",
     "pi:sync": "bash scripts/pi-sync.sh"
   },
   "dependencies": {

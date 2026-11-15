@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Copy the porch recorder and public API base URL to the Pi.
-# Private keys stay on the device.
+# Copy the porch recorder and public API base URL to the Pi, then restart it.
+# Private keys stay on the device. Use npm run pi:start to restart without copying.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -32,3 +32,5 @@ ssh -i "${KEY}" "${HOST}" "chmod 600 '${REMOTE_ENV}'"
 
 echo "synced ${SOURCE} -> ${HOST}:${DEST}"
 echo "wrote ${REMOTE_ENV} with PORCH_API_BASE_URL=${API_BASE}"
+
+bash "${ROOT_DIR}/scripts/pi-start.sh"
