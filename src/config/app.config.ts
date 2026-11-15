@@ -34,6 +34,14 @@ const DEFAULT_CORS_ORIGINS = [
   'https://crittercanteen.com',
 ];
 
+/** Next dev (:3000) and the signed-cookie test CDN proxy (:8080). */
+const LOCAL_DEV_CORS_ORIGINS = [
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'http://localhost:8080',
+  'http://127.0.0.1:8080',
+];
+
 const logger = new Logger('AppConfig');
 
 /**
@@ -86,8 +94,12 @@ function parseCorsOrigins(env: NodeJS.ProcessEnv): string[] {
   }
 
   const origins = [...DEFAULT_CORS_ORIGINS];
-  if (env.NODE_ENV === 'development' || env.NODE_ENV === 'test') {
-    origins.push('http://localhost:3000', 'http://127.0.0.1:3000');
+  // ECS sets NODE_ENV to the stack Environment ("dev" / "prod"), not Nest's
+  // "development". Include local proxy origins for any non-prod-like value.
+  const nodeEnv = env.NODE_ENV || 'development';
+  const isProdLike = nodeEnv === 'production' || nodeEnv === 'prod';
+  if (!isProdLike) {
+    origins.push(...LOCAL_DEV_CORS_ORIGINS);
   }
   return origins;
 }

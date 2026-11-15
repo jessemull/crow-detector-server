@@ -55,7 +55,7 @@ Local helpers may also use filesystem paths (scripts only):
 
 | Variable               | Description                                      | Required | Default |
 | ---------------------- | ------------------------------------------------ | -------- | ------- |
-| `CORS_ALLOWED_ORIGINS` | Comma-separated origins for the public clip list | No       | Critter Canteen site (+ localhost in development/test) |
+| `CORS_ALLOWED_ORIGINS` | Comma-separated origins for the public clip list | No       | Critter Canteen site (+ localhost `:3000` / `:8080` when `NODE_ENV` is not `prod`/`production`) |
 
 Porch Pi recorder (device, not Nest):
 

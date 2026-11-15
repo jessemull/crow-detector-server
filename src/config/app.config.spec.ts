@@ -72,6 +72,18 @@ describe('app.config', () => {
     expect(config.corsAllowedOrigins).toContain(
       'https://www.crittercanteen.com',
     );
+    expect(config.corsAllowedOrigins).not.toContain('http://localhost:8080');
+  });
+
+  it('allows local Next and proxy origins on the ECS dev environment', () => {
+    const config = loadAppConfig({ NODE_ENV: 'dev' });
+    expect(config.corsAllowedOrigins).toEqual(
+      expect.arrayContaining([
+        'https://www.crittercanteen.com',
+        'http://localhost:3000',
+        'http://localhost:8080',
+      ]),
+    );
   });
 
   it('parses CORS_ALLOWED_ORIGINS when set', () => {
