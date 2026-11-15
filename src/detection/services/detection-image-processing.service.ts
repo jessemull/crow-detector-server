@@ -6,7 +6,6 @@ import {
 import { DeleteObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { Injectable } from '@nestjs/common';
 import { createLogger } from 'src/common/logger/logger.config';
-import { ClaudeService } from './claude.service';
 import {
   AnimalDetectionResult,
   DetectedAnimal,
@@ -20,10 +19,7 @@ export class DetectionImageProcessingService {
   private readonly rekognition: RekognitionClient;
   private readonly s3: S3Client;
 
-  constructor(
-    private readonly configService: ConfigService,
-    private readonly claudeService: ClaudeService,
-  ) {
+  constructor(private readonly configService: ConfigService) {
     const region = this.configService.get<string>('awsRegion') || 'us-west-2';
 
     this.rekognition = new RekognitionClient({
@@ -48,9 +44,10 @@ export class DetectionImageProcessingService {
 
       const labels = await this.detectLabels(bucket, key);
 
-      // Step 2: Analyze results for animals...
+      // Parent labels describe the same creature. Animal + Bird + Crow
+      // is one crow, so the stored count comes from the labels directly.
 
-      const result = await this.analyzeAnimalDetection(labels);
+      const result = this.countAnimals(labels.Labels || []);
 
       // Step 3: If no animals detected, delete the image...
 
@@ -103,78 +100,98 @@ export class DetectionImageProcessingService {
     }
   }
 
-  private async analyzeAnimalDetection(
-    labelsResult: RekognitionLabelsResult,
-  ): Promise<Omit<AnimalDetectionResult, 'processingDuration'>> {
-    const labels = labelsResult.Labels || [];
-
-    try {
-      this.logger.info('Using Claude API for animal detection analysis');
-      const result = await this.claudeService.analyzeAnimalDetection(labels);
-      return result;
-    } catch (error) {
-      this.logger.warn(
-        'Claude analysis failed, falling back to basic detection',
-        error,
-      );
-      return this.fallbackAnimalDetection(labels);
-    }
-  }
-
-  private fallbackAnimalDetection(
+  private countAnimals(
     labels: RekognitionLabel[],
   ): Omit<AnimalDetectionResult, 'processingDuration'> {
-    // Basic fallback detection for when Claude is unavailable...
-
-    const generalAnimalCategories = [
-      'Animal',
-      'Wildlife',
-      'Pet',
-      'Farm Animal',
-    ];
-
-    const birdCategories = ['Bird', 'Avian', 'Flying Animal'];
-    const mammalCategories = ['Mammal', 'Furry Animal'];
-    const crowTerms = ['crow', 'raven', 'blackbird', 'corvid'];
+    const named = labels.filter(
+      (label) => label.Name && label.Confidence !== undefined,
+    );
+    const crowLabels = named.filter((label) => this.isCrowLabel(label.Name!));
+    const specificLabels = named.filter(
+      (label) =>
+        !this.isBroadLabel(label.Name!) &&
+        !this.isCrowLabel(label.Name!) &&
+        this.hasAnimalParent(label),
+    );
 
     const detectedAnimals: DetectedAnimal[] = [];
-
-    let crowCount = 0;
     let animalCount = 0;
-    let maxConfidence = 0;
+    let crowCount = 0;
 
-    for (const label of labels) {
-      if (label.Name && label.Confidence) {
-        maxConfidence = Math.max(maxConfidence, label.Confidence);
-        const labelName = label.Name.toLowerCase();
+    if (crowLabels.length > 0) {
+      const crow = this.representative(crowLabels);
+      detectedAnimals.push(crow);
+      animalCount += crow.count;
+      crowCount += crow.count;
+    }
 
-        // Check if it's a crow first (crows are always animals)...
+    for (const label of this.collapseNestedNames(specificLabels)) {
+      const count = this.instanceCount(label);
+      detectedAnimals.push({
+        name: label.Name!,
+        confidence: label.Confidence!,
+        count,
+      });
+      animalCount += count;
+    }
 
-        const isCrow = crowTerms.some((term) => labelName.includes(term));
+    if (specificLabels.length === 0 && crowLabels.length === 0) {
+      const birdLabels = this.labelsNamed(named, [
+        'bird',
+        'avian',
+        'flying animal',
+      ]);
+      const mammalLabels = this.labelsNamed(named, ['mammal', 'furry animal']);
 
-        // Check if it's an animal using general categories...
-
-        const isAnimal =
-          generalAnimalCategories.some((cat) =>
-            labelName.includes(cat.toLowerCase()),
-          ) ||
-          birdCategories.some((cat) => labelName.includes(cat.toLowerCase())) ||
-          mammalCategories.some((cat) =>
-            labelName.includes(cat.toLowerCase()),
-          ) ||
-          isCrow;
-
-        if (isAnimal) {
-          detectedAnimals.push({
-            name: label.Name,
-            confidence: label.Confidence || 0,
-            count: 1,
-          });
-          animalCount++;
-          if (isCrow) {
-            crowCount++;
-          }
+      for (const branchLabels of [birdLabels, mammalLabels]) {
+        if (branchLabels.length === 0) {
+          continue;
         }
+        const chosen = this.representative(branchLabels);
+        detectedAnimals.push(chosen);
+        animalCount += chosen.count;
+      }
+
+      if (birdLabels.length === 0 && mammalLabels.length === 0) {
+        const genericLabels = this.labelsNamed(named, [
+          'animal',
+          'wildlife',
+          'pet',
+          'farm animal',
+        ]);
+        if (genericLabels.length > 0) {
+          const chosen = this.representative(genericLabels);
+          detectedAnimals.push(chosen);
+          animalCount += chosen.count;
+        }
+      }
+    } else {
+      const uncoveredBranches = [
+        {
+          names: ['bird', 'avian', 'flying animal'],
+          covered: crowLabels.length > 0,
+        },
+        {
+          names: ['mammal', 'furry animal'],
+          covered: specificLabels.some((label) =>
+            this.hasParent(label, ['mammal', 'furry animal', 'animal']),
+          ),
+        },
+      ];
+
+      for (const branch of uncoveredBranches) {
+        if (branch.covered) {
+          continue;
+        }
+        const branchLabels = named.filter((label) =>
+          branch.names.includes(label.Name!.toLowerCase()),
+        );
+        if (branchLabels.length === 0) {
+          continue;
+        }
+        const chosen = this.representative(branchLabels);
+        detectedAnimals.push(chosen);
+        animalCount += chosen.count;
       }
     }
 
@@ -184,6 +201,99 @@ export class DetectionImageProcessingService {
       animalCount,
       detectedAnimals,
     };
+  }
+
+  private labelsNamed(
+    labels: RekognitionLabel[],
+    names: string[],
+  ): RekognitionLabel[] {
+    return labels.filter((label) => names.includes(label.Name!.toLowerCase()));
+  }
+
+  private representative(labels: RekognitionLabel[]): DetectedAnimal {
+    const parentNames = new Set(
+      labels.flatMap((label) =>
+        (label.Parents || []).map((parent) => parent.Name?.toLowerCase()),
+      ),
+    );
+    const leaves = labels.filter(
+      (label) => !parentNames.has(label.Name?.toLowerCase()),
+    );
+    const candidates = leaves.length > 0 ? leaves : labels;
+    const best = candidates.reduce((current, label) =>
+      (label.Confidence || 0) > (current.Confidence || 0) ? label : current,
+    );
+    return {
+      name: best.Name!,
+      confidence: best.Confidence!,
+      count: Math.max(...labels.map((label) => this.instanceCount(label))),
+    };
+  }
+
+  private instanceCount(label: RekognitionLabel): number {
+    const instances = label.Instances?.length ?? 0;
+    return instances > 0 ? instances : 1;
+  }
+
+  private isBroadLabel(name: string): boolean {
+    return [
+      'animal',
+      'wildlife',
+      'pet',
+      'farm animal',
+      'bird',
+      'avian',
+      'flying animal',
+      'mammal',
+      'furry animal',
+    ].includes(name.toLowerCase());
+  }
+
+  private isCrowLabel(name: string): boolean {
+    const normalized = name.toLowerCase();
+    return ['crow', 'raven', 'blackbird', 'corvid'].some((term) =>
+      normalized.includes(term),
+    );
+  }
+
+  private hasAnimalParent(label: RekognitionLabel): boolean {
+    return this.hasParent(label, [
+      'animal',
+      'wildlife',
+      'pet',
+      'farm animal',
+      'bird',
+      'avian',
+      'flying animal',
+      'mammal',
+      'furry animal',
+    ]);
+  }
+
+  private hasParent(label: RekognitionLabel, names: string[]): boolean {
+    return (label.Parents || []).some(
+      (parent) => parent.Name && names.includes(parent.Name.toLowerCase()),
+    );
+  }
+
+  private collapseNestedNames(labels: RekognitionLabel[]): RekognitionLabel[] {
+    const kept: RekognitionLabel[] = [];
+    const sorted = [...labels].sort(
+      (left, right) => right.Name!.length - left.Name!.length,
+    );
+
+    for (const label of sorted) {
+      const name = label.Name!.toLowerCase();
+      const nestsWithKept = kept.some((existing) => {
+        const existingName = existing.Name!.toLowerCase();
+        return existingName.includes(name) || name.includes(existingName);
+      });
+      if (!nestsWithKept) {
+        kept.push(label);
+      }
+    }
+
+    return kept;
   }
 
   private async deleteImage(bucket: string, key: string): Promise<void> {

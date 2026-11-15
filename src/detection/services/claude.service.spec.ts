@@ -159,6 +159,25 @@ describe('ClaudeService', () => {
       );
     });
 
+    it('should tell Claude that parent labels are one creature', async () => {
+      mockConfigService.get.mockReturnValue('test-api-key');
+      (service as any).anthropic.messages.create.mockResolvedValue({
+        content: [
+          {
+            type: 'text',
+            text: '{"hasAnimals": true, "crowCount": 1, "animalCount": 1, "detectedAnimals": []}',
+          },
+        ],
+      });
+
+      await service.analyzeAnimalDetection(mockLabels);
+
+      const prompt = (service as any).anthropic.messages.create.mock.calls[0][0]
+        .messages[0].content as string;
+      expect(prompt).toContain('not four animals');
+      expect(prompt).toContain('A generic Bird is not a crow');
+    });
+
     it('should handle non-text response type from Claude', async () => {
       mockConfigService.get.mockReturnValue('test-api-key');
 

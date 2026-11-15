@@ -1,4 +1,3 @@
-import { ClaudeService } from './claude.service';
 import { ConfigService } from '@nestjs/config';
 import { DetectionImageProcessingService } from './detection-image-processing.service';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -31,14 +30,9 @@ const mockLogger = {
 describe('DetectionImageProcessingService', () => {
   let service: DetectionImageProcessingService;
   let configService: ConfigService;
-  let claudeService: ClaudeService;
 
   const mockConfigService = {
     get: jest.fn(),
-  };
-
-  const mockClaudeService = {
-    analyzeAnimalDetection: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -59,10 +53,6 @@ describe('DetectionImageProcessingService', () => {
           provide: ConfigService,
           useValue: mockConfigService,
         },
-        {
-          provide: ClaudeService,
-          useValue: mockClaudeService,
-        },
       ],
     }).compile();
 
@@ -70,7 +60,6 @@ describe('DetectionImageProcessingService', () => {
       DetectionImageProcessingService,
     );
     configService = module.get<ConfigService>(ConfigService);
-    claudeService = module.get<ClaudeService>(ClaudeService);
 
     (service as any).rekognition = mockRekognitionClient;
     (service as any).s3 = mockS3Client;
@@ -88,10 +77,7 @@ describe('DetectionImageProcessingService', () => {
     it('should use default region when AWS_REGION not configured', () => {
       mockConfigService.get.mockReturnValue(undefined);
 
-      const newService = new DetectionImageProcessingService(
-        configService,
-        claudeService,
-      );
+      const newService = new DetectionImageProcessingService(configService);
       expect(newService).toBeDefined();
     });
   });
@@ -115,21 +101,14 @@ describe('DetectionImageProcessingService', () => {
           ),
       );
 
-      const claudeResult = {
-        hasAnimals: true,
-        crowCount: 1,
-        animalCount: 1,
-        detectedAnimals: ['Crow'],
-      };
-
-      mockClaudeService.analyzeAnimalDetection.mockResolvedValue(claudeResult);
-
       const result = await service.processImage('test-bucket', 'test-key');
 
       expect(result.hasAnimals).toBe(true);
       expect(result.crowCount).toBe(1);
       expect(result.animalCount).toBe(1);
-      expect(result.detectedAnimals).toEqual(['Crow']);
+      expect(result.detectedAnimals).toEqual([
+        { name: 'Crow', confidence: 87, count: 1 },
+      ]);
       expect(result.processingDuration).toBeGreaterThan(0);
     });
 
@@ -142,17 +121,12 @@ describe('DetectionImageProcessingService', () => {
       };
       mockRekognitionClient.send.mockResolvedValue(rekognitionResponse);
 
-      mockClaudeService.analyzeAnimalDetection.mockRejectedValue(
-        new Error('Claude API error'),
-      );
-
       const result = await service.processImage('test-bucket', 'test-key');
 
       expect(result.hasAnimals).toBe(true);
       expect(result.crowCount).toBe(1);
-      expect(result.animalCount).toBe(2);
+      expect(result.animalCount).toBe(1);
       expect(result.detectedAnimals).toEqual([
-        { name: 'Bird', confidence: 95, count: 1 },
         { name: 'Crow', confidence: 87, count: 1 },
       ]);
     });
@@ -167,15 +141,6 @@ describe('DetectionImageProcessingService', () => {
       mockRekognitionClient.send.mockResolvedValue(rekognitionResponse);
 
       mockS3Client.send.mockResolvedValue({});
-
-      const claudeResult = {
-        hasAnimals: false,
-        crowCount: 0,
-        animalCount: 0,
-        detectedAnimals: [],
-      };
-
-      mockClaudeService.analyzeAnimalDetection.mockResolvedValue(claudeResult);
 
       const result = await service.processImage('test-bucket', 'test-key');
 
@@ -201,15 +166,6 @@ describe('DetectionImageProcessingService', () => {
       };
       mockRekognitionClient.send.mockResolvedValue(rekognitionResponse);
 
-      const claudeResult = {
-        hasAnimals: false,
-        crowCount: 0,
-        animalCount: 0,
-        detectedAnimals: [],
-      };
-
-      mockClaudeService.analyzeAnimalDetection.mockResolvedValue(claudeResult);
-
       mockS3Client.send.mockRejectedValue(
         new Error('S3 delete operation failed'),
       );
@@ -225,15 +181,6 @@ describe('DetectionImageProcessingService', () => {
       };
       mockRekognitionClient.send.mockResolvedValue(rekognitionResponse);
 
-      const claudeResult = {
-        hasAnimals: false,
-        crowCount: 0,
-        animalCount: 0,
-        detectedAnimals: [],
-      };
-
-      mockClaudeService.analyzeAnimalDetection.mockResolvedValue(claudeResult);
-
       mockS3Client.send.mockResolvedValue({});
 
       const result = await service.processImage('test-bucket', 'test-key');
@@ -247,15 +194,6 @@ describe('DetectionImageProcessingService', () => {
     it('should handle undefined labels from Rekognition', async () => {
       const rekognitionResponse = {};
       mockRekognitionClient.send.mockResolvedValue(rekognitionResponse);
-
-      const claudeResult = {
-        hasAnimals: false,
-        crowCount: 0,
-        animalCount: 0,
-        detectedAnimals: [],
-      };
-
-      mockClaudeService.analyzeAnimalDetection.mockResolvedValue(claudeResult);
 
       mockS3Client.send.mockResolvedValue({});
 
@@ -282,26 +220,15 @@ describe('DetectionImageProcessingService', () => {
       };
       mockRekognitionClient.send.mockResolvedValue(rekognitionResponse);
 
-      mockClaudeService.analyzeAnimalDetection.mockRejectedValue(
-        new Error('Claude API error'),
-      );
-
       const result = await service.processImage('test-bucket', 'test-key');
 
       expect(result.hasAnimals).toBe(true);
-      expect(result.animalCount).toBe(8);
-      expect(result.detectedAnimals).toEqual(
-        expect.arrayContaining([
-          { name: 'Animal', confidence: 95, count: 1 },
-          { name: 'Wildlife', confidence: 87, count: 1 },
-          { name: 'Pet', confidence: 92, count: 1 },
-          { name: 'Farm Animal', confidence: 88, count: 1 },
-          { name: 'Bird', confidence: 90, count: 1 },
-          { name: 'Avian', confidence: 85, count: 1 },
-          { name: 'Mammal', confidence: 89, count: 1 },
-          { name: 'Furry Animal', confidence: 86, count: 1 },
-        ]),
-      );
+      expect(result.crowCount).toBe(0);
+      expect(result.animalCount).toBe(2);
+      expect(result.detectedAnimals).toEqual([
+        { name: 'Bird', confidence: 90, count: 1 },
+        { name: 'Mammal', confidence: 89, count: 1 },
+      ]);
     });
 
     it('should handle fallback detection with crow-specific terms', async () => {
@@ -315,23 +242,14 @@ describe('DetectionImageProcessingService', () => {
       };
       mockRekognitionClient.send.mockResolvedValue(rekognitionResponse);
 
-      mockClaudeService.analyzeAnimalDetection.mockRejectedValue(
-        new Error('Claude API error'),
-      );
-
       const result = await service.processImage('test-bucket', 'test-key');
 
       expect(result.hasAnimals).toBe(true);
-      expect(result.crowCount).toBe(4);
-      expect(result.animalCount).toBe(4);
-      expect(result.detectedAnimals).toEqual(
-        expect.arrayContaining([
-          { name: 'crow', confidence: 95, count: 1 },
-          { name: 'raven', confidence: 87, count: 1 },
-          { name: 'blackbird', confidence: 92, count: 1 },
-          { name: 'corvid', confidence: 88, count: 1 },
-        ]),
-      );
+      expect(result.crowCount).toBe(1);
+      expect(result.animalCount).toBe(1);
+      expect(result.detectedAnimals).toEqual([
+        { name: 'crow', confidence: 95, count: 1 },
+      ]);
     });
 
     it('should handle fallback detection with mixed case labels', async () => {
@@ -344,21 +262,64 @@ describe('DetectionImageProcessingService', () => {
       };
       mockRekognitionClient.send.mockResolvedValue(rekognitionResponse);
 
-      mockClaudeService.analyzeAnimalDetection.mockRejectedValue(
-        new Error('Claude API error'),
-      );
+      const result = await service.processImage('test-bucket', 'test-key');
+
+      expect(result.hasAnimals).toBe(true);
+      expect(result.crowCount).toBe(0);
+      expect(result.animalCount).toBe(2);
+      expect(result.detectedAnimals).toEqual([
+        { name: 'BIRD', confidence: 95, count: 1 },
+        { name: 'Mammal', confidence: 87, count: 1 },
+      ]);
+    });
+
+    it('should count one crow when parent labels repeat the same bird', async () => {
+      mockRekognitionClient.send.mockResolvedValue({
+        Labels: [
+          { Name: 'Animal', Confidence: 99.7 },
+          { Name: 'Bird', Confidence: 99.7 },
+          {
+            Name: 'Blackbird',
+            Confidence: 99.7,
+            Parents: [{ Name: 'Bird' }, { Name: 'Animal' }],
+          },
+          {
+            Name: 'Crow',
+            Confidence: 92,
+            Parents: [
+              { Name: 'Blackbird' },
+              { Name: 'Bird' },
+              { Name: 'Animal' },
+            ],
+          },
+        ],
+      });
+
+      const result = await service.processImage('test-bucket', 'test-key');
+
+      expect(result.animalCount).toBe(1);
+      expect(result.crowCount).toBe(1);
+      expect(result.detectedAnimals).toEqual([
+        { name: 'Crow', confidence: 92, count: 1 },
+      ]);
+    });
+
+    it('should count one mammal when only broad mammal labels are present', async () => {
+      mockRekognitionClient.send.mockResolvedValue({
+        Labels: [
+          { Name: 'Animal', Confidence: 99.2 },
+          { Name: 'Mammal', Confidence: 99.2 },
+        ],
+      });
 
       const result = await service.processImage('test-bucket', 'test-key');
 
       expect(result.hasAnimals).toBe(true);
-      expect(result.animalCount).toBe(3);
-      expect(result.detectedAnimals).toEqual(
-        expect.arrayContaining([
-          { name: 'BIRD', confidence: 95, count: 1 },
-          { name: 'Mammal', confidence: 87, count: 1 },
-          { name: 'wildlife', confidence: 92, count: 1 },
-        ]),
-      );
+      expect(result.animalCount).toBe(1);
+      expect(result.crowCount).toBe(0);
+      expect(result.detectedAnimals).toEqual([
+        { name: 'Mammal', confidence: 99.2, count: 1 },
+      ]);
     });
   });
 });

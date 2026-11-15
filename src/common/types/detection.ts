@@ -23,6 +23,7 @@ export interface RekognitionLabel {
   Name?: string;
   Confidence?: number;
   Instances?: Array<{ BoundingBox?: unknown; Confidence?: number }>;
+  Parents?: Array<{ Name?: string }>;
 }
 
 export interface RekognitionLabelsResult {

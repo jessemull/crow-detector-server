@@ -51,7 +51,7 @@ export class ClaudeService {
 
 Labels: ${labelsText}
 
-CRITICAL: Count individual animals using the Instances data, not just label names.
+CRITICAL: Count creatures, not label names. Rekognition repeats parent categories for the same creature.
 
 IMPORTANT: You must respond with ONLY valid JSON. No additional text, explanations, or markdown formatting.
 
@@ -70,11 +70,19 @@ Required JSON structure:
 }
 
 COUNTING RULES:
-- crowCount: Count individual crows/blackbirds (if Bird has 2 instances, that's 2 crows)
-- animalCount: Sum of all individual animals (Bird instances + Pig instances)
-- detectedAnimals: Array of objects with animal name, confidence score, and instance count
+- Animal, Bird, Blackbird, and Crow together are one bird, not four animals.
+- Ignore a broad label (Animal, Wildlife, Pet, Bird, Mammal, and similar) when a more specific label is present.
+- animalCount is the number of creatures. Use Instances on the most specific label.
+- crowCount counts only crows, ravens, blackbirds, and other corvids. A generic Bird is not a crow.
+- detectedAnimals lists only the specific labels you counted.
 
-Example: Bird with 2 instances + Pig with 1 instance = 3 total animals, 2 crows.
+Example: Animal (1), Bird (1), Blackbird (1), Crow (1) = 1 animal, 1 crow.
+detectedAnimals: [{"name": "Crow", "confidence": 92, "count": 1}]
+
+Example: Animal (1), Mammal (1) = 1 animal, 0 crows.
+detectedAnimals: [{"name": "Mammal", "confidence": 99, "count": 1}]
+
+Example: Bird (2 instances), Pig (1 instance) = 3 animals, 0 crows.
 detectedAnimals: [{"name": "Bird", "confidence": 99.1, "count": 2}, {"name": "Pig", "confidence": 99.2, "count": 1}]`;
 
       const message = await this.anthropic.messages.create({
