@@ -1,4 +1,9 @@
-import { CreateFeedImageUrlDto, CreateDetectionImageUrlDto } from './dto';
+import { ForbiddenException } from '@nestjs/common';
+import {
+  CreateFeedImageUrlDto,
+  CreateDetectionImageUrlDto,
+  CreatePorchClipUrlDto,
+} from './dto';
 import { ImageFormat } from '../common/types';
 import { Test, TestingModule } from '@nestjs/testing';
 import { UrlsController } from './urls.controller';
@@ -11,6 +16,7 @@ describe('UrlsController', () => {
   const mockUrlsService = {
     createFeedImageSignedUrl: jest.fn(),
     createDetectionImageSignedUrl: jest.fn(),
+    createPorchClipSignedUrl: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -137,6 +143,50 @@ describe('UrlsController', () => {
       expect(service.createDetectionImageSignedUrl).toHaveBeenCalledWith(
         createDetectionImageUrlDto,
       );
+    });
+  });
+
+  describe('createPorchClipSignedUrl', () => {
+    it('should create a porch clip signed URL for pi-porch', async () => {
+      const createPorchClipUrlDto: CreatePorchClipUrlDto = {
+        fileName: 'clip-20261114-210000',
+        contentType: 'video/mp4',
+      };
+
+      const expectedResult = {
+        signedUrl:
+          'https://test-bucket.s3.amazonaws.com/porch/123-clip.mp4?signature=...',
+        key: 'porch/123-clip-20261114-210000.mp4',
+        expiresAt: '2024-01-01T12:00:00.000Z',
+        bucket: 'test-bucket',
+        metadata: {
+          timestamp: 123,
+          type: 'porch',
+        },
+      };
+
+      mockUrlsService.createPorchClipSignedUrl.mockResolvedValue(
+        expectedResult,
+      );
+
+      const result = await controller.createPorchClipSignedUrl(
+        createPorchClipUrlDto,
+        { deviceId: 'pi-porch' } as any,
+      );
+
+      expect(service.createPorchClipSignedUrl).toHaveBeenCalledWith(
+        createPorchClipUrlDto,
+      );
+      expect(result).toEqual(expectedResult);
+    });
+
+    it('should reject other devices', async () => {
+      await expect(
+        controller.createPorchClipSignedUrl({ fileName: 'clip-1' }, {
+          deviceId: 'pi-user',
+        } as any),
+      ).rejects.toThrow(ForbiddenException);
+      expect(service.createPorchClipSignedUrl).not.toHaveBeenCalled();
     });
   });
 });

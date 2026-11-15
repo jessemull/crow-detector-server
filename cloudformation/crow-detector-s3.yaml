@@ -35,6 +35,12 @@ Resources:
             Status: Enabled
             ExpirationInDays: 365
             NoncurrentVersionExpirationInDays: 30
+          # Porch videos are short-lived. Photos keep the year-long rule above.
+          - Id: DeleteOldPorchClips
+            Status: Enabled
+            Prefix: porch/
+            ExpirationInDays: 30
+            NoncurrentVersionExpirationInDays: 7
       CorsConfiguration:
         CorsRules:
           - AllowedHeaders: ['*']

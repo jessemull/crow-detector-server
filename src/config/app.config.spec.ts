@@ -60,9 +60,28 @@ describe('app.config', () => {
           PI_USER_PUBLIC_KEY: 'a',
           PI_MOTION_PUBLIC_KEY: 'b',
           PI_FEEDER_PUBLIC_KEY: 'c',
+          PI_PORCH_PUBLIC_KEY: 'e',
           LAMBDA_S3_PUBLIC_KEY: 'd',
         }),
       ),
     ).not.toThrow();
+  });
+
+  it('loads default CORS origins for the public site', () => {
+    const config = loadAppConfig({ NODE_ENV: 'production' });
+    expect(config.corsAllowedOrigins).toContain(
+      'https://www.crittercanteen.com',
+    );
+  });
+
+  it('parses CORS_ALLOWED_ORIGINS when set', () => {
+    const config = loadAppConfig({
+      ...baseEnv,
+      CORS_ALLOWED_ORIGINS: 'https://a.example, https://b.example',
+    });
+    expect(config.corsAllowedOrigins).toEqual([
+      'https://a.example',
+      'https://b.example',
+    ]);
   });
 });

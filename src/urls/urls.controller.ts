@@ -1,7 +1,21 @@
-import { Controller, Post, Body, UseGuards } from '@nestjs/common';
-import { CreateFeedImageUrlDto, CreateDetectionImageUrlDto } from './dto';
+import {
+  Body,
+  Controller,
+  ForbiddenException,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+import { FastifyRequest } from 'fastify';
+import {
+  CreateFeedImageUrlDto,
+  CreateDetectionImageUrlDto,
+  CreatePorchClipUrlDto,
+} from './dto';
 import { UrlsService } from './services/urls.service';
 import { EcdsaAuthGuard } from '../auth/middleware/ecdsa-auth.guard';
+
+type DeviceRequest = FastifyRequest & { deviceId?: string };
 
 @Controller('urls')
 export class UrlsController {
@@ -23,5 +37,21 @@ export class UrlsController {
     return this.urlsService.createDetectionImageSignedUrl(
       createDetectionImageUrlDto,
     );
+  }
+
+  @Post('porch')
+  @UseGuards(EcdsaAuthGuard)
+  async createPorchClipSignedUrl(
+    @Body() createPorchClipUrlDto: CreatePorchClipUrlDto,
+    @Req() request: DeviceRequest,
+  ) {
+    // Porch uploads are only for the porch camera (plus local dev-mode bypass).
+    if (request.deviceId !== 'pi-porch' && request.deviceId !== 'dev-mode') {
+      throw new ForbiddenException(
+        'Only the porch camera can request porch upload URLs',
+      );
+    }
+
+    return this.urlsService.createPorchClipSignedUrl(createPorchClipUrlDto);
   }
 }

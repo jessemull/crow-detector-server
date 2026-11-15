@@ -15,6 +15,7 @@ describe('bootstrap', () => {
     jest.spyOn(NestFactory, 'create').mockResolvedValue({
       listen: listenMock,
       useGlobalPipes: jest.fn(),
+      enableCors: jest.fn(),
     });
 
     jest.spyOn(process, 'exit').mockImplementation((code?: number) => {

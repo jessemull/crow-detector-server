@@ -40,6 +40,7 @@ Public keys are typically base64-encoded PEM strings:
 | `PI_USER_PUBLIC_KEY`   | User Pi device public key      | Prod yes |
 | `PI_MOTION_PUBLIC_KEY` | Motion Pi device public key    | Prod yes |
 | `PI_FEEDER_PUBLIC_KEY` | Feeder Pi device public key    | Prod yes |
+| `PI_PORCH_PUBLIC_KEY`  | Porch camera Pi public key     | Prod yes |
 | `LAMBDA_S3_PUBLIC_KEY` | S3 Lambda caller public key    | Prod yes |
 
 Local helpers may also use filesystem paths (scripts only):
@@ -49,7 +50,19 @@ Local helpers may also use filesystem paths (scripts only):
 | `PI_USER_PRIVATE_KEY_PATH`  | Path to user private key   |
 | `PI_MOTION_PRIVATE_KEY_PATH`| Path to motion private key |
 | `PI_FEEDER_PRIVATE_KEY_PATH`| Path to feeder private key |
+| `PI_PORCH_PRIVATE_KEY_PATH` | Path to porch private key  |
 | `PI_*_PUBLIC_KEY_PATH`      | Path variants for scripts  |
+
+| Variable               | Description                                      | Required | Default |
+| ---------------------- | ------------------------------------------------ | -------- | ------- |
+| `CORS_ALLOWED_ORIGINS` | Comma-separated origins for the public clip list | No       | Critter Canteen site (+ localhost in development/test) |
+
+Porch Pi recorder (device, not Nest):
+
+| Variable                   | Description                          | Required |
+| -------------------------- | ------------------------------------ | -------- |
+| `PORCH_API_BASE_URL`       | API base used by `pi/record-on-motion.py` | Yes |
+| `PI_PORCH_PRIVATE_KEY_PATH`| Path to porch private key on the Pi  | No (default `~/keys/pi-porch-private.pem`) |
 
 ---
 

@@ -32,9 +32,11 @@ crow-detector-server/
 │   ├── detection/              # Detection events, Claude, image processing
 │   ├── feed/                   # Feed events, image processing, S3 metadata
 │   ├── health/                 # Health checks
+│   ├── porch/                  # Public porch clip list
 │   ├── urls/                   # Presigned S3 URL issuance
 │   ├── app.module.ts
 │   └── main.ts
+├── pi/                         # Porch recorder synced to the Pi
 ├── lambda/                     # Nested package: S3 → SQS → API glue
 │   ├── src/
 │   ├── cloudformation/
@@ -87,6 +89,7 @@ Prefer `make` targets. Run **`make`** or **`make help`** for a compact list.
 | `npm run db:seed`  | Seed database                                    |
 | `npm run db:reset` | Reset + seed                                     |
 | `npm run auth:token` | Generate ECDSA auth token helper               |
+| `npm run pi:sync`  | Copy `pi/record-on-motion.py` to the porch Pi  |
 
 ---
 

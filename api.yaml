@@ -511,6 +511,63 @@ paths:
         '500':
           description: Internal server error
 
+  /urls/porch:
+    post:
+      summary: Create signed URL for porch clip upload
+      description: Generate a pre-signed URL for uploading a porch-camera mp4 under porch/
+      tags:
+        - URLs
+      security:
+        - ECDSA: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePorchClipUrlDTO'
+      responses:
+        '200':
+          description: Signed URL created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  signedUrl:
+                    type: string
+                    format: uri
+                  key:
+                    type: string
+                  expiresAt:
+                    type: string
+                    format: date-time
+        '400':
+          description: Bad request - invalid input data
+        '401':
+          description: Unauthorized - invalid authentication
+        '500':
+          description: Internal server error
+
+  /porch/clips:
+    get:
+      summary: List porch clips
+      description: Public list of recent porch clips with short-lived playback URLs
+      tags:
+        - Porch
+      responses:
+        '200':
+          description: Clip list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PorchClip'
+        '429':
+          description: Too many requests
+        '500':
+          description: Internal server error
+
 components:
   securitySchemes:
     ECDSA:
@@ -520,7 +577,7 @@ components:
       description: |
         ECDSA signature for request authentication.
         Required headers:
-        - x-device-id: Device identifier (pi-user, pi-motion, pi-feeder)
+        - x-device-id: Device identifier (pi-user, pi-motion, pi-feeder, pi-porch)
         - x-signature: Base64-encoded ECDSA signature
         - x-timestamp: Request timestamp in milliseconds
 
@@ -711,6 +768,43 @@ components:
           type: string
           description: MIME type of the image (optional)
           example: "image/jpeg"
+
+    CreatePorchClipUrlDTO:
+      type: object
+      required:
+        - fileName
+      properties:
+        fileName:
+          type: string
+          description: Clip file name without path
+          example: "clip-20261114-210000"
+        contentType:
+          type: string
+          description: MIME type of the clip (optional)
+          example: "video/mp4"
+
+    PorchClip:
+      type: object
+      required:
+        - name
+        - recordedAt
+        - playbackUrl
+        - expiresAt
+      properties:
+        name:
+          type: string
+          description: Clip file name under porch/
+          example: "1731628800000-clip-20261114-210000.mp4"
+        recordedAt:
+          type: string
+          format: date-time
+        playbackUrl:
+          type: string
+          format: uri
+          description: Short-lived signed playback URL
+        expiresAt:
+          type: string
+          format: date-time
 
     DetectionEvent:
       type: object

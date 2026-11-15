@@ -19,13 +19,20 @@ export interface AppConfig {
     username?: string;
   };
   s3BucketName?: string;
+  corsAllowedOrigins: string[];
   devicePublicKeys: {
     lambdaS3?: string;
     piFeeder?: string;
     piMotion?: string;
+    piPorch?: string;
     piUser?: string;
   };
 }
+
+const DEFAULT_CORS_ORIGINS = [
+  'https://www.crittercanteen.com',
+  'https://crittercanteen.com',
+];
 
 const logger = new Logger('AppConfig');
 
@@ -60,13 +67,29 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       username: env.RDS_USERNAME,
     },
     s3BucketName: env.S3_BUCKET_NAME,
+    corsAllowedOrigins: parseCorsOrigins(env),
     devicePublicKeys: {
       lambdaS3: env.LAMBDA_S3_PUBLIC_KEY,
       piFeeder: env.PI_FEEDER_PUBLIC_KEY,
       piMotion: env.PI_MOTION_PUBLIC_KEY,
+      piPorch: env.PI_PORCH_PUBLIC_KEY,
       piUser: env.PI_USER_PUBLIC_KEY,
     },
   };
+}
+
+function parseCorsOrigins(env: NodeJS.ProcessEnv): string[] {
+  if (env.CORS_ALLOWED_ORIGINS) {
+    return env.CORS_ALLOWED_ORIGINS.split(',')
+      .map((origin) => origin.trim())
+      .filter((origin) => origin.length > 0);
+  }
+
+  const origins = [...DEFAULT_CORS_ORIGINS];
+  if (env.NODE_ENV === 'development' || env.NODE_ENV === 'test') {
+    origins.push('http://localhost:3000', 'http://127.0.0.1:3000');
+  }
+  return origins;
 }
 
 /**
@@ -90,6 +113,7 @@ export function validateAppConfig(config: AppConfig): void {
     ['PI_USER_PUBLIC_KEY', config.devicePublicKeys.piUser],
     ['PI_MOTION_PUBLIC_KEY', config.devicePublicKeys.piMotion],
     ['PI_FEEDER_PUBLIC_KEY', config.devicePublicKeys.piFeeder],
+    ['PI_PORCH_PUBLIC_KEY', config.devicePublicKeys.piPorch],
     ['LAMBDA_S3_PUBLIC_KEY', config.devicePublicKeys.lambdaS3],
   ];
 
