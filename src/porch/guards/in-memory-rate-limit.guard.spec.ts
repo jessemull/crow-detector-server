@@ -35,4 +35,15 @@ describe('InMemoryRateLimitGuard', () => {
       guard.canActivate(makeContext('9.9.9.9', '3.3.3.3, 4.4.4.4')),
     ).toThrow(HttpException);
   });
+
+  it('prunes stale client entries from the hit map', () => {
+    const guard = new InMemoryRateLimitGuard(2, 20);
+    expect(guard.canActivate(makeContext('5.5.5.5'))).toBe(true);
+
+    const hitsByClient = (guard as any).hitsByClient as Map<string, number[]>;
+    hitsByClient.set('stale', [Date.now() - 1_000]);
+
+    expect(guard.canActivate(makeContext('6.6.6.6'))).toBe(true);
+    expect(hitsByClient.has('stale')).toBe(false);
+  });
 });

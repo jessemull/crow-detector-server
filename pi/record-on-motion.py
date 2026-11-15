@@ -24,9 +24,8 @@ HEIGHT = 720
 # About 1.75 Mbps — clear enough for a porch visit without huge files.
 BITRATE = 1_750_000
 DEVICE_ID = "pi-porch"
-API_BASE_URL = os.environ.get(
-    "PORCH_API_BASE_URL", "https://api-dev.crittercanteen.com"
-).rstrip("/")
+# Required. Example: export PORCH_API_BASE_URL=https://api-dev.crittercanteen.com
+API_BASE_URL = os.environ.get("PORCH_API_BASE_URL", "").rstrip("/")
 PRIVATE_KEY_PATH = Path(
     os.environ.get(
         "PI_PORCH_PRIVATE_KEY_PATH",
@@ -131,6 +130,11 @@ def upload_and_remove(path: Path) -> None:
 
 
 def main() -> None:
+    if not API_BASE_URL:
+        raise SystemExit(
+            "Set PORCH_API_BASE_URL to the Critter Canteen API base URL"
+        )
+
     pir = MotionSensor(SENSOR_PIN)
     print("waiting for motion. Ctrl+C to stop.")
     try:

@@ -22,9 +22,10 @@ export class InMemoryRateLimitGuard implements CanActivate {
     const clientKey = this.clientKey(request);
     const now = Date.now();
     const windowStart = now - this.windowMs;
-    const recent = (this.hitsByClient.get(clientKey) || []).filter(
-      (timestamp) => timestamp > windowStart,
-    );
+
+    this.prune(windowStart);
+
+    const recent = this.hitsByClient.get(clientKey) || [];
 
     if (recent.length >= this.maxRequests) {
       throw new HttpException(
@@ -36,6 +37,17 @@ export class InMemoryRateLimitGuard implements CanActivate {
     recent.push(now);
     this.hitsByClient.set(clientKey, recent);
     return true;
+  }
+
+  private prune(windowStart: number): void {
+    for (const [key, hits] of this.hitsByClient) {
+      const filtered = hits.filter((timestamp) => timestamp > windowStart);
+      if (filtered.length === 0) {
+        this.hitsByClient.delete(key);
+      } else {
+        this.hitsByClient.set(key, filtered);
+      }
+    }
   }
 
   private clientKey(request: FastifyRequest): string {

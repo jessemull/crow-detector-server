@@ -61,6 +61,8 @@ Shared networking (VPC, subnets, security groups) comes from the **`aws-infra-*`
 
 Porch videos live under the `porch/` prefix. They never enter the animal photo pipeline (S3 notifications and the Lambda only handle image suffixes under `feed/` and `detection/`). The Pi recorder lives in `pi/record-on-motion.py` and is copied with `npm run pi:sync`.
 
+Merge-to-main deploys the **ECS task** stack only. The 30-day `porch/` lifecycle rule lives in `cloudformation/crow-detector-s3.yaml` and must be applied with a one-shot deploy of the S3 stack after that template changes (it is not part of `merge.yml`).
+
 ### Boundary rules
 
 - Controllers stay thin; services own business logic.

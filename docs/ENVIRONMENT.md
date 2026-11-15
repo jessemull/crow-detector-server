@@ -57,6 +57,13 @@ Local helpers may also use filesystem paths (scripts only):
 | ---------------------- | ------------------------------------------------ | -------- | ------- |
 | `CORS_ALLOWED_ORIGINS` | Comma-separated origins for the public clip list | No       | Critter Canteen site (+ localhost in development/test) |
 
+Porch Pi recorder (device, not Nest):
+
+| Variable                   | Description                          | Required |
+| -------------------------- | ------------------------------------ | -------- |
+| `PORCH_API_BASE_URL`       | API base used by `pi/record-on-motion.py` | Yes |
+| `PI_PORCH_PRIVATE_KEY_PATH`| Path to porch private key on the Pi  | No (default `~/keys/pi-porch-private.pem`) |
+
 ---
 
 ## AWS / S3 / AI (Nest)

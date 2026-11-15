@@ -39,17 +39,12 @@ export class PorchClipsService {
 
   async listClips(): Promise<PorchClipListItem[]> {
     try {
-      const objects = await this.listPorchObjects();
-      const clips = objects
-        .filter((object) => this.isMp4(object.Key))
-        .sort((left, right) => {
-          const leftTime = left.LastModified?.getTime() || 0;
-          const rightTime = right.LastModified?.getTime() || 0;
-          return rightTime - leftTime;
-        })
-        .slice(0, MAX_CLIPS);
-
-      return Promise.all(clips.map((object) => this.toListItem(object)));
+      // Keys are porch/{timestamp}-… so ascending list order is oldest→newest.
+      // Keep only the trailing window instead of buffering the whole prefix.
+      const newest = await this.listNewestPorchObjects();
+      return Promise.all(
+        [...newest].reverse().map((object) => this.toListItem(object)),
+      );
     } catch (error) {
       logger.error(
         { error: error instanceof Error ? error.message : String(error) },
@@ -59,8 +54,8 @@ export class PorchClipsService {
     }
   }
 
-  private async listPorchObjects(): Promise<_Object[]> {
-    const objects: _Object[] = [];
+  private async listNewestPorchObjects(): Promise<_Object[]> {
+    const newest: _Object[] = [];
     let continuationToken: string | undefined;
 
     do {
@@ -69,15 +64,26 @@ export class PorchClipsService {
           Bucket: this.bucketName,
           Prefix: PORCH_PREFIX,
           ContinuationToken: continuationToken,
+          MaxKeys: 1000,
         }),
       );
-      objects.push(...(response.Contents || []));
+
+      for (const object of response.Contents || []) {
+        if (!this.isMp4(object.Key)) {
+          continue;
+        }
+        newest.push(object);
+        if (newest.length > MAX_CLIPS) {
+          newest.shift();
+        }
+      }
+
       continuationToken = response.IsTruncated
         ? response.NextContinuationToken
         : undefined;
     } while (continuationToken);
 
-    return objects;
+    return newest;
   }
 
   private async toListItem(object: _Object): Promise<PorchClipListItem> {

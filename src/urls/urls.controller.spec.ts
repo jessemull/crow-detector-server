@@ -1,3 +1,4 @@
+import { ForbiddenException } from '@nestjs/common';
 import {
   CreateFeedImageUrlDto,
   CreateDetectionImageUrlDto,
@@ -146,7 +147,7 @@ describe('UrlsController', () => {
   });
 
   describe('createPorchClipSignedUrl', () => {
-    it('should create a porch clip signed URL', async () => {
+    it('should create a porch clip signed URL for pi-porch', async () => {
       const createPorchClipUrlDto: CreatePorchClipUrlDto = {
         fileName: 'clip-20261114-210000',
         contentType: 'video/mp4',
@@ -170,12 +171,22 @@ describe('UrlsController', () => {
 
       const result = await controller.createPorchClipSignedUrl(
         createPorchClipUrlDto,
+        { deviceId: 'pi-porch' } as any,
       );
 
       expect(service.createPorchClipSignedUrl).toHaveBeenCalledWith(
         createPorchClipUrlDto,
       );
       expect(result).toEqual(expectedResult);
+    });
+
+    it('should reject other devices', async () => {
+      await expect(
+        controller.createPorchClipSignedUrl({ fileName: 'clip-1' }, {
+          deviceId: 'pi-user',
+        } as any),
+      ).rejects.toThrow(ForbiddenException);
+      expect(service.createPorchClipSignedUrl).not.toHaveBeenCalled();
     });
   });
 });

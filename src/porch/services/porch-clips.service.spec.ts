@@ -84,6 +84,23 @@ describe('PorchClipsService', () => {
     expect(JSON.stringify(clips)).not.toContain('"key"');
   });
 
+  it('keeps only the newest window of clips while listing', async () => {
+    const contents = Array.from({ length: 55 }, (_, index) => ({
+      Key: `porch/${String(index).padStart(3, '0')}.mp4`,
+      LastModified: new Date(Date.UTC(2026, 10, 1, 0, 0, index)),
+    }));
+    sendMock.mockResolvedValue({
+      Contents: contents,
+      IsTruncated: false,
+    });
+
+    const clips = await service.listClips();
+
+    expect(clips).toHaveLength(50);
+    expect(clips[0].name).toBe('054.mp4');
+    expect(clips[49].name).toBe('005.mp4');
+  });
+
   it('throws when listing fails', async () => {
     sendMock.mockRejectedValue(new Error('S3 down'));
     await expect(service.listClips()).rejects.toThrow(BadRequestException);

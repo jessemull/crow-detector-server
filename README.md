@@ -602,7 +602,7 @@ The S3 bucket is configured with:
 - **Directory Structure**:
   - `feed/` - User interaction images (triggers processing)
   - `detection/` - Motion detection images (triggers processing)
-  - `porch/` - Porch camera clips (no notification; deleted after about 30 days)
+  - `porch/` - Porch camera clips (no notification; deleted after about 30 days via the S3 stack lifecycle rule — deploy `crow-detector-s3.yaml` when that rule changes; merge.yml does not update the S3 stack)
   - `processed/` - Cropped/processed images (safe from reprocessing)
 
 ## License
