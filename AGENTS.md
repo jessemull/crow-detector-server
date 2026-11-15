@@ -91,6 +91,7 @@ Prefer `make` targets. Run **`make`** or **`make help`** for a compact list.
 | `npm run auth:token` | Generate ECDSA auth token helper               |
 | `npm run pi:sync`  | Copy recorder + `porch.env` to the Pi, then restart |
 | `npm run pi:start` | Restart the porch recorder on the Pi (no copy)    |
+| `npm run pi:stop`  | Stop the porch recorder on the Pi                 |
 
 ---
 

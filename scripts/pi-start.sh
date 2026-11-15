@@ -3,6 +3,7 @@
 # Does not copy files — run npm run pi:sync (or scp) first when the script changed.
 set -euo pipefail
 
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HOST="${PI_HOST:-juzo-inui@critter-cam.local}"
 KEY="${PI_SSH_KEY:-${HOME}/.ssh/critter-cam}"
 DEST="${PI_REMOTE_PATH:-/home/juzo-inui/record-on-motion.py}"
@@ -12,8 +13,10 @@ if [[ ! -f "${KEY}" ]]; then
   exit 1
 fi
 
-# Stop any prior recorder, then start a fresh one under nohup with a pid file.
-# Survives SSH disconnect; does not survive reboot (re-run pi:start or pi:sync after boot).
+bash "${ROOT_DIR}/scripts/pi-stop.sh"
+
+# Start under nohup with a pid file. Survives SSH disconnect; does not survive
+# reboot (re-run pi:start or pi:sync after boot).
 ssh -i "${KEY}" "${HOST}" "bash -s" <<REMOTE
 set -euo pipefail
 REC='${DEST}'
@@ -26,16 +29,6 @@ if [[ ! -f "\${REC}" ]]; then
 fi
 
 mkdir -p "\${HOME}/clips"
-
-if [[ -f "\${PID_FILE}" ]]; then
-  old="\$(cat "\${PID_FILE}" 2>/dev/null || true)"
-  if [[ -n "\${old}" ]] && kill -0 "\${old}" 2>/dev/null; then
-    kill "\${old}" || true
-    sleep 1
-  fi
-fi
-pkill -f "\${REC}" 2>/dev/null || true
-sleep 1
 
 nohup python3 "\${REC}" >> "\${LOG}" 2>&1 &
 echo \$! > "\${PID_FILE}"
