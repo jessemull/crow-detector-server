@@ -37,7 +37,7 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   return {
     awsRegion: env.AWS_REGION || 'us-west-2',
     claudeApiKey: env.CLAUDE_API_KEY,
-    claudeModel: env.CLAUDE_MODEL || 'claude-3-opus-20240229',
+    claudeModel: env.CLAUDE_MODEL || 'claude-haiku-5-5',
     feedCooldownHours: parseInt(env.FEED_COOLDOWN_HOURS || '4', 10),
     logLevel: env.LOG_LEVEL || 'info',
     nodeEnv: env.NODE_ENV || 'development',

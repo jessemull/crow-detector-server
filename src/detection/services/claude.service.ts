@@ -3,7 +3,12 @@ import { ConfigService } from '@nestjs/config';
 import { Injectable } from '@nestjs/common';
 import { createLogger } from '../../common/logger/logger.config';
 
-import { AnimalAnalysisResult, RekognitionLabel } from '../../common/types';
+import { AnimalAnalysisResult, DetectedAnimal } from '../../common/types';
+
+const HAIKU_MODEL = 'claude-haiku-5-5';
+
+export type AnimalPhotoMediaType =
+  'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
 
 @Injectable()
 export class ClaudeService {
@@ -26,77 +31,65 @@ export class ClaudeService {
   }
 
   private getClaudeModel(): string {
-    return (
-      this.configService.get<string>('claudeModel') || 'claude-3-opus-20240229'
-    );
+    return this.configService.get<string>('claudeModel') || HAIKU_MODEL;
   }
 
-  async analyzeAnimalDetection(
-    labels: RekognitionLabel[],
+  async analyzeAnimalPhoto(
+    image: Buffer,
+    mediaType: AnimalPhotoMediaType,
   ): Promise<AnimalAnalysisResult> {
     try {
       if (!this.configService.get<string>('claudeApiKey')) {
         throw new Error('Claude API key not configured');
       }
 
-      const labelsText = labels
-        .filter((label) => label.Name && label.Confidence)
-        .map((label) => {
-          const instanceCount = label.Instances ? label.Instances.length : 0;
-          return `${label.Name} (${label.Confidence}%) - ${instanceCount} instance${instanceCount !== 1 ? 's' : ''}`;
-        })
-        .join(', ');
+      const prompt = `Look at this photo and count the living animals.
 
-      const prompt = `Analyze these image labels and determine if any animals are present. Focus on identifying crows specifically.
+Respond with ONLY valid JSON. No markdown.
 
-Labels: ${labelsText}
-
-CRITICAL: Count creatures, not label names. Rekognition repeats parent categories for the same creature.
-
-IMPORTANT: You must respond with ONLY valid JSON. No additional text, explanations, or markdown formatting.
-
-Required JSON structure:
 {
   "hasAnimals": boolean,
   "crowCount": number,
   "animalCount": number,
   "detectedAnimals": [
-    {
-      "name": "string",
-      "confidence": number,
-      "count": number
-    }
+    { "name": "string", "confidence": number, "count": number }
   ]
 }
 
-COUNTING RULES:
-- Animal, Bird, Blackbird, and Crow together are one bird, not four animals.
-- Ignore a broad label (Animal, Wildlife, Pet, Bird, Mammal, and similar) when a more specific label is present.
-- animalCount is the number of creatures. Use Instances on the most specific label.
-- crowCount counts only crows, ravens, blackbirds, and other corvids. A generic Bird is not a crow.
-- detectedAnimals lists only the specific labels you counted.
-
-Example: Animal (1), Bird (1), Blackbird (1), Crow (1) = 1 animal, 1 crow.
-detectedAnimals: [{"name": "Crow", "confidence": 92, "count": 1}]
-
-Example: Animal (1), Mammal (1) = 1 animal, 0 crows.
-detectedAnimals: [{"name": "Mammal", "confidence": 99, "count": 1}]
-
-Example: Bird (2 instances), Pig (1 instance) = 3 animals, 0 crows.
-detectedAnimals: [{"name": "Bird", "confidence": 99.1, "count": 2}, {"name": "Pig", "confidence": 99.2, "count": 1}]`;
+Rules:
+- animalCount is how many living animals are in the photo. A raccoon and a cat are two animals.
+- Name each kind with its everyday name, such as raccoon, squirrel, skunk, deer, cardinal, or whale.
+- Do not name a body part. A cardinal is a cardinal, not a beak.
+- crowCount counts only crows, ravens, and blackbirds. A cardinal or any other bird is not a crow.
+- Statues, toys, stuffed animals, drawings, and people in costumes are not animals.
+- confidence is from 0 to 100.
+- If there are no living animals, hasAnimals is false, both counts are 0, and detectedAnimals is empty.`;
 
       const message = await this.anthropic.messages.create({
         model: this.getClaudeModel(),
         max_tokens: 1000,
-        temperature: 0.1, // Low temperature for consistent JSON responses
+        temperature: 0,
         messages: [
           {
             role: 'user',
-            content: prompt,
+            content: [
+              {
+                type: 'image',
+                source: {
+                  type: 'base64',
+                  media_type: mediaType,
+                  data: image.toString('base64'),
+                },
+              },
+              {
+                type: 'text',
+                text: prompt,
+              },
+            ],
           },
         ],
         system:
-          'You are an expert at analyzing image detection results and counting animals. Always respond with valid JSON in the exact format requested.',
+          'You look at a photo and count the living animals in it. Always respond with valid JSON in the exact format requested.',
       });
 
       const content = message.content[0];
@@ -110,30 +103,21 @@ detectedAnimals: [{"name": "Bird", "confidence": 99.1, "count": 2}, {"name": "Pi
       const responseText = content.text.trim();
       this.logger.info(`Raw Claude response: ${responseText}`);
 
-      // Try to extract JSON from the response...
-
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         throw new Error('No JSON found in Claude response');
       }
 
       const result = JSON.parse(jsonMatch[0]) as AnimalAnalysisResult;
-
-      // Validate the result structure...
-
-      if (
-        typeof result.hasAnimals !== 'boolean' ||
-        typeof result.crowCount !== 'number' ||
-        typeof result.animalCount !== 'number' ||
-        !Array.isArray(result.detectedAnimals)
-      ) {
+      if (!this.isAnalysisResult(result)) {
         throw new Error('Invalid response structure from Claude');
       }
 
+      const normalized = this.normalize(result);
       this.logger.info(
-        `Claude analysis completed: ${result.animalCount} animals, ${result.crowCount} crows`,
+        `Claude analysis completed: ${normalized.animalCount} animals, ${normalized.crowCount} crows`,
       );
-      return result;
+      return normalized;
     } catch (error) {
       this.logger.error(
         `Claude analysis failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -141,5 +125,70 @@ detectedAnimals: [{"name": "Bird", "confidence": 99.1, "count": 2}, {"name": "Pi
       );
       throw error;
     }
+  }
+
+  private isAnalysisResult(value: unknown): value is AnimalAnalysisResult {
+    if (!value || typeof value !== 'object') {
+      return false;
+    }
+    const result = value as AnimalAnalysisResult;
+    return (
+      typeof result.hasAnimals === 'boolean' &&
+      typeof result.crowCount === 'number' &&
+      Number.isFinite(result.crowCount) &&
+      typeof result.animalCount === 'number' &&
+      Number.isFinite(result.animalCount) &&
+      Array.isArray(result.detectedAnimals) &&
+      result.detectedAnimals.every((animal) => this.isDetectedAnimal(animal))
+    );
+  }
+
+  private isDetectedAnimal(value: unknown): value is DetectedAnimal {
+    if (!value || typeof value !== 'object') {
+      return false;
+    }
+    const animal = value as DetectedAnimal;
+    return (
+      typeof animal.name === 'string' &&
+      typeof animal.confidence === 'number' &&
+      Number.isFinite(animal.confidence) &&
+      typeof animal.count === 'number' &&
+      Number.isFinite(animal.count)
+    );
+  }
+
+  private normalize(result: AnimalAnalysisResult): AnimalAnalysisResult {
+    const detectedAnimals = result.detectedAnimals
+      .map((animal) => ({
+        name: animal.name.trim(),
+        confidence: Math.min(100, Math.max(0, animal.confidence)),
+        count: Math.round(animal.count),
+      }))
+      .filter((animal) => animal.name.length > 0 && animal.count > 0);
+    const animalCount = detectedAnimals.reduce(
+      (sum, animal) => sum + animal.count,
+      0,
+    );
+    const namedCrows = detectedAnimals
+      .filter((animal) => this.isCrowName(animal.name))
+      .reduce((sum, animal) => sum + animal.count, 0);
+    const crowCount = Math.min(
+      animalCount,
+      Math.max(0, Math.round(result.crowCount), namedCrows),
+    );
+
+    return {
+      hasAnimals: animalCount > 0,
+      crowCount,
+      animalCount,
+      detectedAnimals,
+    };
+  }
+
+  private isCrowName(name: string): boolean {
+    const normalized = name.toLowerCase();
+    return ['crow', 'raven', 'blackbird', 'corvid'].some((term) =>
+      normalized.includes(term),
+    );
   }
 }

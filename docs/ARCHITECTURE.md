@@ -12,7 +12,7 @@ This repository powers the **Crow Detector** interactive crow feeder backend:
 
 - **NestJS 11 + Fastify** API on **ECS Fargate** (Node 26)
 - **PostgreSQL** via **TypeORM 0.3** for feed/detection events
-- **S3** for images; **Rekognition** for moderation/labels; **Claude** for animal/crow classification
+- **S3** for images; **Rekognition** for feed moderation and faces; **Claude Haiku** for animal photos
 - **ECDSA** device authentication for Raspberry Pi devices and the S3 Lambda
 - Nested **`lambda/`** package (Node 24 runtime, webpack-bundled) that turns S3→SQS events into signed API calls
 
@@ -42,7 +42,7 @@ Shared networking (VPC, subnets, security groups) comes from the **`aws-infra-*`
 1. Devices/clients request presigned URLs from Nest (`urls` module).
 2. Objects land in S3; bucket notifications enqueue SQS messages.
 3. Lambda signs ECDSA requests and POSTs/PATCHes Nest feed/detection endpoints.
-4. Nest processes images (Rekognition, Sharp, Claude), updates event status, stores metadata.
+4. Nest processes images (Haiku for animal photos, Rekognition and Sharp for the feed), updates event status, stores metadata.
 
 ---
 
@@ -52,7 +52,7 @@ Shared networking (VPC, subnets, security groups) comes from the **`aws-infra-*`
 | ------------ | ----------------------------------------------------------- |
 | `auth`       | ECDSA guard                                                 |
 | `feed`       | Feed events, face/crop pipeline, S3 metadata helpers        |
-| `detection`  | Detection events, Rekognition labels, Claude classification |
+| `detection`  | Detection events, Claude Haiku animal counts                 |
 | `urls`       | Presigned S3 URL creation                                   |
 | `health`     | Health endpoints                                            |
 | `common`     | Logger, shared types                                        |

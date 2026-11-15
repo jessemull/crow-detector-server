@@ -87,7 +87,7 @@ Resources:
             - Name: AWS_REGION
               Value: !Ref AWS::Region
             - Name: CLAUDE_MODEL
-              Value: 'claude-3-opus-20240229'
+              Value: 'claude-haiku-5-5'
             - Name: FEED_COOLDOWN_HOURS
               Value: '4'
           Secrets:

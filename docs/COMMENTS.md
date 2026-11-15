@@ -46,7 +46,7 @@ Do **not**:
 async function processDetection(labels: RekognitionLabel[]): Promise<void> {
   // Claude requires instance counts, not just label names
 
-  const analysis = await this.claudeService.analyzeAnimalDetection(labels);
+  const analysis = await this.claudeService.analyzeAnimalPhoto(image, 'image/jpeg');
 
   // Persist crow counts for gallery cooldown logic
 

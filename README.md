@@ -77,8 +77,7 @@ The **Crow Detector** is an interactive system that allows users to feed crows t
 - **Face Detection**: AWS Rekognition detects faces and provides bounding box coordinates.
 - **Image Cropping**: Sharp library crops images to focus on detected faces with padding.
 - **Image Storage**: Organized S3 storage with separate directories for original and processed images.
-- **Animal Detection**: AWS Rekognition identifies animals and provides confidence scores.
-- **AI Classification**: Claude AI analyzes detected animals for species identification and crow detection.
+- **Animal Detection**: Claude Haiku looks at the photo, names the animals, and counts them.
 - **Processing Workflow**: Comprehensive status tracking from upload to completion.
 
 ## System Architecture
@@ -206,7 +205,7 @@ To clone the repository, install dependencies, and run the project locally follo
 
    # AI Configuration
    CLAUDE_API_KEY=your_claude_api_key
-   CLAUDE_MODEL=claude-3-opus-20240229
+   CLAUDE_MODEL=claude-haiku-5-5
 
    # Feed Configuration
    FEED_COOLDOWN_HOURS=4
@@ -311,7 +310,7 @@ The system provides secure image upload capabilities through pre-signed S3 URLs:
 
 1. **Initial Status**: Detection events start with `PENDING` status.
 2. **Processing Phase**: Status changes to `PROCESSING` during analysis.
-3. **AI Analysis**: AWS Rekognition detects animals, Claude AI classifies species.
+3. **AI Analysis**: Claude Haiku looks at the photo and names the animals.
 4. **Completion**: Status updates to `COMPLETED` with results or `FAILED` with errors.
 5. **Metadata Storage**: Processing duration, error details, and analysis results saved.
 
@@ -336,8 +335,7 @@ The system provides comprehensive animal detection and analysis capabilities thr
 
 ### Analysis Components
 
-- **AWS Rekognition**: Primary animal detection with confidence scores.
-- **Claude AI**: Advanced species classification and crow identification.
+- **Claude Haiku**: Looks at the animal photo and returns the names and counts.
 - **Fallback Detection**: Local processing when external services are unavailable.
 - **Error Handling**: Comprehensive error tracking and retry mechanisms.
 

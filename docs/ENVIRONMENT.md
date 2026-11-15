@@ -60,7 +60,7 @@ Local helpers may also use filesystem paths (scripts only):
 | `AWS_REGION`       | AWS region                               | No       | `us-west-2` |
 | `S3_BUCKET_NAME`   | Image bucket                             | Yes      | -           |
 | `CLAUDE_API_KEY`   | Anthropic API key                        | Prod yes | -           |
-| `CLAUDE_MODEL`     | Claude model id                          | No       | `claude-3-opus-20240229` |
+| `CLAUDE_MODEL`     | Claude model id                          | No       | `claude-haiku-5-5` |
 | `FEED_COOLDOWN_HOURS` | Hours between feeds                   | No       | `4`         |
 
 ---

@@ -69,9 +69,9 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
+                  # Animal photos are named by Claude. The feed still uses these two.
                   - rekognition:DetectFaces
                   - rekognition:DetectModerationLabels
-                  - rekognition:DetectLabels
                 Resource: '*'
 
 Outputs:

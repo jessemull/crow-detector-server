@@ -10,12 +10,17 @@ const mockCreateLogger = createLogger as jest.MockedFunction<
 
 describe('ClaudeService', () => {
   let service: ClaudeService;
-  let configService: ConfigService;
   let mockLogger: any;
 
   const mockConfigService = {
     get: jest.fn(),
   };
+
+  const photo = Buffer.from('photo');
+
+  const jsonResponse = (body: unknown) => ({
+    content: [{ type: 'text', text: JSON.stringify(body) }],
+  });
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -39,11 +44,6 @@ describe('ClaudeService', () => {
     }).compile();
 
     service = module.get<ClaudeService>(ClaudeService);
-    configService = module.get<ConfigService>(ConfigService);
-  });
-
-  afterEach(() => {
-    jest.clearAllMocks();
   });
 
   describe('constructor', () => {
@@ -86,102 +86,106 @@ describe('ClaudeService', () => {
     });
   });
 
-  describe('analyzeAnimalDetection', () => {
-    const mockLabels = [
-      { Name: 'Bird', Confidence: 95 },
-      { Name: 'Crow', Confidence: 87 },
-      { Name: 'Tree', Confidence: 92 },
-    ];
-
+  describe('analyzeAnimalPhoto', () => {
     beforeEach(() => {
-      const mockAnthropic = {
-        messages: {
-          create: jest.fn(),
-        },
+      mockConfigService.get.mockImplementation((key: string) => {
+        if (key === 'claudeApiKey') {
+          return 'test-api-key';
+        }
+        if (key === 'claudeModel') {
+          return 'claude-haiku-5-5';
+        }
+        return undefined;
+      });
+      (service as any).anthropic = {
+        messages: { create: jest.fn() },
       };
-      (service as any).anthropic = mockAnthropic;
     });
 
     it('should throw error when API key is not configured', async () => {
       mockConfigService.get.mockReturnValue(undefined);
 
-      await expect(service.analyzeAnimalDetection(mockLabels)).rejects.toThrow(
-        'Claude API key not configured',
-      );
+      await expect(
+        service.analyzeAnimalPhoto(photo, 'image/jpeg'),
+      ).rejects.toThrow('Claude API key not configured');
     });
 
-    it('should handle missing API key gracefully in constructor', () => {
-      mockConfigService.get.mockReturnValue(undefined);
-
-      expect(() => new ClaudeService(configService)).not.toThrow();
-    });
-
-    it('should call config service to get API key', () => {
-      const freshMockConfigService = {
-        get: jest.fn().mockReturnValue('test-api-key'),
-      };
-      const freshMockLogger = {
-        warn: jest.fn(),
-        info: jest.fn(),
-        error: jest.fn(),
-      };
-      mockCreateLogger.mockReturnValue(freshMockLogger as any);
-
-      new ClaudeService(freshMockConfigService as any);
-
-      expect(freshMockConfigService.get).toHaveBeenCalledWith('claudeApiKey');
-    });
-
-    it('should successfully analyze animal detection with valid response', async () => {
-      mockConfigService.get.mockReturnValue('test-api-key');
-
-      const mockResponse = {
-        content: [
-          {
-            type: 'text',
-            text: '{"hasAnimals": true, "crowCount": 1, "animalCount": 2, "detectedAnimals": ["Bird", "Crow"]}',
-          },
-        ],
-      };
-
+    it('should send the photo to Haiku and return the animals', async () => {
       (service as any).anthropic.messages.create.mockResolvedValue(
-        mockResponse,
+        jsonResponse({
+          hasAnimals: true,
+          crowCount: 0,
+          animalCount: 2,
+          detectedAnimals: [
+            { name: 'Raccoon', confidence: 92, count: 1 },
+            { name: 'Cat', confidence: 90, count: 1 },
+          ],
+        }),
       );
 
-      const result = await service.analyzeAnimalDetection(mockLabels);
+      const result = await service.analyzeAnimalPhoto(photo, 'image/jpeg');
 
-      expect(result.hasAnimals).toBe(true);
-      expect(result.crowCount).toBe(1);
-      expect(result.animalCount).toBe(2);
-      expect(result.detectedAnimals).toEqual(['Bird', 'Crow']);
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        'Claude analysis completed: 2 animals, 1 crows',
+      const request = (service as any).anthropic.messages.create.mock
+        .calls[0][0];
+      expect(request.model).toBe('claude-haiku-5-5');
+      expect(request.messages[0].content[0]).toEqual({
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: 'image/jpeg',
+          data: photo.toString('base64'),
+        },
+      });
+      expect(request.messages[0].content[1].text).toContain(
+        'A raccoon and a cat are two animals',
       );
-    });
-
-    it('should tell Claude that parent labels are one creature', async () => {
-      mockConfigService.get.mockReturnValue('test-api-key');
-      (service as any).anthropic.messages.create.mockResolvedValue({
-        content: [
-          {
-            type: 'text',
-            text: '{"hasAnimals": true, "crowCount": 1, "animalCount": 1, "detectedAnimals": []}',
-          },
+      expect(request.messages[0].content[1].text).toContain('not a crow');
+      expect(result).toEqual({
+        hasAnimals: true,
+        crowCount: 0,
+        animalCount: 2,
+        detectedAnimals: [
+          { name: 'Raccoon', confidence: 92, count: 1 },
+          { name: 'Cat', confidence: 90, count: 1 },
         ],
       });
+    });
 
-      await service.analyzeAnimalDetection(mockLabels);
+    it('should count a blackbird as a crow when the count field is left at zero', async () => {
+      (service as any).anthropic.messages.create.mockResolvedValue(
+        jsonResponse({
+          hasAnimals: true,
+          crowCount: 0,
+          animalCount: 1,
+          detectedAnimals: [{ name: 'Blackbird', confidence: 80, count: 1 }],
+        }),
+      );
 
-      const prompt = (service as any).anthropic.messages.create.mock.calls[0][0]
-        .messages[0].content as string;
-      expect(prompt).toContain('not four animals');
-      expect(prompt).toContain('A generic Bird is not a crow');
+      const result = await service.analyzeAnimalPhoto(photo, 'image/jpeg');
+
+      expect(result.crowCount).toBe(1);
+      expect(result.animalCount).toBe(1);
+    });
+
+    it('should treat an empty animal list as no animals', async () => {
+      (service as any).anthropic.messages.create.mockResolvedValue(
+        jsonResponse({
+          hasAnimals: true,
+          crowCount: 1,
+          animalCount: 1,
+          detectedAnimals: [],
+        }),
+      );
+
+      const result = await service.analyzeAnimalPhoto(photo, 'image/jpeg');
+
+      expect(result.hasAnimals).toBe(false);
+      expect(result.animalCount).toBe(0);
+      expect(result.crowCount).toBe(0);
     });
 
     it('should handle non-text response type from Claude', async () => {
-      mockConfigService.get.mockReturnValue('test-api-key');
-
-      const mockResponse = {
+      (service as any).anthropic.messages.create.mockResolvedValue({
         content: [
           {
             type: 'image',
@@ -192,105 +196,52 @@ describe('ClaudeService', () => {
             },
           },
         ],
-      };
+      });
 
-      (service as any).anthropic.messages.create.mockResolvedValue(
-        mockResponse,
-      );
-
-      await expect(service.analyzeAnimalDetection(mockLabels)).rejects.toThrow(
-        'Unexpected response type from Claude',
-      );
+      await expect(
+        service.analyzeAnimalPhoto(photo, 'image/jpeg'),
+      ).rejects.toThrow('Unexpected response type from Claude');
     });
 
     it('should handle Claude response with no JSON content', async () => {
-      mockConfigService.get.mockReturnValue('test-api-key');
-
-      const mockResponse = {
+      (service as any).anthropic.messages.create.mockResolvedValue({
         content: [
-          {
-            type: 'text',
-            text: 'I cannot analyze this image properly.',
-          },
+          { type: 'text', text: 'I cannot analyze this image properly.' },
         ],
-      };
+      });
 
-      (service as any).anthropic.messages.create.mockResolvedValue(
-        mockResponse,
-      );
-
-      await expect(service.analyzeAnimalDetection(mockLabels)).rejects.toThrow(
-        'No JSON found in Claude response',
-      );
+      await expect(
+        service.analyzeAnimalPhoto(photo, 'image/jpeg'),
+      ).rejects.toThrow('No JSON found in Claude response');
     });
 
     it('should handle Claude response with invalid JSON structure', async () => {
-      mockConfigService.get.mockReturnValue('test-api-key');
-
-      const mockResponse = {
-        content: [
-          {
-            type: 'text',
-            text: '{"hasAnimals": true, "crowCount": "invalid", "animalCount": 2, "detectedAnimals": ["Bird"]}',
-          },
-        ],
-      };
-
       (service as any).anthropic.messages.create.mockResolvedValue(
-        mockResponse,
+        jsonResponse({
+          hasAnimals: true,
+          crowCount: 'invalid',
+          animalCount: 2,
+          detectedAnimals: ['Bird'],
+        }),
       );
 
-      await expect(service.analyzeAnimalDetection(mockLabels)).rejects.toThrow(
-        'Invalid response structure from Claude',
-      );
+      await expect(
+        service.analyzeAnimalPhoto(photo, 'image/jpeg'),
+      ).rejects.toThrow('Invalid response structure from Claude');
     });
 
     it('should handle Claude API errors gracefully', async () => {
-      mockConfigService.get.mockReturnValue('test-api-key');
-
       (service as any).anthropic.messages.create.mockRejectedValue(
         new Error('Claude API rate limit exceeded'),
       );
 
-      await expect(service.analyzeAnimalDetection(mockLabels)).rejects.toThrow(
-        'Claude API rate limit exceeded',
-      );
-
+      await expect(
+        service.analyzeAnimalPhoto(photo, 'image/jpeg'),
+      ).rejects.toThrow('Claude API rate limit exceeded');
       expect(mockLogger.error).toHaveBeenCalledWith(
         'Claude analysis failed: Claude API rate limit exceeded',
         expect.any(String),
       );
-    });
-
-    it('should filter out labels without name or confidence', async () => {
-      mockConfigService.get.mockReturnValue('test-api-key');
-
-      const incompleteLabels = [
-        { Name: 'Bird', Confidence: 95 },
-        { Name: 'Crow' },
-        { Confidence: 87 },
-        { Name: 'Tree', Confidence: 92 },
-      ];
-
-      const mockResponse = {
-        content: [
-          {
-            type: 'text',
-            text: '{"hasAnimals": true, "crowCount": 1, "animalCount": 1, "detectedAnimals": ["Bird"]}',
-          },
-        ],
-      };
-
-      (service as any).anthropic.messages.create.mockResolvedValue(
-        mockResponse,
-      );
-
-      const result = await service.analyzeAnimalDetection(incompleteLabels);
-
-      expect(result.hasAnimals).toBe(true);
-      expect(result.crowCount).toBe(1);
-      expect(result.animalCount).toBe(1);
-      expect(result.detectedAnimals).toEqual(['Bird']);
     });
   });
 });
