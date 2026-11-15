@@ -10,6 +10,7 @@ jest.mock('../../common/logger/logger.config');
 import {
   DeleteObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
 
@@ -45,10 +46,15 @@ describe('DetectionImageProcessingService', () => {
       () => mockS3Client as any,
     );
     mockCreateLogger.mockReturnValue(mockLogger as any);
-    mockS3Client.send.mockResolvedValue({
-      Body: {
-        transformToByteArray: () => Promise.resolve(imageBytes),
-      },
+    mockS3Client.send.mockImplementation((command) => {
+      if (command instanceof HeadObjectCommand) {
+        return Promise.resolve({ ContentLength: imageBytes.byteLength });
+      }
+      return Promise.resolve({
+        Body: {
+          transformToByteArray: () => Promise.resolve(imageBytes),
+        },
+      });
     });
 
     const module: TestingModule = await Test.createTestingModule({
@@ -164,8 +170,25 @@ describe('DetectionImageProcessingService', () => {
       );
     });
 
+    it('should refuse a photo larger than 5 MB before reading it', async () => {
+      mockS3Client.send.mockResolvedValue({
+        ContentLength: 5 * 1024 * 1024 + 1,
+      });
+
+      await expect(
+        service.processImage('bucket', 'detection/photo.jpg'),
+      ).rejects.toThrow('Image is too large');
+      expect(mockClaudeService.analyzeAnimalPhoto).not.toHaveBeenCalled();
+      expect(mockS3Client.send).toHaveBeenCalledTimes(1);
+      expect(mockS3Client.send).toHaveBeenCalledWith(
+        expect.any(HeadObjectCommand),
+      );
+    });
+
     it('should fail when the image body is empty', async () => {
-      mockS3Client.send.mockResolvedValue({});
+      mockS3Client.send
+        .mockResolvedValueOnce({ ContentLength: imageBytes.byteLength })
+        .mockResolvedValueOnce({});
 
       await expect(
         service.processImage('bucket', 'detection/photo.jpg'),
@@ -199,6 +222,7 @@ describe('DetectionImageProcessingService', () => {
         detectedAnimals: [],
       });
       mockS3Client.send
+        .mockResolvedValueOnce({ ContentLength: imageBytes.byteLength })
         .mockResolvedValueOnce({
           Body: { transformToByteArray: () => Promise.resolve(imageBytes) },
         })

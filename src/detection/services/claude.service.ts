@@ -101,7 +101,6 @@ Rules:
       }
 
       const responseText = content.text.trim();
-      this.logger.info(`Raw Claude response: ${responseText}`);
 
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
@@ -169,13 +168,12 @@ Rules:
       (sum, animal) => sum + animal.count,
       0,
     );
-    const namedCrows = detectedAnimals
+
+    // A crow count that does not match the names stored a squirrel as a crow.
+
+    const crowCount = detectedAnimals
       .filter((animal) => this.isCrowName(animal.name))
       .reduce((sum, animal) => sum + animal.count, 0);
-    const crowCount = Math.min(
-      animalCount,
-      Math.max(0, Math.round(result.crowCount), namedCrows),
-    );
 
     return {
       hasAnimals: animalCount > 0,

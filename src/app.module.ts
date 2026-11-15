@@ -14,6 +14,9 @@ import { buildRdsSslOptions } from './config/rds-ca';
 const appConfig = loadAppConfig();
 validateAppConfig(appConfig);
 
+/** The running server must not rewrite tables. Schema changes belong in migrations. */
+export const typeOrmSynchronize = false;
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -26,8 +29,7 @@ validateAppConfig(appConfig);
       host: appConfig.rds.host,
       password: appConfig.rds.password,
       port: appConfig.rds.port,
-      synchronize:
-        appConfig.nodeEnv !== 'production' && appConfig.nodeEnv !== 'prod',
+      synchronize: typeOrmSynchronize,
       type: 'postgres',
       username: appConfig.rds.username,
       ssl: buildRdsSslOptions(appConfig.rds.sslRejectUnauthorized),

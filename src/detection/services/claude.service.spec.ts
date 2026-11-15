@@ -151,6 +151,23 @@ describe('ClaudeService', () => {
       });
     });
 
+    it('should not count a squirrel as a crow when the count field says one', async () => {
+      (service as any).anthropic.messages.create.mockResolvedValue(
+        jsonResponse({
+          hasAnimals: true,
+          crowCount: 1,
+          animalCount: 1,
+          detectedAnimals: [{ name: 'Squirrel', confidence: 98, count: 1 }],
+        }),
+      );
+
+      const result = await service.analyzeAnimalPhoto(photo, 'image/jpeg');
+
+      expect(result.crowCount).toBe(0);
+      expect(result.animalCount).toBe(1);
+      expect(result.detectedAnimals[0].name).toBe('Squirrel');
+    });
+
     it('should count a blackbird as a crow when the count field is left at zero', async () => {
       (service as any).anthropic.messages.create.mockResolvedValue(
         jsonResponse({

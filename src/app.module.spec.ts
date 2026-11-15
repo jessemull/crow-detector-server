@@ -1,3 +1,4 @@
+import { typeOrmSynchronize } from './app.module';
 import { loadAppConfig } from './config/app.config';
 
 describe('AppModule configuration helpers', () => {
@@ -11,17 +12,7 @@ describe('AppModule configuration helpers', () => {
     expect(config.rds.sslRejectUnauthorized).toBe(false);
   });
 
-  it('should enable synchronize outside production', () => {
-    const config = loadAppConfig({ NODE_ENV: 'development' });
-    const synchronize =
-      config.nodeEnv !== 'production' && config.nodeEnv !== 'prod';
-    expect(synchronize).toBe(true);
-  });
-
-  it('should disable synchronize in production', () => {
-    const config = loadAppConfig({ NODE_ENV: 'production' });
-    const synchronize =
-      config.nodeEnv !== 'production' && config.nodeEnv !== 'prod';
-    expect(synchronize).toBe(false);
+  it('should keep TypeORM from rewriting the schema', () => {
+    expect(typeOrmSynchronize).toBe(false);
   });
 });

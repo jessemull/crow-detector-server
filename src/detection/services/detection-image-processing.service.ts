@@ -2,12 +2,15 @@ import { ConfigService } from '@nestjs/config';
 import {
   DeleteObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
 import { Injectable } from '@nestjs/common';
 import { createLogger } from 'src/common/logger/logger.config';
 import { AnimalDetectionResult } from 'src/common/types';
 import { AnimalPhotoMediaType, ClaudeService } from './claude.service';
+
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 @Injectable()
 export class DetectionImageProcessingService {
@@ -66,18 +69,31 @@ export class DetectionImageProcessingService {
 
   private async readImage(bucket: string, key: string): Promise<Buffer> {
     try {
+      const head = await this.s3.send(
+        new HeadObjectCommand({ Bucket: bucket, Key: key }),
+      );
+      this.assertImageSize(head.ContentLength);
+
       const object = await this.s3.send(
         new GetObjectCommand({ Bucket: bucket, Key: key }),
       );
       if (!object.Body) {
         throw new Error('Image body was empty');
       }
-      return Buffer.from(await object.Body.transformToByteArray());
+      const image = Buffer.from(await object.Body.transformToByteArray());
+      this.assertImageSize(image.length);
+      return image;
     } catch (error) {
       this.logger.error(
         `Failed to read image: ${error instanceof Error ? error.message : String(error)}`,
       );
       throw error;
+    }
+  }
+
+  private assertImageSize(size: number | undefined): void {
+    if (size !== undefined && size > MAX_IMAGE_BYTES) {
+      throw new Error('Image is too large');
     }
   }
 
