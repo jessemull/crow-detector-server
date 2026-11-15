@@ -11,11 +11,19 @@ import { FastifyRequest } from 'fastify';
 @Injectable()
 export class InMemoryRateLimitGuard implements CanActivate {
   private readonly hitsByClient = new Map<string, number[]>();
+  private maxRequests = 30;
+  private windowMs = 60_000;
 
-  constructor(
-    private readonly maxRequests = 30,
-    private readonly windowMs = 60_000,
-  ) {}
+  /**
+   * Nest must construct this with no injectable params — numeric defaults in the
+   * constructor were treated as DI tokens and crashed the porch module on boot.
+   * Tests call {@link configure} to tighten the window.
+   */
+  configure(maxRequests: number, windowMs: number): this {
+    this.maxRequests = maxRequests;
+    this.windowMs = windowMs;
+    return this;
+  }
 
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<FastifyRequest>();

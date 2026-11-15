@@ -1,4 +1,5 @@
 import { ExecutionContext, HttpException } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
 import { InMemoryRateLimitGuard } from './in-memory-rate-limit.guard';
 
 describe('InMemoryRateLimitGuard', () => {
@@ -12,14 +13,24 @@ describe('InMemoryRateLimitGuard', () => {
       }),
     }) as ExecutionContext;
 
+  it('can be constructed by Nest without constructor DI tokens', async () => {
+    const module = await Test.createTestingModule({
+      providers: [InMemoryRateLimitGuard],
+    }).compile();
+
+    expect(module.get(InMemoryRateLimitGuard)).toBeInstanceOf(
+      InMemoryRateLimitGuard,
+    );
+  });
+
   it('allows requests under the limit', () => {
-    const guard = new InMemoryRateLimitGuard(2, 60_000);
+    const guard = new InMemoryRateLimitGuard().configure(2, 60_000);
     expect(guard.canActivate(makeContext('1.1.1.1'))).toBe(true);
     expect(guard.canActivate(makeContext('1.1.1.1'))).toBe(true);
   });
 
   it('blocks when the client exceeds the window', () => {
-    const guard = new InMemoryRateLimitGuard(1, 60_000);
+    const guard = new InMemoryRateLimitGuard().configure(1, 60_000);
     expect(guard.canActivate(makeContext('2.2.2.2'))).toBe(true);
     expect(() => guard.canActivate(makeContext('2.2.2.2'))).toThrow(
       HttpException,
@@ -27,7 +38,7 @@ describe('InMemoryRateLimitGuard', () => {
   });
 
   it('uses the first x-forwarded-for address when present', () => {
-    const guard = new InMemoryRateLimitGuard(1, 60_000);
+    const guard = new InMemoryRateLimitGuard().configure(1, 60_000);
     expect(guard.canActivate(makeContext('9.9.9.9', '3.3.3.3, 4.4.4.4'))).toBe(
       true,
     );
@@ -37,7 +48,7 @@ describe('InMemoryRateLimitGuard', () => {
   });
 
   it('prunes stale client entries from the hit map', () => {
-    const guard = new InMemoryRateLimitGuard(2, 20);
+    const guard = new InMemoryRateLimitGuard().configure(2, 20);
     expect(guard.canActivate(makeContext('5.5.5.5'))).toBe(true);
 
     const hitsByClient = (guard as any).hitsByClient as Map<string, number[]>;
