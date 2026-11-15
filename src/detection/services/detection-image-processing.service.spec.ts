@@ -224,10 +224,9 @@ describe('DetectionImageProcessingService', () => {
 
       expect(result.hasAnimals).toBe(true);
       expect(result.crowCount).toBe(0);
-      expect(result.animalCount).toBe(2);
+      expect(result.animalCount).toBe(1);
       expect(result.detectedAnimals).toEqual([
         { name: 'Bird', confidence: 90, count: 1 },
-        { name: 'Mammal', confidence: 89, count: 1 },
       ]);
     });
 
@@ -266,10 +265,9 @@ describe('DetectionImageProcessingService', () => {
 
       expect(result.hasAnimals).toBe(true);
       expect(result.crowCount).toBe(0);
-      expect(result.animalCount).toBe(2);
+      expect(result.animalCount).toBe(1);
       expect(result.detectedAnimals).toEqual([
         { name: 'BIRD', confidence: 95, count: 1 },
-        { name: 'Mammal', confidence: 87, count: 1 },
       ]);
     });
 
@@ -319,6 +317,115 @@ describe('DetectionImageProcessingService', () => {
       expect(result.crowCount).toBe(0);
       expect(result.detectedAnimals).toEqual([
         { name: 'Mammal', confidence: 99.2, count: 1 },
+      ]);
+    });
+
+    it('should count one squirrel when several names describe it', async () => {
+      mockRekognitionClient.send.mockResolvedValue({
+        Labels: [
+          {
+            Name: 'Rodent',
+            Confidence: 99.2,
+            Parents: [{ Name: 'Mammal' }, { Name: 'Animal' }],
+          },
+          {
+            Name: 'Squirrel',
+            Confidence: 98,
+            Parents: [
+              { Name: 'Rodent' },
+              { Name: 'Mammal' },
+              { Name: 'Animal' },
+            ],
+          },
+          {
+            Name: 'Rat',
+            Confidence: 97.8,
+            Parents: [
+              { Name: 'Rodent' },
+              { Name: 'Mammal' },
+              { Name: 'Animal' },
+            ],
+          },
+        ],
+      });
+
+      const result = await service.processImage('test-bucket', 'test-key');
+
+      expect(result.animalCount).toBe(1);
+      expect(result.crowCount).toBe(0);
+      expect(result.detectedAnimals).toEqual([
+        { name: 'Squirrel', confidence: 98, count: 1 },
+      ]);
+    });
+
+    it('should count overlapping boxes as one animal', async () => {
+      const box = { Left: 0.2, Top: 0.2, Width: 0.4, Height: 0.5 };
+      mockRekognitionClient.send.mockResolvedValue({
+        Labels: [
+          {
+            Name: 'Rodent',
+            Confidence: 99.2,
+            Instances: [{ BoundingBox: box }],
+            Parents: [{ Name: 'Animal' }],
+          },
+          {
+            Name: 'Squirrel',
+            Confidence: 98,
+            Instances: [{ BoundingBox: { ...box, Left: 0.22 } }],
+            Parents: [{ Name: 'Rodent' }, { Name: 'Animal' }],
+          },
+          {
+            Name: 'Rat',
+            Confidence: 97,
+            Instances: [{ BoundingBox: { ...box, Top: 0.25 } }],
+            Parents: [{ Name: 'Rodent' }, { Name: 'Animal' }],
+          },
+        ],
+      });
+
+      const result = await service.processImage('test-bucket', 'test-key');
+
+      expect(result.animalCount).toBe(1);
+      expect(result.crowCount).toBe(0);
+      expect(result.detectedAnimals).toEqual([
+        { name: 'Squirrel', confidence: 98, count: 1 },
+      ]);
+    });
+
+    it('should count separate boxes as separate animals', async () => {
+      mockRekognitionClient.send.mockResolvedValue({
+        Labels: [
+          {
+            Name: 'Crow',
+            Confidence: 96,
+            Instances: [
+              {
+                BoundingBox: { Left: 0.05, Top: 0.1, Width: 0.2, Height: 0.3 },
+              },
+              { BoundingBox: { Left: 0.7, Top: 0.1, Width: 0.2, Height: 0.3 } },
+            ],
+            Parents: [{ Name: 'Bird' }, { Name: 'Animal' }],
+          },
+          {
+            Name: 'Squirrel',
+            Confidence: 94,
+            Instances: [
+              {
+                BoundingBox: { Left: 0.4, Top: 0.6, Width: 0.2, Height: 0.25 },
+              },
+            ],
+            Parents: [{ Name: 'Mammal' }, { Name: 'Animal' }],
+          },
+        ],
+      });
+
+      const result = await service.processImage('test-bucket', 'test-key');
+
+      expect(result.animalCount).toBe(3);
+      expect(result.crowCount).toBe(2);
+      expect(result.detectedAnimals).toEqual([
+        { name: 'Crow', confidence: 96, count: 2 },
+        { name: 'Squirrel', confidence: 94, count: 1 },
       ]);
     });
   });
