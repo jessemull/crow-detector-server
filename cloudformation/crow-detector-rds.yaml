@@ -23,7 +23,7 @@ Resources:
       DBInstanceIdentifier: !Sub 'crow-detector-db-${Environment}'
       DBInstanceClass: !Ref DatabaseInstanceClass
       Engine: 'postgres'
-      EngineVersion: '17.5'
+      EngineVersion: '17.11'
       DBName: !Sub 'crow_detector_db_${Environment}'
       MasterUsername: !Sub '{{resolve:secretsmanager:crow-detector-db-${Environment}:SecretString:username}}'
       MasterUserPassword: !Sub '{{resolve:secretsmanager:crow-detector-db-${Environment}:SecretString:password}}'
