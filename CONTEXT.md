@@ -22,6 +22,8 @@ Every agent MUST read the following documents **in order** before making any cha
 
 Read items 5–10 on every task. Do not skip them because the work “seems unrelated”; agents cannot know upfront which rules will apply.
 
+Domain doc when touching porch/feeder/Pi/hardware capture: **`docs/DEVICES.md`** (supersedes README physical-device sections where they conflict).
+
 ---
 
 ## Source-of-Truth Precedence
