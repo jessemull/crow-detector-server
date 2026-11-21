@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 
 from record_on_motion_lib import (
+    env_float,
     load_env_file,
     mean_abs_diff_ratio,
     motion_detected,
@@ -71,6 +72,22 @@ class MotionScoreTests(unittest.TestCase):
     def test_motion_threshold(self) -> None:
         self.assertTrue(motion_detected(0.05, 0.035))
         self.assertFalse(motion_detected(0.01, 0.035))
+
+
+class EnvFloatTests(unittest.TestCase):
+    def test_default_when_unset(self) -> None:
+        self.assertEqual(env_float("MISSING", 0.035, {}), 0.035)
+
+    def test_default_when_blank(self) -> None:
+        self.assertEqual(env_float("X", 1.5, {"X": "  "}), 1.5)
+
+    def test_parses_number(self) -> None:
+        self.assertEqual(env_float("X", 0.0, {"X": "0.04"}), 0.04)
+
+    def test_invalid_exits(self) -> None:
+        with self.assertRaises(SystemExit) as raised:
+            env_float("X", 0.035, {"X": "nope"})
+        self.assertIn("Invalid X", str(raised.exception))
 
 
 if __name__ == "__main__":

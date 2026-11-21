@@ -20,10 +20,10 @@ PORCH_REPO_DIR="${PORCH_REPO_DIR:-~/crow-detector-server}"
 PORCH_SERVICE="${PORCH_SERVICE:-porch-recorder}"
 
 ssh "${DEPLOY_HOST}" "set -euo pipefail
-  cd ${PORCH_REPO_DIR}
+  cd \"${PORCH_REPO_DIR}\"
   git pull
-  sudo systemctl restart ${PORCH_SERVICE}
-  sudo systemctl --no-pager --full status ${PORCH_SERVICE} | head -20
+  sudo systemctl restart \"${PORCH_SERVICE}\"
+  sudo systemctl --no-pager --full status \"${PORCH_SERVICE}\" | head -20
 "
 
 echo "Deployed porch recorder on ${DEPLOY_HOST} (${PORCH_SERVICE} restarted)."

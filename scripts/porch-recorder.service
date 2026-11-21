@@ -5,7 +5,8 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-# Adjust User/Group/WorkingDirectory to the LAN host account that owns the clone.
+# Before enable: edit User, Group, WorkingDirectory, EnvironmentFile, and ExecStart
+# to match the LAN host account and crow-detector-server clone path.
 User=porch
 Group=porch
 WorkingDirectory=/home/porch/crow-detector-server

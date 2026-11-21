@@ -22,6 +22,7 @@ if str(_PI_DIR) not in sys.path:
     sys.path.insert(0, str(_PI_DIR))
 
 from record_on_motion_lib import (  # noqa: E402
+    env_float,
     load_env_file,
     mean_abs_diff_ratio,
     motion_detected,
@@ -56,15 +57,11 @@ PRIVATE_KEY_PATH = Path(
         str(Path.home() / "keys" / "pi-porch-private.pem"),
     )
 )
-MOTION_THRESHOLD = float(
-    os.environ.get("PORCH_MOTION_THRESHOLD", str(DEFAULT_MOTION_THRESHOLD))
-)
-POLL_SECONDS = float(os.environ.get("PORCH_MOTION_POLL_SECONDS", str(DEFAULT_POLL_SECONDS)))
-IDLE_SECONDS = float(os.environ.get("PORCH_IDLE_SECONDS", str(DEFAULT_IDLE_SECONDS)))
-VISIT_COOLDOWN_SECONDS = float(
-    os.environ.get(
-        "PORCH_VISIT_COOLDOWN_SECONDS", str(DEFAULT_VISIT_COOLDOWN_SECONDS)
-    )
+MOTION_THRESHOLD = env_float("PORCH_MOTION_THRESHOLD", DEFAULT_MOTION_THRESHOLD)
+POLL_SECONDS = env_float("PORCH_MOTION_POLL_SECONDS", DEFAULT_POLL_SECONDS)
+IDLE_SECONDS = env_float("PORCH_IDLE_SECONDS", DEFAULT_IDLE_SECONDS)
+VISIT_COOLDOWN_SECONDS = env_float(
+    "PORCH_VISIT_COOLDOWN_SECONDS", DEFAULT_VISIT_COOLDOWN_SECONDS
 )
 
 
@@ -85,7 +82,13 @@ def require_rtsp_url() -> str:
 
 
 def grab_gray_frame(rtsp_url: str, ffmpeg_bin: str | None = None) -> bytes:
-    """Pull one low-res grayscale frame from RTSP as raw bytes."""
+    """
+    Pull one low-res grayscale frame from RTSP as raw bytes.
+
+    Each call starts a short-lived ffmpeg process. That is simple and fine for
+    bring-up; a long-lived sampler can replace it later if the LAN host shows
+    CPU or RTSP reconnect pressure.
+    """
     binary = ffmpeg_bin or require_ffmpeg()
     result = subprocess.run(
         [

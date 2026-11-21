@@ -58,3 +58,25 @@ def mean_abs_diff_ratio(previous: bytes, current: bytes) -> float:
 def motion_detected(score: float, threshold: float) -> bool:
     """True when the frame-diff score clears the configured threshold."""
     return score >= threshold
+
+
+def env_float(
+    name: str,
+    default: float,
+    environ: dict[str, str] | None = None,
+) -> float:
+    """
+    Parse a float env var, or return default when unset/blank.
+
+    Raises SystemExit with a clear message when the value is present but invalid.
+    """
+    source = environ if environ is not None else os.environ
+    raw = source.get(name)
+    if raw is None or not str(raw).strip():
+        return default
+    try:
+        return float(str(raw).strip())
+    except ValueError as error:
+        raise SystemExit(
+            f"Invalid {name}={raw!r}; expected a number (e.g. {default})"
+        ) from error

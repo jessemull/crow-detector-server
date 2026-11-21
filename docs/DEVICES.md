@@ -66,6 +66,8 @@ Keep bare Pi camera / PIR parts for indoor experiments only.
 
 Recorder: `pi/record-on-motion.py` (ffmpeg RTSP + software motion; ECDSA `pi-porch`). Helpers/tests: `pi/record_on_motion_lib.py`, `pi/test_record_on_motion_lib.py`.
 
+**Host load note:** motion sampling starts a short-lived `ffmpeg` process per frame. That is intentional for bring-up simplicity. If the laptop shows high CPU or flaky RTSP reconnects, replace `grab_gray_frame` with a longer-lived sampler later.
+
 ## Agent rules
 
 - Prefer adapting porch recording to **RTSP → clip → existing ECDSA upload** over new device types.
