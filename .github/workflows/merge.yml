@@ -47,6 +47,9 @@ jobs:
           S3_BUCKET_NAME: crow-detector-images-test
         run: npm run test:cov
 
+      - name: Run Porch Recorder Helper Tests
+        run: npm run porch:test
+
       - name: Build Application
         run: npm run build
 
