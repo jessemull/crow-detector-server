@@ -59,7 +59,7 @@ Shared networking (VPC, subnets, security groups) comes from the **`aws-infra-*`
 | `common`     | Logger, shared types                                        |
 | `config`     | Typed environment configuration                             |
 
-Porch videos live under the `porch/` prefix. They never enter the animal photo pipeline (S3 notifications and the Lambda only handle image suffixes under `feed/` and `detection/`). Capture hardware and the LAN uploader plan are in **`docs/DEVICES.md`** (sealed outdoor cams + always-on host; not outdoor CSI/PIR kits). The reference recorder script is `pi/record-on-motion.py`; `npm run pi:sync` / `pi:start` / `pi:stop` still apply when that process runs on a Pi or similar host.
+Porch videos live under the `porch/` prefix. They never enter the animal photo pipeline (S3 notifications and the Lambda only handle image suffixes under `feed/` and `detection/`). Capture hardware and the LAN uploader plan are in **`docs/DEVICES.md`** (sealed outdoor cams + always-on host; not outdoor CSI/PIR kits). The reference recorder is `pi/record-on-motion.py` (ffmpeg RTSP + software motion → ECDSA upload). Production path: systemd on the LAN host + `scripts/deploy-porch-host.sh`. Legacy `npm run pi:sync` / `pi:start` / `pi:stop` remain for SSH copy/restart helpers.
 
 Merge-to-main deploys the **ECS task** stack only. The 30-day `porch/` lifecycle rule lives in `cloudformation/crow-detector-s3.yaml` and must be applied with a one-shot deploy of the S3 stack after that template changes (it is not part of `merge.yml`).
 

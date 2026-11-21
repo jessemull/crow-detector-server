@@ -1,81 +1,161 @@
 #!/usr/bin/env python3
-"""Record short porch clips on motion, upload them, then remove the local copy."""
+"""Record short porch clips from a LAN RTSP camera, upload them, remove local copies."""
 
 from __future__ import annotations
 
+import argparse
 import base64
 import json
 import os
+import shutil
 import subprocess
+import sys
 import time
 import urllib.error
 import urllib.request
 from datetime import datetime
 from pathlib import Path
 
-from gpiozero import MotionSensor
+# Allow `python pi/record-on-motion.py` without installing a package.
+_PI_DIR = Path(__file__).resolve().parent
+if str(_PI_DIR) not in sys.path:
+    sys.path.insert(0, str(_PI_DIR))
+
+from record_on_motion_lib import (  # noqa: E402
+    load_env_file,
+    mean_abs_diff_ratio,
+    motion_detected,
+)
 
 CLIP_SECONDS = 25
 VISIT_CAP_SECONDS = 120
 OUTPUT_DIR = Path.home() / "clips"
-SENSOR_PIN = 17
-WIDTH = 1280
-HEIGHT = 720
-# About 1.75 Mbps — clear enough for a porch visit without huge files.
-BITRATE = 1_750_000
 DEVICE_ID = "pi-porch"
 PORCH_ENV_PATH = Path.home() / "porch.env"
+# Low-res grayscale samples for motion; full clip uses the RTSP encode path.
+SAMPLE_WIDTH = 160
+SAMPLE_HEIGHT = 90
+DEFAULT_MOTION_THRESHOLD = 0.035
+DEFAULT_POLL_SECONDS = 0.5
+DEFAULT_IDLE_SECONDS = 3.0
+DEFAULT_VISIT_COOLDOWN_SECONDS = 30.0
 
 
 def load_porch_env(path: Path = PORCH_ENV_PATH) -> None:
-    """Load public porch settings from ~/porch.env when the shell did not export them."""
-    if not path.is_file():
-        return
-    for line in path.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#") or "=" not in stripped:
-            continue
-        key, value = stripped.split("=", 1)
-        key = key.strip()
-        value = value.strip().strip('"').strip("'")
-        if key and key not in os.environ:
-            os.environ[key] = value
+    """Load host settings from ~/porch.env when the shell did not export them."""
+    load_env_file(path)
 
 
 load_porch_env()
 
 API_BASE_URL = os.environ.get("PORCH_API_BASE_URL", "").rstrip("/")
+RTSP_URL = os.environ.get("PORCH_RTSP_URL", "").strip()
 PRIVATE_KEY_PATH = Path(
     os.environ.get(
         "PI_PORCH_PRIVATE_KEY_PATH",
         str(Path.home() / "keys" / "pi-porch-private.pem"),
     )
 )
+MOTION_THRESHOLD = float(
+    os.environ.get("PORCH_MOTION_THRESHOLD", str(DEFAULT_MOTION_THRESHOLD))
+)
+POLL_SECONDS = float(os.environ.get("PORCH_MOTION_POLL_SECONDS", str(DEFAULT_POLL_SECONDS)))
+IDLE_SECONDS = float(os.environ.get("PORCH_IDLE_SECONDS", str(DEFAULT_IDLE_SECONDS)))
+VISIT_COOLDOWN_SECONDS = float(
+    os.environ.get(
+        "PORCH_VISIT_COOLDOWN_SECONDS", str(DEFAULT_VISIT_COOLDOWN_SECONDS)
+    )
+)
 
 
-def record_clip() -> Path:
+def require_ffmpeg() -> str:
+    path = shutil.which("ffmpeg")
+    if not path:
+        raise SystemExit("ffmpeg not found on PATH — install ffmpeg on the LAN host")
+    return path
+
+
+def require_rtsp_url() -> str:
+    if not RTSP_URL:
+        raise SystemExit(
+            "Set PORCH_RTSP_URL to the camera RTSP URL "
+            "(rtsp://user:pass@host:554/stream1)"
+        )
+    return RTSP_URL
+
+
+def grab_gray_frame(rtsp_url: str, ffmpeg_bin: str | None = None) -> bytes:
+    """Pull one low-res grayscale frame from RTSP as raw bytes."""
+    binary = ffmpeg_bin or require_ffmpeg()
+    result = subprocess.run(
+        [
+            binary,
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-rtsp_transport",
+            "tcp",
+            "-i",
+            rtsp_url,
+            "-frames:v",
+            "1",
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "gray",
+            "-s",
+            f"{SAMPLE_WIDTH}x{SAMPLE_HEIGHT}",
+            "pipe:1",
+        ],
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+    expected = SAMPLE_WIDTH * SAMPLE_HEIGHT
+    if result.returncode != 0 or len(result.stdout) < expected:
+        err = result.stderr.decode("utf-8", errors="replace").strip()
+        raise RuntimeError(f"failed to sample RTSP frame: {err or result.returncode}")
+    return result.stdout[:expected]
+
+
+def record_clip(
+    rtsp_url: str | None = None,
+    ffmpeg_bin: str | None = None,
+    clip_seconds: int = CLIP_SECONDS,
+) -> Path:
+    """Record a fixed-length mp4 from RTSP into ~/clips."""
+    url = rtsp_url or require_rtsp_url()
+    binary = ffmpeg_bin or require_ffmpeg()
     OUTPUT_DIR.mkdir(exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     path = OUTPUT_DIR / f"clip-{stamp}.mp4"
-    print(f"recording {path.name} for {CLIP_SECONDS}s")
+    print(f"recording {path.name} for {clip_seconds}s")
     subprocess.run(
         [
-            "rpicam-vid",
-            "--nopreview",
-            "--codec",
-            "libav",
+            binary,
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-rtsp_transport",
+            "tcp",
+            "-i",
+            url,
             "-t",
-            str(CLIP_SECONDS * 1000),
-            "--width",
-            str(WIDTH),
-            "--height",
-            str(HEIGHT),
-            "--bitrate",
-            str(BITRATE),
-            "-o",
+            str(clip_seconds),
+            "-c:v",
+            "libx264",
+            "-preset",
+            "veryfast",
+            "-pix_fmt",
+            "yuv420p",
+            "-an",
+            "-movflags",
+            "+faststart",
+            "-y",
             str(path),
         ],
         check=True,
+        timeout=clip_seconds + 60,
     )
     print(f"saved {path}")
     return path
@@ -148,29 +228,99 @@ def upload_and_remove(path: Path) -> None:
         print(f"upload failed for {path.name}: {error}")
 
 
-def main() -> None:
+def wait_for_motion(
+    rtsp_url: str,
+    threshold: float = MOTION_THRESHOLD,
+    poll_seconds: float = POLL_SECONDS,
+) -> None:
+    """Block until consecutive RTSP samples clear the motion threshold."""
+    previous = grab_gray_frame(rtsp_url)
+    while True:
+        time.sleep(poll_seconds)
+        current = grab_gray_frame(rtsp_url)
+        score = mean_abs_diff_ratio(previous, current)
+        previous = current
+        if motion_detected(score, threshold):
+            print(f"motion score={score:.4f}")
+            return
+
+
+def activity_still_present(
+    rtsp_url: str,
+    threshold: float = MOTION_THRESHOLD,
+    poll_seconds: float = POLL_SECONDS,
+    window_seconds: float = IDLE_SECONDS,
+) -> bool:
+    """True if another motion spike appears within window_seconds."""
+    previous = grab_gray_frame(rtsp_url)
+    deadline = time.monotonic() + window_seconds
+    while time.monotonic() < deadline:
+        time.sleep(poll_seconds)
+        current = grab_gray_frame(rtsp_url)
+        score = mean_abs_diff_ratio(previous, current)
+        previous = current
+        if motion_detected(score, threshold):
+            return True
+    return False
+
+
+def run_once() -> None:
+    """Record one clip and upload — laptop bring-up without waiting for motion."""
     if not API_BASE_URL:
         raise SystemExit(
             "Set PORCH_API_BASE_URL to the Critter Canteen API base URL"
         )
+    require_ffmpeg()
+    rtsp_url = require_rtsp_url()
+    clip_path = record_clip(rtsp_url)
+    upload_and_remove(clip_path)
 
-    pir = MotionSensor(SENSOR_PIN)
-    print("waiting for motion. Ctrl+C to stop.")
+
+def run_loop() -> None:
+    if not API_BASE_URL:
+        raise SystemExit(
+            "Set PORCH_API_BASE_URL to the Critter Canteen API base URL"
+        )
+    require_ffmpeg()
+    rtsp_url = require_rtsp_url()
+    print(
+        "waiting for RTSP motion "
+        f"(threshold={MOTION_THRESHOLD}, poll={POLL_SECONDS}s). Ctrl+C to stop."
+    )
     try:
         while True:
-            pir.wait_for_motion()
+            wait_for_motion(rtsp_url)
             visit_started = time.monotonic()
             print("visit started")
-            while pir.motion_detected:
-                if time.monotonic() - visit_started >= VISIT_CAP_SECONDS:
-                    print("visit cap reached")
-                    break
-                clip_path = record_clip()
+            while time.monotonic() - visit_started < VISIT_CAP_SECONDS:
+                clip_path = record_clip(rtsp_url)
                 upload_and_remove(clip_path)
-            pir.wait_for_no_motion()
+                if not activity_still_present(rtsp_url):
+                    break
+            else:
+                print("visit cap reached")
             print("visit ended")
+            if VISIT_COOLDOWN_SECONDS > 0:
+                print(f"cooldown {VISIT_COOLDOWN_SECONDS}s")
+                time.sleep(VISIT_COOLDOWN_SECONDS)
     except KeyboardInterrupt:
         print("\nstopped")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Porch RTSP recorder — motion clips to Critter Canteen"
+    )
+    parser.add_argument(
+        "--once",
+        action="store_true",
+        help="Record and upload a single clip, then exit",
+    )
+    args = parser.parse_args()
+    if args.once:
+        run_once()
+    else:
+        run_loop()
 
 
 if __name__ == "__main__":

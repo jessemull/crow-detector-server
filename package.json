@@ -41,7 +41,9 @@
     "test:watch": "jest --watch",
     "pi:start": "bash scripts/pi-start.sh",
     "pi:stop": "bash scripts/pi-stop.sh",
-    "pi:sync": "bash scripts/pi-sync.sh"
+    "pi:sync": "bash scripts/pi-sync.sh",
+    "porch:deploy": "bash scripts/deploy-porch-host.sh",
+    "porch:test": "python3 -m unittest discover -s pi -p 'test_*.py'"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.116.0",

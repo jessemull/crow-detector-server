@@ -1,0 +1,20 @@
+[Unit]
+Description=Critter Canteen porch RTSP recorder
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Adjust User/Group/WorkingDirectory to the LAN host account that owns the clone.
+User=porch
+Group=porch
+WorkingDirectory=/home/porch/crow-detector-server
+EnvironmentFile=-/home/porch/porch.env
+ExecStart=/usr/bin/python3 /home/porch/crow-detector-server/pi/record-on-motion.py
+Restart=on-failure
+RestartSec=10
+# Keep the laptop awake while this unit runs when supported.
+# ExecStartPre may be added for systemd-inhibit if the host sleeps aggressively.
+
+[Install]
+WantedBy=multi-user.target
