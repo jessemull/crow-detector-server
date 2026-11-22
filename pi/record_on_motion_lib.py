@@ -131,6 +131,20 @@ def prune_segments_older_than(
     return [path for path, start in segments if start < keep_after_epoch]
 
 
+def drop_incomplete_newest_segment(
+    segments: list[tuple[Path, float]],
+) -> list[tuple[Path, float]]:
+    """
+    Drop the newest segment from an ordered index.
+
+    The muxer is usually still writing that file; joining it yields flaky clips.
+    If only one segment exists, keep it (best effort) rather than retain nothing.
+    """
+    if len(segments) <= 1:
+        return list(segments)
+    return list(segments[:-1])
+
+
 PopenFactory = Callable[..., Any]
 
 
@@ -207,6 +221,9 @@ class ContinuousRetainPipeline:
 
     @property
     def command(self) -> list[str]:
+        # Note: ffmpeg requires the RTSP URL (with userinfo) as -i argv. There is
+        # no portable credentials-file input for RTSP, so the Camera Account
+        # secret is visible in `ps` on the LAN host — keep that host locked down.
         return [
             self.ffmpeg_bin,
             "-hide_banner",
@@ -246,16 +263,18 @@ class ContinuousRetainPipeline:
             "pipe:1",
         ]
 
-    def start(self) -> None:
+    def start(self, *, clear_segments: bool = True) -> None:
         self.close()
         self.segment_dir.mkdir(parents=True, exist_ok=True)
-        for stale in self.segment_dir.glob("seg_*.mp4"):
-            stale.unlink(missing_ok=True)
-        self._segment_starts.clear()
+        if clear_segments:
+            for stale in self.segment_dir.glob("seg_*.mp4"):
+                stale.unlink(missing_ok=True)
+            self._segment_starts.clear()
+        # DEVNULL: never buffer stderr on a PIPE (hang risk for long-lived ffmpeg).
         self._proc = self._popen(
             self.command,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
             bufsize=0,
         )
 
@@ -267,11 +286,6 @@ class ContinuousRetainPipeline:
         try:
             if proc.stdout is not None:
                 proc.stdout.close()
-        except OSError:
-            pass
-        try:
-            if proc.stderr is not None:
-                proc.stderr.close()
         except OSError:
             pass
         _kill_process(proc)
@@ -298,7 +312,8 @@ class ContinuousRetainPipeline:
         if len(frame) == self.frame_size:
             self.refresh_segment_index()
             return frame
-        self.start()
+        # Reconnect without wiping retained segments on a transient RTSP blip.
+        self.start(clear_segments=False)
         frame = self._read_exact(self.frame_size)
         if len(frame) != self.frame_size:
             raise RuntimeError("failed to sample RTSP frame from retain pipeline")
@@ -313,7 +328,7 @@ class ContinuousRetainPipeline:
 
     def _read_exact(self, size: int) -> bytes:
         if self._proc is None or self._proc.stdout is None:
-            self.start()
+            self.start(clear_segments=False)
         assert self._proc is not None and self._proc.stdout is not None
         stdout: IO[bytes] = self._proc.stdout
         chunks: list[bytes] = []

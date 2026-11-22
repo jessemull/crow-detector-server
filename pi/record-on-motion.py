@@ -28,6 +28,7 @@ if str(_PI_DIR) not in sys.path:
 from record_on_motion_lib import (  # noqa: E402
     ContinuousRetainPipeline,
     activity_still_present,
+    drop_incomplete_newest_segment,
     env_float,
     load_env_file,
     prune_segments_older_than,
@@ -187,12 +188,15 @@ def retain_event_clip(
         f"(pre={pre_roll_seconds}s post={post_roll_seconds}s)"
     )
     pipeline.drain_for(float(post_roll_seconds) + float(SEGMENT_TIME))
-    index = pipeline.refresh_segment_index()
+    # Newest file is usually still open for writing — drop it before select.
+    index = drop_incomplete_newest_segment(pipeline.refresh_segment_index())
     retained = select_segments_overlapping_window(
         index,
         window_start=window_start,
         window_end=window_end,
     )
+    if not retained:
+        raise RuntimeError("no complete segments overlap the retain window")
     print(f"retained {len(retained)} segments")
     concat_segments(retained, path, ffmpeg_bin)
     print(f"saved {path}")
@@ -321,40 +325,48 @@ def run_loop() -> None:
         ) as pipeline:
             pipeline.drain_for(float(SEGMENT_TIME + 1))
             while True:
-                wait_for_motion(
-                    pipeline,
-                    threshold=MOTION_THRESHOLD,
-                    on_motion=lambda score: print(f"motion score={score:.4f}"),
-                )
-                visit_started = time.monotonic()
-                motion_epoch = time.time()
-                print("visit started")
-                while time.monotonic() - visit_started < VISIT_CAP_SECONDS:
-                    clip_path = retain_event_clip(
-                        pipeline,
-                        ffmpeg_bin=ffmpeg_bin,
-                        motion_epoch=motion_epoch,
-                        pre_roll_seconds=PRE_ROLL,
-                        post_roll_seconds=POST_ROLL,
-                    )
-                    upload_and_remove(clip_path)
-                    if not activity_still_present(
+                try:
+                    wait_for_motion(
                         pipeline,
                         threshold=MOTION_THRESHOLD,
-                        window_seconds=IDLE_SECONDS,
-                    ):
-                        break
-                    motion_epoch = time.time()
-                else:
-                    print("visit cap reached")
-                print("visit ended")
-                if VISIT_COOLDOWN_SECONDS > 0:
-                    print(f"cooldown {VISIT_COOLDOWN_SECONDS}s")
-                    pipeline.drain_for(VISIT_COOLDOWN_SECONDS)
-                    prune_local_segments(
-                        pipeline,
-                        keep_after_epoch=time.time() - float(LOCAL_RETENTION),
+                        on_motion=lambda score: print(
+                            f"motion score={score:.4f}"
+                        ),
                     )
+                    visit_started = time.monotonic()
+                    motion_epoch = time.time()
+                    print("visit started")
+                    while time.monotonic() - visit_started < VISIT_CAP_SECONDS:
+                        clip_path = retain_event_clip(
+                            pipeline,
+                            ffmpeg_bin=ffmpeg_bin,
+                            motion_epoch=motion_epoch,
+                            pre_roll_seconds=PRE_ROLL,
+                            post_roll_seconds=POST_ROLL,
+                        )
+                        upload_and_remove(clip_path)
+                        if not activity_still_present(
+                            pipeline,
+                            threshold=MOTION_THRESHOLD,
+                            window_seconds=IDLE_SECONDS,
+                        ):
+                            break
+                        motion_epoch = time.time()
+                    else:
+                        print("visit cap reached")
+                    print("visit ended")
+                    if VISIT_COOLDOWN_SECONDS > 0:
+                        print(f"cooldown {VISIT_COOLDOWN_SECONDS}s")
+                        pipeline.drain_for(VISIT_COOLDOWN_SECONDS)
+                        prune_local_segments(
+                            pipeline,
+                            keep_after_epoch=time.time()
+                            - float(LOCAL_RETENTION),
+                        )
+                except (RuntimeError, OSError, subprocess.SubprocessError) as error:
+                    # Empty/failed harvest or transient ffmpeg — stay alive.
+                    print(f"retain/upload error (continuing): {error}")
+                    time.sleep(2.0)
     except KeyboardInterrupt:
         print("\nstopped")
 

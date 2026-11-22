@@ -9,6 +9,7 @@ from pathlib import Path
 from record_on_motion_lib import (
     ContinuousRetainPipeline,
     activity_still_present,
+    drop_incomplete_newest_segment,
     env_float,
     load_env_file,
     mean_abs_diff_ratio,
@@ -116,6 +117,29 @@ class RetainWindowTests(unittest.TestCase):
             [Path("old.mp4")],
         )
 
+    def test_empty_overlap_returns_empty(self) -> None:
+        paths = [
+            (Path("a.mp4"), 100.0),
+            (Path("b.mp4"), 102.0),
+        ]
+        # Window entirely before any segment start → no overlap.
+        chosen = select_segments_overlapping_window(
+            paths, window_start=50.0, window_end=60.0
+        )
+        self.assertEqual(chosen, [])
+
+    def test_drop_incomplete_newest(self) -> None:
+        paths = [
+            (Path("a.mp4"), 100.0),
+            (Path("b.mp4"), 102.0),
+            (Path("c.mp4"), 104.0),
+        ]
+        dropped = drop_incomplete_newest_segment(paths)
+        self.assertEqual([p.name for p, _ in dropped], ["a.mp4", "b.mp4"])
+        self.assertEqual(drop_incomplete_newest_segment([]), [])
+        only = [(Path("solo.mp4"), 1.0)]
+        self.assertEqual(drop_incomplete_newest_segment(only), only)
+
 
 class ConcatListTests(unittest.TestCase):
     def test_writes_ffconcat(self) -> None:
@@ -166,8 +190,10 @@ class _FakeProc:
 class PipelineTests(unittest.TestCase):
     def test_command_is_copy_segments_plus_gray_pipe(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
+            popen_kwargs: list[dict[str, object]] = []
 
-            def fake_popen(*_a: object, **_k: object) -> _FakeProc:
+            def fake_popen(*_a: object, **kwargs: object) -> _FakeProc:
+                popen_kwargs.append(kwargs)
                 return _FakeProc([bytes([1, 2, 3, 4])])
 
             pipeline = ContinuousRetainPipeline(
@@ -185,6 +211,38 @@ class PipelineTests(unittest.TestCase):
                 self.assertIn("pipe:1", joined)
                 self.assertIn("stream2", joined)
                 self.assertEqual(pipeline.read_frame(), bytes([1, 2, 3, 4]))
+            self.assertTrue(popen_kwargs)
+            self.assertIs(popen_kwargs[0].get("stderr"), __import__("subprocess").DEVNULL)
+
+    def test_reconnect_preserves_segments(self) -> None:
+        import subprocess
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            kept = root / "seg_keep.mp4"
+            kept.write_bytes(b"keep")
+            launches = {"n": 0}
+
+            def fake_popen(*_a: object, **kwargs: object) -> _FakeProc:
+                self.assertIs(kwargs.get("stderr"), subprocess.DEVNULL)
+                launches["n"] += 1
+                if launches["n"] == 1:
+                    return _FakeProc([])  # EOF → reconnect
+                return _FakeProc([bytes([5, 6, 7, 8])])
+
+            pipeline = ContinuousRetainPipeline(
+                "rtsp://u:p@host/stream2",
+                segment_dir=root,
+                width=2,
+                height=2,
+                ffmpeg_bin="/usr/bin/ffmpeg",
+                popen=fake_popen,
+            )
+            # First launch EOF → clear_segments=False reconnect → frame OK
+            self.assertEqual(pipeline.read_frame(), bytes([5, 6, 7, 8]))
+            self.assertEqual(launches["n"], 2)
+            self.assertTrue(kept.exists())
+            pipeline.close()
 
 
 class MotionLoopTests(unittest.TestCase):
