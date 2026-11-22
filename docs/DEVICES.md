@@ -55,14 +55,15 @@ Keep bare Pi camera / PIR parts for indoor experiments only.
 
    `rtsp://CAMERA_USER:CAMERA_PASS@CAMERA_IP:554/stream1`
 
-3. **On the always-on laptop:** install `ffmpeg` + `python3`, clone `crow-detector-server`, place `~/keys/pi-porch-private.pem`, copy `pi/porch.env.example` → `~/porch.env` and fill `PORCH_API_BASE_URL` + `PORCH_RTSP_URL` (`chmod 600`).
+3. **On the always-on laptop** (Tailscale host `juzu-inui`): install `ffmpeg` + `python3`, clone into `~/Development/crow-detector-server`, place `~/keys/pi-porch-private.pem`, copy `pi/porch.env.example` → `~/porch.env` and fill `PORCH_API_BASE_URL` + `PORCH_RTSP_URL` (`chmod 600`).
 4. **Smoke upload:**  
-   `python3 pi/record-on-motion.py --once`  
+   `cd ~/Development/crow-detector-server && python3 pi/record-on-motion.py --once`  
    Confirm a clip on the API’s Shelter Cam list (api-dev for bring-up).
-5. **Daemon:** install `scripts/porch-recorder.service` (edit User/paths), `systemctl enable --now porch-recorder`. Prevent host sleep while recording.
-6. **Ship code from a dev machine:** push the branch, then  
-   `DEPLOY_HOST=user@lan-host ./scripts/deploy-porch-host.sh`  
-   (SSH + `git pull` + restart unit — same idea as nextdoor’s laptop deploy).
+5. **Daemon:** install `scripts/porch-recorder.service` (paths target `juzu-inui`), `systemctl enable --now porch-recorder`. Prevent host sleep while recording.
+6. **SSH from the Mac:** use `~/.ssh/id_ed25519_porch` (Host `juzu-inui` in `~/.ssh/config`). Confirm: `ssh juzu-inui 'echo ok'`.
+7. **Ship code from a dev machine:** push the branch, then  
+   `DEPLOY_HOST=juzu-inui PORCH_GIT_REF=main ./scripts/deploy-porch-host.sh`  
+   (SSH + `git pull` in `~/Development/crow-detector-server` + restart unit). Override with `PORCH_REPO_DIR='~/…'` if the clone path differs — quote so `~` expands on the remote.
 
 Recorder: `pi/record-on-motion.py` (ffmpeg RTSP + software motion; ECDSA `pi-porch`). Helpers/tests: `pi/record_on_motion_lib.py`, `pi/test_record_on_motion_lib.py`.
 

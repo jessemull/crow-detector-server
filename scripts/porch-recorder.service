@@ -5,14 +5,14 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-# Before enable: edit User, Group, WorkingDirectory, EnvironmentFile, and ExecStart
-# to match the LAN host account and crow-detector-server clone path.
-User=porch
-Group=porch
-WorkingDirectory=/home/porch/crow-detector-server
-EnvironmentFile=-/home/porch/porch.env
+# Paths match the LAN host (juzu-inui): clone under ~/Development, secrets in ~.
+# If you reinstall on another account, edit User/Group/WorkingDirectory/EnvironmentFile/ExecStart.
+User=juzu-inui
+Group=juzu-inui
+WorkingDirectory=/home/juzu-inui/Development/crow-detector-server
+EnvironmentFile=-/home/juzu-inui/porch.env
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/usr/bin/python3 /home/porch/crow-detector-server/pi/record-on-motion.py
+ExecStart=/usr/bin/python3 /home/juzu-inui/Development/crow-detector-server/pi/record-on-motion.py
 Restart=on-failure
 RestartSec=10
 # Keep the laptop awake while this unit runs when supported.
