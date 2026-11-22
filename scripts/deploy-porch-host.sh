@@ -34,6 +34,10 @@ if [[ ! "${PORCH_REPO_DIR}" =~ ^(~/|/)[A-Za-z0-9._/-]+$ ]] || [[ "${PORCH_REPO_D
   echo "Error: unsafe PORCH_REPO_DIR" >&2
   exit 1
 fi
+if [[ ! "${PORCH_SERVICE}" =~ ^[A-Za-z][A-Za-z0-9:_.@-]*$ ]]; then
+  echo "Error: unsafe PORCH_SERVICE" >&2
+  exit 1
+fi
 
 ssh "${DEPLOY_HOST}" "set -euo pipefail
   cd ${PORCH_REPO_DIR}

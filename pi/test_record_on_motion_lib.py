@@ -430,6 +430,59 @@ class MotionLoopTests(unittest.TestCase):
         )
         self.assertGreaterEqual(len(ticks), 1)
 
+    def test_reconnect_does_not_count_as_motion(self) -> None:
+        class Stub:
+            def __init__(self) -> None:
+                self.frames = [
+                    bytes([0, 0]),
+                    bytes([255, 255]),
+                    bytes([255, 255]),
+                    bytes([0, 0]),
+                ]
+                self.reconnects = 0
+                self.reads = 0
+
+            def read_frame(self) -> bytes:
+                self.reads += 1
+                if self.reads == 2:
+                    self.reconnects += 1
+                return self.frames.pop(0)
+
+        scores: list[float] = []
+        wait_for_motion(Stub(), threshold=0.5, on_motion=scores.append)  # type: ignore[arg-type]
+        self.assertEqual(len(scores), 1)
+
+    def test_reconnect_does_not_extend_activity(self) -> None:
+        class Stub:
+            def __init__(self) -> None:
+                self.frames = [
+                    bytes([0, 0]),
+                    bytes([255, 255]),
+                    bytes([255, 255]),
+                ]
+                self.reconnects = 0
+                self.reads = 0
+
+            def read_frame(self) -> bytes:
+                self.reads += 1
+                if self.reads == 2:
+                    self.reconnects += 1
+                return self.frames.pop(0)
+
+        times = iter([0.0, 0.0, 0.5, 1.0])
+
+        def monotonic() -> float:
+            return next(times)
+
+        self.assertFalse(
+            activity_still_present(  # type: ignore[arg-type]
+                Stub(),
+                threshold=0.5,
+                window_seconds=1.0,
+                monotonic=monotonic,
+            )
+        )
+
     def test_activity(self) -> None:
         class Moving:
             def __init__(self) -> None:

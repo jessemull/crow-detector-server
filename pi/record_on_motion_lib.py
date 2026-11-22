@@ -283,6 +283,9 @@ class ContinuousRetainPipeline:
         self._stdout_eof.set()
         self._frames: queue.Queue[bytes] = queue.Queue()
         self._index_lock = threading.Lock()
+        # Bumps when read_frame replaces ffmpeg. Motion scoring must not
+        # compare a frame from the old stream with one from the new stream.
+        self.reconnects = 0
         # path -> epoch when this process first saw the file (not mtime)
         self._segment_starts: dict[Path, float] = {}
 
@@ -404,6 +407,7 @@ class ContinuousRetainPipeline:
         if frame is not None:
             return frame
         # Reconnect without wiping retained segments on a transient RTSP blip.
+        self.reconnects += 1
         self.start(clear_segments=False)
         frame = self._next_frame()
         if frame is None:
@@ -454,6 +458,11 @@ class ContinuousRetainPipeline:
             eof.set()
 
 
+def _stream_generation(pipeline: object) -> int:
+    value = getattr(pipeline, "reconnects", 0)
+    return value if isinstance(value, int) else 0
+
+
 def wait_for_motion(
     pipeline: ContinuousRetainPipeline,
     *,
@@ -465,6 +474,7 @@ def wait_for_motion(
 ) -> None:
     """Block until motion. on_tick runs about every tick_seconds while idle."""
     previous = pipeline.read_frame()
+    generation = _stream_generation(pipeline)
     next_tick = monotonic() + max(0.0, tick_seconds)
     while True:
         current = pipeline.read_frame()
@@ -472,6 +482,11 @@ def wait_for_motion(
         if on_tick is not None and now >= next_tick:
             on_tick()
             next_tick = now + max(0.0, tick_seconds)
+        current_generation = _stream_generation(pipeline)
+        if current_generation != generation:
+            previous = current
+            generation = current_generation
+            continue
         score = mean_abs_diff_ratio(previous, current)
         previous = current
         if motion_detected(score, threshold):
@@ -488,9 +503,15 @@ def activity_still_present(
     monotonic: Callable[[], float] = time.monotonic,
 ) -> bool:
     previous = pipeline.read_frame()
+    generation = _stream_generation(pipeline)
     deadline = monotonic() + window_seconds
     while monotonic() < deadline:
         current = pipeline.read_frame()
+        current_generation = _stream_generation(pipeline)
+        if current_generation != generation:
+            previous = current
+            generation = current_generation
+            continue
         score = mean_abs_diff_ratio(previous, current)
         previous = current
         if motion_detected(score, threshold):
