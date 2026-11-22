@@ -48,6 +48,26 @@ Keep bare Pi camera / PIR parts for indoor experiments only.
 
 ---
 
+## First camera bring-up (LAN host)
+
+1. **Tapo app:** join LAN Wi‑Fi, leave Privacy Mode **off**, skip Tapo Care, prefer invisible IR, create **Camera Account** (Advanced Settings). Optional: static IP + router WAN block after RTSP works.
+2. **Prove RTSP** from any LAN machine (do not paste passwords into chat/shell history if avoidable — VLC GUI is fine):
+
+   `rtsp://CAMERA_USER:CAMERA_PASS@CAMERA_IP:554/stream1`
+
+3. **On the always-on laptop:** install `ffmpeg` + `python3`, clone `crow-detector-server`, place `~/keys/pi-porch-private.pem`, copy `pi/porch.env.example` → `~/porch.env` and fill `PORCH_API_BASE_URL` + `PORCH_RTSP_URL` (`chmod 600`).
+4. **Smoke upload:**  
+   `python3 pi/record-on-motion.py --once`  
+   Confirm a clip on the API’s Shelter Cam list (api-dev for bring-up).
+5. **Daemon:** install `scripts/porch-recorder.service` (edit User/paths), `systemctl enable --now porch-recorder`. Prevent host sleep while recording.
+6. **Ship code from a dev machine:** push the branch, then  
+   `DEPLOY_HOST=user@lan-host ./scripts/deploy-porch-host.sh`  
+   (SSH + `git pull` + restart unit — same idea as nextdoor’s laptop deploy).
+
+Recorder: `pi/record-on-motion.py` (ffmpeg RTSP + software motion; ECDSA `pi-porch`). Helpers/tests: `pi/record_on_motion_lib.py`, `pi/test_record_on_motion_lib.py`.
+
+**Host load note (approach A):** one long-lived ffmpeg on the **substream** (`stream2` by default) continuously remuxes short `-c copy` segments to disk **and** emits low-res gray frames for motion. On motion we **retain** overlapping segments (pre/post window), join, and upload — no new RTSP open at trigger time. Local disk holds a short rolling window; AWS only gets retained visit clips.
+
 ## Agent rules
 
 - Prefer adapting porch recording to **RTSP → clip → existing ECDSA upload** over new device types.

@@ -1,5 +1,5 @@
 .PHONY: help lint format format-check test test-cov build clean commit \
-	lambda-lint lambda-format-check lambda-test lambda-build preflight ci
+	lambda-lint lambda-format-check lambda-test lambda-build porch-test preflight ci
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -41,7 +41,10 @@ lambda-build: ## Lambda webpack build + zip
 	npm run lambda:build
 	npm run lambda:package
 
-preflight: ## Root + lambda lint, format-check, test, build
+porch-test: ## Porch recorder Python helper unit tests
+	npm run porch:test
+
+preflight: ## Root + lambda lint, format-check, test, build + porch tests
 	npm run lint
 	npm run format:check
 	npm test
@@ -51,5 +54,6 @@ preflight: ## Root + lambda lint, format-check, test, build
 	npm run lambda:test:coverage
 	npm run lambda:build
 	npm run lambda:package
+	npm run porch:test
 
 ci: preflight ## Alias for preflight

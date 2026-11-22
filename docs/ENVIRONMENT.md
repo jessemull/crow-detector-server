@@ -57,14 +57,25 @@ Local helpers may also use filesystem paths (scripts only):
 | ---------------------- | ------------------------------------------------ | -------- | ------- |
 | `CORS_ALLOWED_ORIGINS` | Comma-separated origins for the public clip list | No       | Critter Canteen site (+ localhost `:3000` / `:8080` when `NODE_ENV` is not `prod`/`production`) |
 
-Porch Pi recorder (device, not Nest):
+Porch LAN recorder (host laptop/server, not Nest) — see `docs/DEVICES.md` and `pi/porch.env.example`:
 
-| Variable                   | Description                          | Required |
-| -------------------------- | ------------------------------------ | -------- |
-| `PORCH_API_BASE_URL`       | API base used by `pi/record-on-motion.py` | Yes (`npm run pi:sync` writes `~/porch.env`) |
-| `PI_PORCH_PRIVATE_KEY_PATH`| Path to porch private key on the Pi  | No (default `~/keys/pi-porch-private.pem`) |
+| Variable                      | Description                                      | Required | Default |
+| ----------------------------- | ------------------------------------------------ | -------- | ------- |
+| `PORCH_API_BASE_URL`          | API base for ECDSA porch uploads                 | Yes      | - (bring-up: `https://api-dev.crittercanteen.com`) |
+| `PORCH_RTSP_URL`              | Full RTSP URL including Camera Account user/pass | Yes      | - |
+| `PORCH_RTSP_SAMPLE_URL`       | Override warm pipeline URL (defaults to `stream2` derived from `PORCH_RTSP_URL`) | No | derived `stream2` |
+| `PI_PORCH_PRIVATE_KEY_PATH`   | Path to porch private key on the host            | No       | `~/keys/pi-porch-private.pem` |
+| `PORCH_MOTION_THRESHOLD`      | Frame-diff score (0–1) that counts as motion     | No       | `0.035` |
+| `PORCH_IDLE_SECONDS`          | Quiet window before ending a visit               | No       | `3` |
+| `PORCH_VISIT_COOLDOWN_SECONDS`| Pause after a visit before arming again          | No       | `30` |
+| `PORCH_PRE_ROLL_SECONDS`      | Seconds before motion retained from continuous segments | No | `4` |
+| `PORCH_POST_ROLL_SECONDS`     | Seconds after motion retained from continuous segments | No | `20` |
+| `PORCH_SEGMENT_TIME_SECONDS`  | Continuous remux segment length                  | No       | `2` |
+| `PORCH_LOCAL_RETENTION_SECONDS` | Max age of local segment files before prune    | No       | `180` |
 
-`npm run pi:sync` copies the recorder, writes `~/porch.env`, then restarts the process. `npm run pi:start` only restarts (no copy). `npm run pi:stop` stops it. The recorder runs under `nohup` and survives SSH disconnect; after a Pi reboot, run `pi:start` or `pi:sync` again.
+Host secrets live in `~/porch.env` (`chmod 600`) and are never committed. Prefer systemd (`scripts/porch-recorder.service`) on the LAN host; deploy code with `DEPLOY_HOST=… ./scripts/deploy-porch-host.sh`. `PORCH_GIT_REF` (default: the current local branch) is the ref that script checks out and fast-forwards on the host.
+
+Legacy Pi helpers still exist: `npm run pi:sync` / `pi:start` / `pi:stop` copy/restart a process over SSH. The outdoor porch path is **LAN host + RTSP**, not Pi CSI/PIR.
 
 ---
 
