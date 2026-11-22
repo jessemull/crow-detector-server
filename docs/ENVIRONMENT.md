@@ -73,9 +73,22 @@ Porch LAN recorder (host laptop/server, not Nest) — see `docs/DEVICES.md` and 
 | `PORCH_SEGMENT_TIME_SECONDS`  | Continuous remux segment length                  | No       | `2` |
 | `PORCH_LOCAL_RETENTION_SECONDS` | Max age of local segment files before prune    | No       | `180` |
 
-Host secrets live in `~/porch.env` (`chmod 600`) and are never committed. Prefer systemd (`scripts/porch-recorder.service`) on the LAN host; deploy code with `DEPLOY_HOST=… ./scripts/deploy-porch-host.sh`. `PORCH_GIT_REF` (default: the current local branch) is the ref that script checks out and fast-forwards on the host.
+Host secrets live in `~/porch.env` (`chmod 600`) and are never committed. Prefer systemd (`scripts/porch-recorder.service`) on the LAN host; deploy code with `./scripts/deploy-porch-host.sh`.
 
-Legacy Pi helpers still exist: `npm run pi:sync` / `pi:start` / `pi:stop` copy/restart a process over SSH. The outdoor porch path is **LAN host + RTSP**, not Pi CSI/PIR.
+Deploy script env (Mac → host):
+
+| Variable         | Description | Default |
+| ---------------- | ----------- | ------- |
+| `DEPLOY_HOST`    | SSH target (`juzu-inui` via Tailscale + `~/.ssh/config`) | required |
+| `PORCH_REPO_DIR` | Clone path **on the host** (quote `~` so it expands remotely) | `~/Development/crow-detector-server` |
+| `PORCH_SERVICE`  | systemd unit | `porch-recorder` |
+| `PORCH_GIT_REF`  | Branch to fast-forward on the host | current local branch |
+
+Example: `DEPLOY_HOST=juzu-inui PORCH_GIT_REF=main ./scripts/deploy-porch-host.sh`
+
+SSH login key (Mac): `~/.ssh/id_ed25519_porch` — not the same as `~/keys/pi-porch-private.pem` (API ECDSA on the host).
+
+Legacy Pi helpers still exist: `npm run pi:sync` / `pi:start` / `pi:stop` (hardcoded old `critter-cam.local` paths). The outdoor porch path is **LAN host + RTSP**, not Pi CSI/PIR.
 
 ---
 

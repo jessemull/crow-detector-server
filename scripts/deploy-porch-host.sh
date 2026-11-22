@@ -1,25 +1,28 @@
 #!/usr/bin/env bash
 # Deploy porch recorder changes to the LAN host: SSH, git pull, restart systemd.
 #
-# Set DEPLOY_HOST (e.g. porch@lan-laptop.local).
+# Set DEPLOY_HOST (e.g. juzu-inui — see ~/.ssh/config Host for key + user).
 # Optional:
 #   PORCH_REPO_DIR  remote path to the crow-detector-server clone
-#                   (default: ~/crow-detector-server)
+#                   (default: ~/Development/crow-detector-server)
+#                   Quote the value so ~ expands on the remote, not locally:
+#                   PORCH_REPO_DIR='~/Development/crow-detector-server'
 #   PORCH_SERVICE   systemd unit name (default: porch-recorder)
 #   PORCH_GIT_REF   branch to fast-forward on the host
 #                   (default: the current local branch)
 #
-# Usage: ./scripts/deploy-porch-host.sh
+# Usage:
+#   DEPLOY_HOST=juzu-inui PORCH_GIT_REF=main ./scripts/deploy-porch-host.sh
 set -euo pipefail
 
 DEPLOY_HOST="${DEPLOY_HOST:-}"
 if [[ -z "${DEPLOY_HOST}" ]]; then
-  echo "Error: DEPLOY_HOST not set. Example: DEPLOY_HOST=porch@lan-laptop ./scripts/deploy-porch-host.sh" >&2
+  echo "Error: DEPLOY_HOST not set. Example: DEPLOY_HOST=juzu-inui ./scripts/deploy-porch-host.sh" >&2
   exit 1
 fi
 
-# Leading ~ is expanded by the remote shell (it must stay unquoted there).
-PORCH_REPO_DIR="${PORCH_REPO_DIR:-~/crow-detector-server}"
+# Leading ~ is expanded by the remote shell (keep it unexpanded on the Mac).
+PORCH_REPO_DIR="${PORCH_REPO_DIR:-~/Development/crow-detector-server}"
 PORCH_SERVICE="${PORCH_SERVICE:-porch-recorder}"
 PORCH_GIT_REF="${PORCH_GIT_REF:-$(git rev-parse --abbrev-ref HEAD)}"
 if [[ "${PORCH_GIT_REF}" == "HEAD" ]]; then
