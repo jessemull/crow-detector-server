@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import os
+import queue
 import subprocess
+import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -100,13 +102,17 @@ def select_segments_overlapping_window(
     *,
     window_start: float,
     window_end: float,
+    segment_seconds: float,
 ) -> list[Path]:
     """
     Retain segments whose recording interval overlaps [window_start, window_end].
 
-    Each item is (path, start_epoch). Segment end is inferred as the next
-    segment's start, or window_end for the newest open/finished piece.
+    Each item is (path, start_epoch). A segment ends at the next start, and
+    never longer than segment_seconds, so a gap or a stale newest file cannot
+    stretch across a later window.
     """
+    if segment_seconds <= 0:
+        raise ValueError("segment_seconds must be positive")
     if not segments:
         return []
     ordered = sorted(segments, key=lambda item: item[1])
@@ -115,8 +121,8 @@ def select_segments_overlapping_window(
         if index + 1 < len(ordered):
             end = ordered[index + 1][1]
         else:
-            end = max(window_end, start)
-        # Overlap test against [window_start, window_end]
+            end = start + segment_seconds
+        end = min(end, start + segment_seconds)
         if end >= window_start and start <= window_end:
             chosen.append(path)
     return chosen
@@ -146,6 +152,35 @@ def drop_incomplete_newest_segment(
 
 
 PopenFactory = Callable[..., Any]
+
+
+def _read_exact(stdout: IO[bytes], size: int) -> bytes:
+    chunks: list[bytes] = []
+    remaining = size
+    while remaining > 0:
+        chunk = stdout.read(remaining)
+        if not chunk:
+            break
+        chunks.append(chunk)
+        remaining -= len(chunk)
+    return b"".join(chunks)
+
+
+def _enqueue_frame(frames: queue.Queue[bytes], frame: bytes) -> None:
+    """Drop the oldest frame when the consumer is busy so stdout cannot fill."""
+    try:
+        frames.put_nowait(frame)
+        return
+    except queue.Full:
+        pass
+    try:
+        frames.get_nowait()
+    except queue.Empty:
+        return
+    try:
+        frames.put_nowait(frame)
+    except queue.Full:
+        pass
 
 
 def _kill_process(proc: Any) -> None:
@@ -186,6 +221,7 @@ class ContinuousRetainPipeline:
         ffmpeg_bin: str,
         fps: float = 5.0,
         segment_time: int = 2,
+        frame_timeout: float = 5.0,
         popen: PopenFactory = subprocess.Popen,
     ) -> None:
         if width <= 0 or height <= 0:
@@ -194,6 +230,8 @@ class ContinuousRetainPipeline:
             raise ValueError("fps must be positive")
         if segment_time <= 0:
             raise ValueError("segment_time must be positive")
+        if frame_timeout <= 0:
+            raise ValueError("frame_timeout must be positive")
         self.rtsp_url = rtsp_url
         self.segment_dir = segment_dir
         self.width = width
@@ -202,9 +240,16 @@ class ContinuousRetainPipeline:
         self.ffmpeg_bin = ffmpeg_bin
         self.fps = fps
         self.segment_time = segment_time
+        self.frame_timeout = frame_timeout
         self._popen = popen
         self._proc: Any | None = None
-        # path -> approximate start epoch (when we first observed the file)
+        self._reader: threading.Thread | None = None
+        self._stop = threading.Event()
+        self._stdout_eof = threading.Event()
+        self._stdout_eof.set()
+        self._frames: queue.Queue[bytes] = queue.Queue()
+        self._index_lock = threading.Lock()
+        # path -> epoch when this process first saw the file (not mtime)
         self._segment_starts: dict[Path, float] = {}
 
     def __enter__(self) -> ContinuousRetainPipeline:
@@ -269,7 +314,13 @@ class ContinuousRetainPipeline:
         if clear_segments:
             for stale in self.segment_dir.glob("seg_*.mp4"):
                 stale.unlink(missing_ok=True)
-            self._segment_starts.clear()
+            with self._index_lock:
+                self._segment_starts.clear()
+        self._stop = threading.Event()
+        self._stdout_eof = threading.Event()
+        # A few seconds of frames. Older ones are dropped so a blocked
+        # consumer (concat/upload) cannot fill the ffmpeg stdout pipe.
+        self._frames = queue.Queue(maxsize=max(8, int(self.fps * 4)))
         # DEVNULL: never buffer stderr on a PIPE (hang risk for long-lived ffmpeg).
         self._proc = self._popen(
             self.command,
@@ -277,47 +328,52 @@ class ContinuousRetainPipeline:
             stderr=subprocess.DEVNULL,
             bufsize=0,
         )
+        self._reader = threading.Thread(
+            target=self._drain_stdout,
+            args=(self._proc, self._frames, self._stop, self._stdout_eof),
+            name="porch-frame-drain",
+            daemon=True,
+        )
+        self._reader.start()
 
     def close(self) -> None:
+        self._stop.set()
         proc = self._proc
         self._proc = None
-        if proc is None:
-            return
-        try:
-            if proc.stdout is not None:
-                proc.stdout.close()
-        except OSError:
-            pass
-        _kill_process(proc)
+        if proc is not None:
+            try:
+                if proc.stdout is not None:
+                    proc.stdout.close()
+            except OSError:
+                pass
+            _kill_process(proc)
+        reader = self._reader
+        self._reader = None
+        if reader is not None and reader is not threading.current_thread():
+            reader.join(timeout=1.0)
 
     def refresh_segment_index(self, now: float | None = None) -> list[tuple[Path, float]]:
         """Discover new segment files and return the full (path, start) index."""
         epoch = time.time() if now is None else now
-        for path in self.segment_dir.glob("seg_*.mp4"):
-            if path not in self._segment_starts and path.is_file():
-                # Prefer mtime as approx start; first sighting as fallback.
-                try:
-                    self._segment_starts[path] = path.stat().st_mtime
-                except OSError:
+        with self._index_lock:
+            for path in self.segment_dir.glob("seg_*.mp4"):
+                if path not in self._segment_starts and path.is_file():
                     self._segment_starts[path] = epoch
-        # Drop index entries for deleted files.
-        live = set(self.segment_dir.glob("seg_*.mp4"))
-        for path in list(self._segment_starts):
-            if path not in live:
-                del self._segment_starts[path]
-        return sorted(self._segment_starts.items(), key=lambda item: item[1])
+            live = set(self.segment_dir.glob("seg_*.mp4"))
+            for path in list(self._segment_starts):
+                if path not in live:
+                    del self._segment_starts[path]
+            return sorted(self._segment_starts.items(), key=lambda item: item[1])
 
     def read_frame(self) -> bytes:
-        frame = self._read_exact(self.frame_size)
-        if len(frame) == self.frame_size:
-            self.refresh_segment_index()
+        frame = self._next_frame()
+        if frame is not None:
             return frame
         # Reconnect without wiping retained segments on a transient RTSP blip.
         self.start(clear_segments=False)
-        frame = self._read_exact(self.frame_size)
-        if len(frame) != self.frame_size:
+        frame = self._next_frame()
+        if frame is None:
             raise RuntimeError("failed to sample RTSP frame from retain pipeline")
-        self.refresh_segment_index()
         return frame
 
     def drain_for(self, seconds: float, sleep: Callable[[float], None] = time.sleep) -> None:
@@ -326,20 +382,42 @@ class ContinuousRetainPipeline:
             self.read_frame()
             sleep(0.001)
 
-    def _read_exact(self, size: int) -> bytes:
-        if self._proc is None or self._proc.stdout is None:
-            self.start(clear_segments=False)
-        assert self._proc is not None and self._proc.stdout is not None
-        stdout: IO[bytes] = self._proc.stdout
-        chunks: list[bytes] = []
-        remaining = size
-        while remaining > 0:
-            chunk = stdout.read(remaining)
-            if not chunk:
-                break
-            chunks.append(chunk)
-            remaining -= len(chunk)
-        return b"".join(chunks)
+    def _next_frame(self) -> bytes | None:
+        deadline = time.monotonic() + self.frame_timeout
+        while True:
+            try:
+                return self._frames.get_nowait()
+            except queue.Empty:
+                pass
+            if self._stdout_eof.is_set():
+                return None
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return None
+            try:
+                return self._frames.get(timeout=min(0.2, remaining))
+            except queue.Empty:
+                continue
+
+    def _drain_stdout(
+        self,
+        proc: Any,
+        frames: queue.Queue[bytes],
+        stop: threading.Event,
+        eof: threading.Event,
+    ) -> None:
+        stdout = getattr(proc, "stdout", None)
+        try:
+            if stdout is None:
+                return
+            while not stop.is_set():
+                frame = _read_exact(stdout, self.frame_size)
+                if len(frame) != self.frame_size:
+                    break
+                _enqueue_frame(frames, frame)
+                self.refresh_segment_index()
+        finally:
+            eof.set()
 
 
 def wait_for_motion(

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import tempfile
+import threading
+import time
 import unittest
 from pathlib import Path
 
@@ -103,7 +105,10 @@ class RetainWindowTests(unittest.TestCase):
         ]
         # Motion at 103, pre 2 → window [101, 108]
         chosen = select_segments_overlapping_window(
-            paths, window_start=101.0, window_end=108.0
+            paths,
+            window_start=101.0,
+            window_end=108.0,
+            segment_seconds=2.0,
         )
         self.assertEqual([p.name for p in chosen], ["a.mp4", "b.mp4", "c.mp4"])
 
@@ -124,7 +129,32 @@ class RetainWindowTests(unittest.TestCase):
         ]
         # Window entirely before any segment start → no overlap.
         chosen = select_segments_overlapping_window(
-            paths, window_start=50.0, window_end=60.0
+            paths,
+            window_start=50.0,
+            window_end=60.0,
+            segment_seconds=2.0,
+        )
+        self.assertEqual(chosen, [])
+
+    def test_stale_newest_does_not_cover_later_window(self) -> None:
+        chosen = select_segments_overlapping_window(
+            [(Path("old.mp4"), 100.0)],
+            window_start=200.0,
+            window_end=220.0,
+            segment_seconds=2.0,
+        )
+        self.assertEqual(chosen, [])
+
+    def test_gap_does_not_stretch_earlier_segment(self) -> None:
+        paths = [
+            (Path("a.mp4"), 100.0),
+            (Path("b.mp4"), 200.0),
+        ]
+        chosen = select_segments_overlapping_window(
+            paths,
+            window_start=150.0,
+            window_end=160.0,
+            segment_seconds=2.0,
         )
         self.assertEqual(chosen, [])
 
@@ -236,13 +266,99 @@ class PipelineTests(unittest.TestCase):
                 width=2,
                 height=2,
                 ffmpeg_bin="/usr/bin/ffmpeg",
+                frame_timeout=1.0,
                 popen=fake_popen,
             )
             # First launch EOF → clear_segments=False reconnect → frame OK
+            pipeline.start(clear_segments=False)
             self.assertEqual(pipeline.read_frame(), bytes([5, 6, 7, 8]))
             self.assertEqual(launches["n"], 2)
             self.assertTrue(kept.exists())
             pipeline.close()
+
+    def test_drain_reads_stdout_when_consumer_is_idle(self) -> None:
+        frame = bytes([1, 2, 3, 4])
+        total = 30
+
+        class CountingStdout:
+            def __init__(self) -> None:
+                self.reads = 0
+                self._lock = threading.Lock()
+
+            def read(self, size: int = -1) -> bytes:
+                with self._lock:
+                    if self.reads >= total:
+                        return b""
+                    self.reads += 1
+                    return frame if size < 0 or size >= len(frame) else frame[:size]
+
+            def close(self) -> None:
+                return None
+
+        stdout = CountingStdout()
+
+        def fake_popen(*_a: object, **_k: object) -> _FakeProc:
+            proc = _FakeProc([])
+            proc.stdout = stdout  # type: ignore[assignment]
+            return proc
+
+        with tempfile.TemporaryDirectory() as tmp:
+            pipeline = ContinuousRetainPipeline(
+                "rtsp://u:p@host/stream2",
+                segment_dir=Path(tmp),
+                width=2,
+                height=2,
+                ffmpeg_bin="/usr/bin/ffmpeg",
+                fps=5.0,
+                frame_timeout=1.0,
+                popen=fake_popen,
+            )
+            pipeline.start()
+            try:
+                deadline = time.monotonic() + 2.0
+                while stdout.reads < total and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                self.assertEqual(stdout.reads, total)
+            finally:
+                pipeline.close()
+
+    def test_stalled_stdout_reconnects(self) -> None:
+        launches = {"n": 0}
+
+        class BlockingStdout:
+            def __init__(self) -> None:
+                self._closed = threading.Event()
+
+            def read(self, size: int = -1) -> bytes:
+                self._closed.wait()
+                return b""
+
+            def close(self) -> None:
+                self._closed.set()
+
+        def fake_popen(*_a: object, **_k: object) -> _FakeProc:
+            launches["n"] += 1
+            proc = _FakeProc([bytes([9, 9, 9, 9])] if launches["n"] > 1 else [])
+            if launches["n"] == 1:
+                proc.stdout = BlockingStdout()  # type: ignore[assignment]
+            return proc
+
+        with tempfile.TemporaryDirectory() as tmp:
+            pipeline = ContinuousRetainPipeline(
+                "rtsp://u:p@host/stream2",
+                segment_dir=Path(tmp),
+                width=2,
+                height=2,
+                ffmpeg_bin="/usr/bin/ffmpeg",
+                frame_timeout=0.3,
+                popen=fake_popen,
+            )
+            pipeline.start()
+            try:
+                self.assertEqual(pipeline.read_frame(), bytes([9, 9, 9, 9]))
+                self.assertEqual(launches["n"], 2)
+            finally:
+                pipeline.close()
 
 
 class MotionLoopTests(unittest.TestCase):

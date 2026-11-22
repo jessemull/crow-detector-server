@@ -73,7 +73,7 @@ Porch LAN recorder (host laptop/server, not Nest) — see `docs/DEVICES.md` and 
 | `PORCH_SEGMENT_TIME_SECONDS`  | Continuous remux segment length                  | No       | `2` |
 | `PORCH_LOCAL_RETENTION_SECONDS` | Max age of local segment files before prune    | No       | `180` |
 
-Host secrets live in `~/porch.env` (`chmod 600`) and are never committed. Prefer systemd (`scripts/porch-recorder.service`) on the LAN host; deploy code with `DEPLOY_HOST=… ./scripts/deploy-porch-host.sh`.
+Host secrets live in `~/porch.env` (`chmod 600`) and are never committed. Prefer systemd (`scripts/porch-recorder.service`) on the LAN host; deploy code with `DEPLOY_HOST=… ./scripts/deploy-porch-host.sh`. `PORCH_GIT_REF` (default: the current local branch) is the ref that script checks out and fast-forwards on the host.
 
 Legacy Pi helpers still exist: `npm run pi:sync` / `pi:start` / `pi:stop` copy/restart a process over SSH. The outdoor porch path is **LAN host + RTSP**, not Pi CSI/PIR.
 

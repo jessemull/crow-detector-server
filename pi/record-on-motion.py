@@ -155,6 +155,16 @@ def concat_segments(
         list_path.unlink(missing_ok=True)
 
 
+def prune_old_clips(keep_after_epoch: float, directory: Path = OUTPUT_DIR) -> None:
+    """Delete uploaded-or-abandoned clips older than the local retention window."""
+    for path in directory.glob("clip-*.mp4"):
+        try:
+            if path.stat().st_mtime < keep_after_epoch:
+                path.unlink(missing_ok=True)
+        except OSError as error:
+            print(f"failed to prune {path.name}: {type(error).__name__}")
+
+
 def prune_local_segments(
     pipeline: ContinuousRetainPipeline,
     *,
@@ -164,6 +174,7 @@ def prune_local_segments(
     for path in prune_segments_older_than(index, keep_after_epoch=keep_after_epoch):
         path.unlink(missing_ok=True)
     pipeline.refresh_segment_index()
+    prune_old_clips(keep_after_epoch)
 
 
 def retain_event_clip(
@@ -194,6 +205,7 @@ def retain_event_clip(
         index,
         window_start=window_start,
         window_end=window_end,
+        segment_seconds=float(SEGMENT_TIME),
     )
     if not retained:
         raise RuntimeError("no complete segments overlap the retain window")
@@ -246,29 +258,56 @@ def upload_clip(path: Path) -> None:
         )
     upload = request_upload_url(path.stem)
     signed_url = upload["signedUrl"]
+    size = path.stat().st_size
     with path.open("rb") as handle:
-        data = handle.read()
-    put = urllib.request.Request(
-        signed_url,
-        data=data,
-        method="PUT",
-        headers={
-            "Content-Type": "video/mp4",
-            "x-amz-server-side-encryption": "AES256",
-        },
-    )
-    with urllib.request.urlopen(put, timeout=120) as response:
-        response.read()
+        put = urllib.request.Request(
+            signed_url,
+            data=handle,
+            method="PUT",
+            headers={
+                "Content-Type": "video/mp4",
+                "Content-Length": str(size),
+                "x-amz-server-side-encryption": "AES256",
+            },
+        )
+        with urllib.request.urlopen(put, timeout=120) as response:
+            response.read()
     print(f"uploaded {path.name}")
 
 
-def upload_and_remove(path: Path) -> None:
-    try:
-        upload_clip(path)
-        path.unlink(missing_ok=True)
-        print(f"removed local {path.name}")
-    except (OSError, urllib.error.URLError, urllib.error.HTTPError, KeyError) as error:
-        print(f"upload failed for {path.name}: {error}")
+def _upload_failure_detail(error: BaseException) -> str:
+    detail = type(error).__name__
+    code = getattr(error, "code", None)
+    if isinstance(code, int):
+        return f"{detail} {code}"
+    return detail
+
+
+def upload_and_remove(path: Path, *, attempts: int = 3) -> None:
+    last_error: BaseException | None = None
+    for attempt in range(1, max(1, attempts) + 1):
+        try:
+            upload_clip(path)
+        except (
+            OSError,
+            urllib.error.URLError,
+            KeyError,
+            subprocess.SubprocessError,
+        ) as error:
+            last_error = error
+            if attempt < attempts:
+                time.sleep(1.0)
+            continue
+        try:
+            path.unlink(missing_ok=True)
+        except OSError as error:
+            print(f"uploaded but failed to remove {path.name}: {type(error).__name__}")
+        else:
+            print(f"removed local {path.name}")
+        return
+    detail = _upload_failure_detail(last_error) if last_error else "error"
+    print(f"upload failed for {path.name}: {detail}")
+    prune_old_clips(time.time() - float(LOCAL_RETENTION))
 
 
 def run_once() -> None:
