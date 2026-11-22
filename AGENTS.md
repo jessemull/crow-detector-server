@@ -36,7 +36,7 @@ crow-detector-server/
 │   ├── urls/                   # Presigned S3 URL issuance
 │   ├── app.module.ts
 │   └── main.ts
-├── pi/                         # Porch recorder synced to the Pi
+├── pi/                         # Porch RTSP recorder (runs on LAN host)
 ├── lambda/                     # Nested package: S3 → SQS → API glue
 │   ├── src/
 │   ├── cloudformation/
@@ -89,9 +89,6 @@ Prefer `make` targets. Run **`make`** or **`make help`** for a compact list.
 | `npm run db:seed`  | Seed database                                    |
 | `npm run db:reset` | Reset + seed                                     |
 | `npm run auth:token` | Generate ECDSA auth token helper               |
-| `npm run pi:sync`  | Legacy: copy recorder + `porch.env` over SSH, then restart |
-| `npm run pi:start` | Legacy: restart the porch recorder over SSH (no copy) |
-| `npm run pi:stop`  | Legacy: stop the porch recorder over SSH |
 | `./scripts/deploy-porch-host.sh` | LAN host: SSH `git pull` + restart `porch-recorder` (`DEPLOY_HOST=juzu-inui`; repo default `~/Development/crow-detector-server`) |
 | `python3 pi/record-on-motion.py --once` | One RTSP clip + upload (host bring-up) |
 | `python3 -m unittest pi/test_record_on_motion_lib.py` | Porch recorder helper unit tests |

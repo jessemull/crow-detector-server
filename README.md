@@ -64,8 +64,8 @@ The **Crow Detector** is an interactive system that allows users to feed crows t
 - **Motion Pi Device**: Raspberry Pi with PIR motion sensor and night vision camera:
   - Detects motion and captures images of feeding animals.
   - Uploads detection images to S3.
-- **Porch Pi Device**: Raspberry Pi with PIR sensor and porch camera:
-  - Records 20–30s mp4 clips during a visit (about 2 minutes max).
+- **Porch / Shelter Cam uploader** (ECDSA id `pi-porch`): Always-on LAN host pulls RTSP from sealed outdoor IP cams:
+  - Records visit mp4 clips (motion-triggered; see `docs/DEVICES.md`).
   - Uploads clips to the private `porch/` prefix (no animal naming).
 
 ### Web Interface
