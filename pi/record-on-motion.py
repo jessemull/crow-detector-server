@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Record short porch clips from a LAN RTSP camera, upload them, remove local copies."""
+"""
+Porch recorder — approach A (continuous segments + retain on motion).
+
+Always remux short RTSP segments to disk. Decode a cheap gray view of the
+same stream for motion. On motion, retain overlapping segments, join, upload.
+"""
 
 from __future__ import annotations
 
@@ -16,34 +21,42 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 
-# Allow `python pi/record-on-motion.py` without installing a package.
 _PI_DIR = Path(__file__).resolve().parent
 if str(_PI_DIR) not in sys.path:
     sys.path.insert(0, str(_PI_DIR))
 
 from record_on_motion_lib import (  # noqa: E402
+    ContinuousRetainPipeline,
+    activity_still_present,
     env_float,
     load_env_file,
-    mean_abs_diff_ratio,
-    motion_detected,
+    prune_segments_older_than,
+    rtsp_substream_url,
+    select_segments_overlapping_window,
+    wait_for_motion,
+    write_concat_list,
 )
 
-CLIP_SECONDS = 25
+# Event window retained around motion (seconds).
+PRE_ROLL_SECONDS = 4
+POST_ROLL_SECONDS = 20
+SEGMENT_TIME_SECONDS = 2
+# Keep a little more than one visit on disk for overlap/debug.
+LOCAL_RETENTION_SECONDS = 180
 VISIT_CAP_SECONDS = 120
 OUTPUT_DIR = Path.home() / "clips"
+SEGMENT_DIR = OUTPUT_DIR / "segments"
 DEVICE_ID = "pi-porch"
 PORCH_ENV_PATH = Path.home() / "porch.env"
-# Low-res grayscale samples for motion; full clip uses the RTSP encode path.
 SAMPLE_WIDTH = 160
 SAMPLE_HEIGHT = 90
+DETECT_FPS = 5.0
 DEFAULT_MOTION_THRESHOLD = 0.035
-DEFAULT_POLL_SECONDS = 0.5
 DEFAULT_IDLE_SECONDS = 3.0
 DEFAULT_VISIT_COOLDOWN_SECONDS = 30.0
 
 
 def load_porch_env(path: Path = PORCH_ENV_PATH) -> None:
-    """Load host settings from ~/porch.env when the shell did not export them."""
     load_env_file(path)
 
 
@@ -51,6 +64,7 @@ load_porch_env()
 
 API_BASE_URL = os.environ.get("PORCH_API_BASE_URL", "").rstrip("/")
 RTSP_URL = os.environ.get("PORCH_RTSP_URL", "").strip()
+RTSP_SAMPLE_URL = os.environ.get("PORCH_RTSP_SAMPLE_URL", "").strip()
 PRIVATE_KEY_PATH = Path(
     os.environ.get(
         "PI_PORCH_PRIVATE_KEY_PATH",
@@ -58,10 +72,17 @@ PRIVATE_KEY_PATH = Path(
     )
 )
 MOTION_THRESHOLD = env_float("PORCH_MOTION_THRESHOLD", DEFAULT_MOTION_THRESHOLD)
-POLL_SECONDS = env_float("PORCH_MOTION_POLL_SECONDS", DEFAULT_POLL_SECONDS)
 IDLE_SECONDS = env_float("PORCH_IDLE_SECONDS", DEFAULT_IDLE_SECONDS)
 VISIT_COOLDOWN_SECONDS = env_float(
     "PORCH_VISIT_COOLDOWN_SECONDS", DEFAULT_VISIT_COOLDOWN_SECONDS
+)
+PRE_ROLL = int(env_float("PORCH_PRE_ROLL_SECONDS", float(PRE_ROLL_SECONDS)))
+POST_ROLL = int(env_float("PORCH_POST_ROLL_SECONDS", float(POST_ROLL_SECONDS)))
+SEGMENT_TIME = int(
+    env_float("PORCH_SEGMENT_TIME_SECONDS", float(SEGMENT_TIME_SECONDS))
+)
+LOCAL_RETENTION = int(
+    env_float("PORCH_LOCAL_RETENTION_SECONDS", float(LOCAL_RETENTION_SECONDS))
 )
 
 
@@ -81,91 +102,108 @@ def require_rtsp_url() -> str:
     return RTSP_URL
 
 
-def grab_gray_frame(rtsp_url: str, ffmpeg_bin: str | None = None) -> bytes:
-    """
-    Pull one low-res grayscale frame from RTSP as raw bytes.
-
-    Each call starts a short-lived ffmpeg process. That is simple and fine for
-    bring-up; a long-lived sampler can replace it later if the LAN host shows
-    CPU or RTSP reconnect pressure.
-    """
-    binary = ffmpeg_bin or require_ffmpeg()
-    result = subprocess.run(
-        [
-            binary,
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-rtsp_transport",
-            "tcp",
-            "-i",
-            rtsp_url,
-            "-frames:v",
-            "1",
-            "-f",
-            "rawvideo",
-            "-pix_fmt",
-            "gray",
-            "-s",
-            f"{SAMPLE_WIDTH}x{SAMPLE_HEIGHT}",
-            "pipe:1",
-        ],
-        capture_output=True,
-        check=False,
-        timeout=30,
-    )
-    expected = SAMPLE_WIDTH * SAMPLE_HEIGHT
-    if result.returncode != 0 or len(result.stdout) < expected:
-        err = result.stderr.decode("utf-8", errors="replace").strip()
-        raise RuntimeError(f"failed to sample RTSP frame: {err or result.returncode}")
-    return result.stdout[:expected]
+def pipeline_rtsp_url() -> str:
+    if RTSP_SAMPLE_URL:
+        return RTSP_SAMPLE_URL
+    return rtsp_substream_url(require_rtsp_url())
 
 
-def record_clip(
-    rtsp_url: str | None = None,
-    ffmpeg_bin: str | None = None,
-    clip_seconds: int = CLIP_SECONDS,
+def redacted_rtsp_host(url: str) -> str:
+    return url.rsplit("@", 1)[-1] if "@" in url else "(rtsp)"
+
+
+def concat_segments(
+    segment_paths: list[Path],
+    output_path: Path,
+    ffmpeg_bin: str,
+) -> None:
+    if not segment_paths:
+        raise RuntimeError("no retained segments to build a clip")
+    list_path = output_path.with_suffix(".concat.txt")
+    write_concat_list(segment_paths, list_path)
+    try:
+        # Re-encode: copy-concat across reset segment timestamps is unreliable.
+        subprocess.run(
+            [
+                ffmpeg_bin,
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-f",
+                "concat",
+                "-safe",
+                "0",
+                "-i",
+                str(list_path),
+                "-c:v",
+                "libx264",
+                "-preset",
+                "veryfast",
+                "-pix_fmt",
+                "yuv420p",
+                "-an",
+                "-movflags",
+                "+faststart",
+                "-y",
+                str(output_path),
+            ],
+            check=True,
+            timeout=180,
+        )
+    finally:
+        list_path.unlink(missing_ok=True)
+
+
+def prune_local_segments(
+    pipeline: ContinuousRetainPipeline,
+    *,
+    keep_after_epoch: float,
+) -> None:
+    index = pipeline.refresh_segment_index()
+    for path in prune_segments_older_than(index, keep_after_epoch=keep_after_epoch):
+        path.unlink(missing_ok=True)
+    pipeline.refresh_segment_index()
+
+
+def retain_event_clip(
+    pipeline: ContinuousRetainPipeline,
+    *,
+    ffmpeg_bin: str,
+    motion_epoch: float,
+    pre_roll_seconds: int,
+    post_roll_seconds: int,
 ) -> Path:
-    """Record a fixed-length mp4 from RTSP into ~/clips."""
-    url = rtsp_url or require_rtsp_url()
-    binary = ffmpeg_bin or require_ffmpeg()
-    OUTPUT_DIR.mkdir(exist_ok=True)
+    """
+    Wait out post-roll while segments keep writing, then join overlapping
+    segments for [motion - pre, motion + post].
+    """
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     path = OUTPUT_DIR / f"clip-{stamp}.mp4"
-    print(f"recording {path.name} for {clip_seconds}s")
-    subprocess.run(
-        [
-            binary,
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-rtsp_transport",
-            "tcp",
-            "-i",
-            url,
-            "-t",
-            str(clip_seconds),
-            "-c:v",
-            "libx264",
-            "-preset",
-            "veryfast",
-            "-pix_fmt",
-            "yuv420p",
-            "-an",
-            "-movflags",
-            "+faststart",
-            "-y",
-            str(path),
-        ],
-        check=True,
-        timeout=clip_seconds + 60,
+    window_start = motion_epoch - float(pre_roll_seconds)
+    window_end = motion_epoch + float(post_roll_seconds)
+    print(
+        f"retaining {path.name} "
+        f"(pre={pre_roll_seconds}s post={post_roll_seconds}s)"
     )
+    pipeline.drain_for(float(post_roll_seconds) + float(SEGMENT_TIME))
+    index = pipeline.refresh_segment_index()
+    retained = select_segments_overlapping_window(
+        index,
+        window_start=window_start,
+        window_end=window_end,
+    )
+    print(f"retained {len(retained)} segments")
+    concat_segments(retained, path, ffmpeg_bin)
     print(f"saved {path}")
+    prune_local_segments(
+        pipeline,
+        keep_after_epoch=time.time() - float(LOCAL_RETENTION),
+    )
     return path
 
 
 def sign_request(method: str, path: str, body: dict, timestamp: str) -> str:
-    # Match the Nest ECDSA guard: method + path + JSON.stringify(body) + timestamp.
     payload = f"{method}{path}{json.dumps(body, separators=(',', ':'))}{timestamp}"
     result = subprocess.run(
         ["openssl", "dgst", "-sha256", "-sign", str(PRIVATE_KEY_PATH)],
@@ -202,7 +240,6 @@ def upload_clip(path: Path) -> None:
         raise FileNotFoundError(
             f"Porch private key missing at {PRIVATE_KEY_PATH}"
         )
-
     upload = request_upload_url(path.stem)
     signed_url = upload["signedUrl"]
     with path.open("rb") as handle:
@@ -227,56 +264,37 @@ def upload_and_remove(path: Path) -> None:
         path.unlink(missing_ok=True)
         print(f"removed local {path.name}")
     except (OSError, urllib.error.URLError, urllib.error.HTTPError, KeyError) as error:
-        # Keep the file so a later sync or manual upload can retry.
         print(f"upload failed for {path.name}: {error}")
 
 
-def wait_for_motion(
-    rtsp_url: str,
-    threshold: float = MOTION_THRESHOLD,
-    poll_seconds: float = POLL_SECONDS,
-) -> None:
-    """Block until consecutive RTSP samples clear the motion threshold."""
-    previous = grab_gray_frame(rtsp_url)
-    while True:
-        time.sleep(poll_seconds)
-        current = grab_gray_frame(rtsp_url)
-        score = mean_abs_diff_ratio(previous, current)
-        previous = current
-        if motion_detected(score, threshold):
-            print(f"motion score={score:.4f}")
-            return
-
-
-def activity_still_present(
-    rtsp_url: str,
-    threshold: float = MOTION_THRESHOLD,
-    poll_seconds: float = POLL_SECONDS,
-    window_seconds: float = IDLE_SECONDS,
-) -> bool:
-    """True if another motion spike appears within window_seconds."""
-    previous = grab_gray_frame(rtsp_url)
-    deadline = time.monotonic() + window_seconds
-    while time.monotonic() < deadline:
-        time.sleep(poll_seconds)
-        current = grab_gray_frame(rtsp_url)
-        score = mean_abs_diff_ratio(previous, current)
-        previous = current
-        if motion_detected(score, threshold):
-            return True
-    return False
-
-
 def run_once() -> None:
-    """Record one clip and upload — laptop bring-up without waiting for motion."""
+    """Warm continuous segments briefly, retain a window, upload."""
     if not API_BASE_URL:
         raise SystemExit(
             "Set PORCH_API_BASE_URL to the Critter Canteen API base URL"
         )
-    require_ffmpeg()
-    rtsp_url = require_rtsp_url()
-    clip_path = record_clip(rtsp_url)
-    upload_and_remove(clip_path)
+    ffmpeg_bin = require_ffmpeg()
+    url = pipeline_rtsp_url()
+    with ContinuousRetainPipeline(
+        url,
+        segment_dir=SEGMENT_DIR,
+        width=SAMPLE_WIDTH,
+        height=SAMPLE_HEIGHT,
+        ffmpeg_bin=ffmpeg_bin,
+        fps=DETECT_FPS,
+        segment_time=SEGMENT_TIME,
+    ) as pipeline:
+        print(f"warming continuous segments on {redacted_rtsp_host(url)}")
+        pipeline.drain_for(float(PRE_ROLL + SEGMENT_TIME + 1))
+        motion_epoch = time.time()
+        clip_path = retain_event_clip(
+            pipeline,
+            ffmpeg_bin=ffmpeg_bin,
+            motion_epoch=motion_epoch,
+            pre_roll_seconds=PRE_ROLL,
+            post_roll_seconds=POST_ROLL,
+        )
+        upload_and_remove(clip_path)
 
 
 def run_loop() -> None:
@@ -284,40 +302,71 @@ def run_loop() -> None:
         raise SystemExit(
             "Set PORCH_API_BASE_URL to the Critter Canteen API base URL"
         )
-    require_ffmpeg()
-    rtsp_url = require_rtsp_url()
+    ffmpeg_bin = require_ffmpeg()
+    url = pipeline_rtsp_url()
     print(
-        "waiting for RTSP motion "
-        f"(threshold={MOTION_THRESHOLD}, poll={POLL_SECONDS}s). Ctrl+C to stop."
+        "approach A: continuous segments + retain on motion "
+        f"(stream={redacted_rtsp_host(url)}, segment={SEGMENT_TIME}s, "
+        f"pre={PRE_ROLL}s, post={POST_ROLL}s, threshold={MOTION_THRESHOLD})"
     )
     try:
-        while True:
-            wait_for_motion(rtsp_url)
-            visit_started = time.monotonic()
-            print("visit started")
-            while time.monotonic() - visit_started < VISIT_CAP_SECONDS:
-                clip_path = record_clip(rtsp_url)
-                upload_and_remove(clip_path)
-                if not activity_still_present(rtsp_url):
-                    break
-            else:
-                print("visit cap reached")
-            print("visit ended")
-            if VISIT_COOLDOWN_SECONDS > 0:
-                print(f"cooldown {VISIT_COOLDOWN_SECONDS}s")
-                time.sleep(VISIT_COOLDOWN_SECONDS)
+        with ContinuousRetainPipeline(
+            url,
+            segment_dir=SEGMENT_DIR,
+            width=SAMPLE_WIDTH,
+            height=SAMPLE_HEIGHT,
+            ffmpeg_bin=ffmpeg_bin,
+            fps=DETECT_FPS,
+            segment_time=SEGMENT_TIME,
+        ) as pipeline:
+            pipeline.drain_for(float(SEGMENT_TIME + 1))
+            while True:
+                wait_for_motion(
+                    pipeline,
+                    threshold=MOTION_THRESHOLD,
+                    on_motion=lambda score: print(f"motion score={score:.4f}"),
+                )
+                visit_started = time.monotonic()
+                motion_epoch = time.time()
+                print("visit started")
+                while time.monotonic() - visit_started < VISIT_CAP_SECONDS:
+                    clip_path = retain_event_clip(
+                        pipeline,
+                        ffmpeg_bin=ffmpeg_bin,
+                        motion_epoch=motion_epoch,
+                        pre_roll_seconds=PRE_ROLL,
+                        post_roll_seconds=POST_ROLL,
+                    )
+                    upload_and_remove(clip_path)
+                    if not activity_still_present(
+                        pipeline,
+                        threshold=MOTION_THRESHOLD,
+                        window_seconds=IDLE_SECONDS,
+                    ):
+                        break
+                    motion_epoch = time.time()
+                else:
+                    print("visit cap reached")
+                print("visit ended")
+                if VISIT_COOLDOWN_SECONDS > 0:
+                    print(f"cooldown {VISIT_COOLDOWN_SECONDS}s")
+                    pipeline.drain_for(VISIT_COOLDOWN_SECONDS)
+                    prune_local_segments(
+                        pipeline,
+                        keep_after_epoch=time.time() - float(LOCAL_RETENTION),
+                    )
     except KeyboardInterrupt:
         print("\nstopped")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Porch RTSP recorder — motion clips to Critter Canteen"
+        description="Porch RTSP recorder — continuous retain-on-motion (approach A)"
     )
     parser.add_argument(
         "--once",
         action="store_true",
-        help="Record and upload a single clip, then exit",
+        help="Warm segments, retain one window, upload, exit",
     )
     args = parser.parse_args()
     if args.once:

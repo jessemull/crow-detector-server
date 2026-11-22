@@ -66,7 +66,7 @@ Keep bare Pi camera / PIR parts for indoor experiments only.
 
 Recorder: `pi/record-on-motion.py` (ffmpeg RTSP + software motion; ECDSA `pi-porch`). Helpers/tests: `pi/record_on_motion_lib.py`, `pi/test_record_on_motion_lib.py`.
 
-**Host load note:** motion sampling starts a short-lived `ffmpeg` process per frame. That is intentional for bring-up simplicity. If the laptop shows high CPU or flaky RTSP reconnects, replace `grab_gray_frame` with a longer-lived sampler later.
+**Host load note (approach A):** one long-lived ffmpeg on the **substream** (`stream2` by default) continuously remuxes short `-c copy` segments to disk **and** emits low-res gray frames for motion. On motion we **retain** overlapping segments (pre/post window), join, and upload — no new RTSP open at trigger time. Local disk holds a short rolling window; AWS only gets retained visit clips.
 
 ## Agent rules
 

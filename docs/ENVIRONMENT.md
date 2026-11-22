@@ -63,11 +63,15 @@ Porch LAN recorder (host laptop/server, not Nest) — see `docs/DEVICES.md` and 
 | ----------------------------- | ------------------------------------------------ | -------- | ------- |
 | `PORCH_API_BASE_URL`          | API base for ECDSA porch uploads                 | Yes      | - (bring-up: `https://api-dev.crittercanteen.com`) |
 | `PORCH_RTSP_URL`              | Full RTSP URL including Camera Account user/pass | Yes      | - |
+| `PORCH_RTSP_SAMPLE_URL`       | Override warm pipeline URL (defaults to `stream2` derived from `PORCH_RTSP_URL`) | No | derived `stream2` |
 | `PI_PORCH_PRIVATE_KEY_PATH`   | Path to porch private key on the host            | No       | `~/keys/pi-porch-private.pem` |
 | `PORCH_MOTION_THRESHOLD`      | Frame-diff score (0–1) that counts as motion     | No       | `0.035` |
-| `PORCH_MOTION_POLL_SECONDS`   | Seconds between RTSP motion samples              | No       | `0.5` |
 | `PORCH_IDLE_SECONDS`          | Quiet window before ending a visit               | No       | `3` |
 | `PORCH_VISIT_COOLDOWN_SECONDS`| Pause after a visit before arming again          | No       | `30` |
+| `PORCH_PRE_ROLL_SECONDS`      | Seconds before motion retained from continuous segments | No | `4` |
+| `PORCH_POST_ROLL_SECONDS`     | Seconds after motion retained from continuous segments | No | `20` |
+| `PORCH_SEGMENT_TIME_SECONDS`  | Continuous remux segment length                  | No       | `2` |
+| `PORCH_LOCAL_RETENTION_SECONDS` | Max age of local segment files before prune    | No       | `180` |
 
 Host secrets live in `~/porch.env` (`chmod 600`) and are never committed. Prefer systemd (`scripts/porch-recorder.service`) on the LAN host; deploy code with `DEPLOY_HOST=… ./scripts/deploy-porch-host.sh`.
 
