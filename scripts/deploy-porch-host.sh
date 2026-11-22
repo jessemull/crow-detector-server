@@ -18,6 +18,7 @@ if [[ -z "${DEPLOY_HOST}" ]]; then
   exit 1
 fi
 
+# Leading ~ is expanded by the remote shell (it must stay unquoted there).
 PORCH_REPO_DIR="${PORCH_REPO_DIR:-~/crow-detector-server}"
 PORCH_SERVICE="${PORCH_SERVICE:-porch-recorder}"
 PORCH_GIT_REF="${PORCH_GIT_REF:-$(git rev-parse --abbrev-ref HEAD)}"
@@ -25,13 +26,17 @@ if [[ "${PORCH_GIT_REF}" == "HEAD" ]]; then
   echo "Error: detached HEAD; set PORCH_GIT_REF to the branch to deploy" >&2
   exit 1
 fi
-if [[ ! "${PORCH_GIT_REF}" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+if [[ ! "${PORCH_GIT_REF}" =~ ^[A-Za-z0-9._/][A-Za-z0-9._/-]*$ ]]; then
   echo "Error: unsafe PORCH_GIT_REF" >&2
+  exit 1
+fi
+if [[ ! "${PORCH_REPO_DIR}" =~ ^(~/|/)[A-Za-z0-9._/-]+$ ]] || [[ "${PORCH_REPO_DIR}" == *..* ]]; then
+  echo "Error: unsafe PORCH_REPO_DIR" >&2
   exit 1
 fi
 
 ssh "${DEPLOY_HOST}" "set -euo pipefail
-  cd \"${PORCH_REPO_DIR}\"
+  cd ${PORCH_REPO_DIR}
   git fetch origin
   git checkout \"${PORCH_GIT_REF}\" || git checkout -b \"${PORCH_GIT_REF}\" \"origin/${PORCH_GIT_REF}\"
   git pull --ff-only origin \"${PORCH_GIT_REF}\"

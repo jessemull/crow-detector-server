@@ -360,6 +360,45 @@ class PipelineTests(unittest.TestCase):
             finally:
                 pipeline.close()
 
+    def test_close_returns_while_stdout_is_idle(self) -> None:
+        import os
+
+        read_fd, write_fd = os.pipe()
+        try:
+
+            class PipeStdout:
+                def fileno(self) -> int:
+                    return read_fd
+
+                def read(self, size: int = -1) -> bytes:
+                    count = size if size and size > 0 else 4096
+                    return os.read(read_fd, count)
+
+                def close(self) -> None:
+                    os.close(read_fd)
+
+            def fake_popen(*_a: object, **_k: object) -> _FakeProc:
+                proc = _FakeProc([])
+                proc.stdout = PipeStdout()  # type: ignore[assignment]
+                return proc
+
+            with tempfile.TemporaryDirectory() as tmp:
+                pipeline = ContinuousRetainPipeline(
+                    "rtsp://u:p@host/stream2",
+                    segment_dir=Path(tmp),
+                    width=2,
+                    height=2,
+                    ffmpeg_bin="/usr/bin/ffmpeg",
+                    popen=fake_popen,
+                )
+                pipeline.start()
+                time.sleep(0.05)
+                started = time.monotonic()
+                pipeline.close()
+                self.assertLess(time.monotonic() - started, 1.0)
+        finally:
+            os.close(write_fd)
+
 
 class MotionLoopTests(unittest.TestCase):
     def test_wait_for_motion(self) -> None:
@@ -373,6 +412,23 @@ class MotionLoopTests(unittest.TestCase):
         scores: list[float] = []
         wait_for_motion(Stub(), threshold=0.5, on_motion=scores.append)  # type: ignore[arg-type]
         self.assertEqual(len(scores), 1)
+
+    def test_wait_for_motion_ticks_while_idle(self) -> None:
+        class Stub:
+            def __init__(self) -> None:
+                self.frames = [bytes([0, 0]), bytes([0, 0]), bytes([255, 255])]
+
+            def read_frame(self) -> bytes:
+                return self.frames.pop(0)
+
+        ticks: list[int] = []
+        wait_for_motion(  # type: ignore[arg-type]
+            Stub(),
+            threshold=0.5,
+            on_tick=lambda: ticks.append(1),
+            tick_seconds=0,
+        )
+        self.assertGreaterEqual(len(ticks), 1)
 
     def test_activity(self) -> None:
         class Moving:

@@ -11,6 +11,7 @@ User=porch
 Group=porch
 WorkingDirectory=/home/porch/crow-detector-server
 EnvironmentFile=-/home/porch/porch.env
+Environment=PYTHONUNBUFFERED=1
 ExecStart=/usr/bin/python3 /home/porch/crow-detector-server/pi/record-on-motion.py
 Restart=on-failure
 RestartSec=10

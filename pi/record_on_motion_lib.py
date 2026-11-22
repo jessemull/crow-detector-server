@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import queue
+import select
 import subprocess
 import threading
 import time
@@ -154,11 +155,44 @@ def drop_incomplete_newest_segment(
 PopenFactory = Callable[..., Any]
 
 
-def _read_exact(stdout: IO[bytes], size: int) -> bytes:
+def _stdout_fd(stdout: IO[bytes]) -> int | None:
+    fileno = getattr(stdout, "fileno", None)
+    if not callable(fileno):
+        return None
+    try:
+        return int(fileno())
+    except (OSError, ValueError, AttributeError):
+        return None
+
+
+def _read_exact(
+    stdout: IO[bytes],
+    size: int,
+    stop: threading.Event | None = None,
+) -> bytes:
+    """
+    Read exactly size bytes.
+
+    When the stream has a fileno and stop is set, poll instead of blocking in
+    read() so close() can join the drain thread.
+    """
     chunks: list[bytes] = []
     remaining = size
+    fd = _stdout_fd(stdout) if stop is not None else None
     while remaining > 0:
-        chunk = stdout.read(remaining)
+        if stop is not None and stop.is_set():
+            break
+        if fd is not None:
+            try:
+                readable, _, _ = select.select([fd], [], [], 0.2)
+            except (OSError, ValueError):
+                break
+            if not readable:
+                continue
+        try:
+            chunk = stdout.read(remaining)
+        except OSError:
+            break
         if not chunk:
             break
         chunks.append(chunk)
@@ -411,7 +445,7 @@ class ContinuousRetainPipeline:
             if stdout is None:
                 return
             while not stop.is_set():
-                frame = _read_exact(stdout, self.frame_size)
+                frame = _read_exact(stdout, self.frame_size, stop)
                 if len(frame) != self.frame_size:
                     break
                 _enqueue_frame(frames, frame)
@@ -425,10 +459,19 @@ def wait_for_motion(
     *,
     threshold: float,
     on_motion: Callable[[float], None] | None = None,
+    on_tick: Callable[[], None] | None = None,
+    tick_seconds: float = 30.0,
+    monotonic: Callable[[], float] = time.monotonic,
 ) -> None:
+    """Block until motion. on_tick runs about every tick_seconds while idle."""
     previous = pipeline.read_frame()
+    next_tick = monotonic() + max(0.0, tick_seconds)
     while True:
         current = pipeline.read_frame()
+        now = monotonic()
+        if on_tick is not None and now >= next_tick:
+            on_tick()
+            next_tick = now + max(0.0, tick_seconds)
         score = mean_abs_diff_ratio(previous, current)
         previous = current
         if motion_detected(score, threshold):

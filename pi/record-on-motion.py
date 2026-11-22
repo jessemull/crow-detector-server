@@ -371,6 +371,11 @@ def run_loop() -> None:
                         on_motion=lambda score: print(
                             f"motion score={score:.4f}"
                         ),
+                        on_tick=lambda: prune_local_segments(
+                            pipeline,
+                            keep_after_epoch=time.time()
+                            - float(LOCAL_RETENTION),
+                        ),
                     )
                     visit_started = time.monotonic()
                     motion_epoch = time.time()
