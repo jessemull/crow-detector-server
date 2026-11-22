@@ -88,7 +88,7 @@ Example: `DEPLOY_HOST=juzu-inui PORCH_GIT_REF=main ./scripts/deploy-porch-host.s
 
 SSH login key (Mac): `~/.ssh/id_ed25519_porch` — not the same as `~/keys/pi-porch-private.pem` (API ECDSA on the host).
 
-Legacy Pi helpers still exist: `npm run pi:sync` / `pi:start` / `pi:stop` (hardcoded old `critter-cam.local` paths). The outdoor porch path is **LAN host + RTSP**, not Pi CSI/PIR.
+The outdoor porch path is **LAN host + RTSP**, not Pi CSI/PIR.
 
 ---
 
