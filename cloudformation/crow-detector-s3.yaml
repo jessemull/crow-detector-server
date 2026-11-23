@@ -41,6 +41,11 @@ Resources:
             Prefix: porch/
             ExpirationInDays: 30
             NoncurrentVersionExpirationInDays: 7
+          - Id: DeleteOldFeederClips
+            Status: Enabled
+            Prefix: feeder/
+            ExpirationInDays: 30
+            NoncurrentVersionExpirationInDays: 7
       CorsConfiguration:
         CorsRules:
           - AllowedHeaders: ['*']

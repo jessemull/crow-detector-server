@@ -39,6 +39,21 @@ export class UrlsController {
     );
   }
 
+  @Post('feeder')
+  @UseGuards(EcdsaAuthGuard)
+  async createFeederClipSignedUrl(
+    @Body() createPorchClipUrlDto: CreatePorchClipUrlDto,
+    @Req() request: DeviceRequest,
+  ) {
+    if (request.deviceId !== 'pi-feeder' && request.deviceId !== 'dev-mode') {
+      throw new ForbiddenException(
+        'Only the feeder host can request feeder upload URLs',
+      );
+    }
+
+    return this.urlsService.createFeederClipSignedUrl(createPorchClipUrlDto);
+  }
+
   @Post('porch')
   @UseGuards(EcdsaAuthGuard)
   async createPorchClipSignedUrl(

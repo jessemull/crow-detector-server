@@ -17,6 +17,7 @@ describe('UrlsController', () => {
     createFeedImageSignedUrl: jest.fn(),
     createDetectionImageSignedUrl: jest.fn(),
     createPorchClipSignedUrl: jest.fn(),
+    createFeederClipSignedUrl: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -187,6 +188,53 @@ describe('UrlsController', () => {
         } as any),
       ).rejects.toThrow(ForbiddenException);
       expect(service.createPorchClipSignedUrl).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('createFeederClipSignedUrl', () => {
+    it('should create a feeder clip signed URL for pi-feeder', async () => {
+      const dto: CreatePorchClipUrlDto = {
+        fileName: 'clip-20261122-201000',
+        contentType: 'video/mp4',
+      };
+      const expectedResult = {
+        signedUrl: 'https://test-bucket.s3.amazonaws.com/feeder/123-clip.mp4',
+        key: 'feeder/123-clip-20261122-201000.mp4',
+        expiresAt: '2024-01-01T12:00:00.000Z',
+        bucket: 'test-bucket',
+        metadata: { timestamp: 123, type: 'feeder' },
+      };
+      mockUrlsService.createFeederClipSignedUrl.mockResolvedValue(
+        expectedResult,
+      );
+
+      const result = await controller.createFeederClipSignedUrl(dto, {
+        deviceId: 'pi-feeder',
+      } as any);
+
+      expect(service.createFeederClipSignedUrl).toHaveBeenCalledWith(dto);
+      expect(result).toEqual(expectedResult);
+    });
+
+    it('should allow dev-mode', async () => {
+      mockUrlsService.createFeederClipSignedUrl.mockResolvedValue({
+        key: 'feeder/1-clip.mp4',
+      });
+
+      await controller.createFeederClipSignedUrl({ fileName: 'clip-1' }, {
+        deviceId: 'dev-mode',
+      } as any);
+
+      expect(service.createFeederClipSignedUrl).toHaveBeenCalled();
+    });
+
+    it('should reject other devices', async () => {
+      await expect(
+        controller.createFeederClipSignedUrl({ fileName: 'clip-1' }, {
+          deviceId: 'pi-porch',
+        } as any),
+      ).rejects.toThrow(ForbiddenException);
+      expect(service.createFeederClipSignedUrl).not.toHaveBeenCalled();
     });
   });
 });

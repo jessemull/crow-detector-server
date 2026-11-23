@@ -274,6 +274,26 @@ describe('UrlsService', () => {
     });
   });
 
+  describe('createFeederClipSignedUrl', () => {
+    it('should create a feeder clip signed URL under feeder/', async () => {
+      const result = await service.createFeederClipSignedUrl({
+        fileName: 'clip-20261122-201000',
+        contentType: 'video/mp4',
+      });
+
+      expect(result.key).toMatch(/^feeder\/\d+-clip-20261122-201000\.mp4$/);
+      expect(result.metadata.type).toBe('feeder');
+      expect(result.bucket).toBe('test-bucket');
+    });
+
+    it('should throw BadRequestException when signing fails', async () => {
+      mockGetSignedUrl.mockRejectedValue(new Error('S3 error'));
+      await expect(
+        service.createFeederClipSignedUrl({ fileName: 'clip-1' }),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
   describe('getContentType', () => {
     it('should return correct content type for JPG', () => {
       const result = (service as any).getContentType(ImageFormat.JPG);

@@ -10,7 +10,7 @@ import { ClaudeService } from './services/claude.service';
 
 @Module({
   controllers: [DetectionController],
-  exports: [DetectionEventService],
+  exports: [DetectionEventService, ClaudeService],
   imports: [FeedModule, TypeOrmModule.forFeature([DetectionEvent, FeedEvent])],
   providers: [
     DetectionEventService,

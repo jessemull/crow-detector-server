@@ -197,6 +197,52 @@ export class UrlsService {
     }
   }
 
+  async createFeederClipSignedUrl(
+    createPorchClipUrlDto: CreatePorchClipUrlDto,
+  ) {
+    const { fileName, contentType } = createPorchClipUrlDto;
+    const safeName = this.sanitizePorchFileName(fileName);
+    const timestamp = Date.now();
+    const key = `feeder/${timestamp}-${safeName}.mp4`;
+    const finalContentType = contentType || 'video/mp4';
+
+    const command = new PutObjectCommand({
+      Bucket: this.bucketName,
+      Key: key,
+      ContentType: finalContentType,
+      ServerSideEncryption: 'AES256',
+      Metadata: {
+        'x-amz-meta-timestamp': timestamp.toString(),
+        'x-amz-meta-type': 'feeder',
+      },
+    });
+
+    try {
+      const signedUrl = await getSignedUrl(this.s3Client, command, {
+        expiresIn: 900,
+      });
+
+      return {
+        signedUrl,
+        key,
+        expiresAt: new Date(Date.now() + 900 * 1000).toISOString(),
+        bucket: this.bucketName,
+        metadata: {
+          timestamp,
+          type: 'feeder',
+        },
+      };
+    } catch (error) {
+      logger.error(
+        { error: error instanceof Error ? error.message : String(error) },
+        'Failed to generate feeder clip signed URL',
+      );
+      throw new BadRequestException(
+        'Failed to generate feeder clip signed URL',
+      );
+    }
+  }
+
   private sanitizePorchFileName(fileName: string): string {
     const baseName = fileName.split(/[/\\]/).pop() || 'clip';
     const withoutExtension = baseName.replace(/\.mp4$/i, '');
