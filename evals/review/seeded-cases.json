@@ -1,0 +1,310 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "control-benign",
+      "title": "Control: comment wording only",
+      "summary": "docs(auth): clarify the development bypass comment",
+      "edits": [
+        {
+          "path": "src/auth/middleware/ecdsa-auth.guard.ts",
+          "find": "// Development-only bypass — must never activate when NODE_ENV is production/prod.",
+          "replace": "// Development-only bypass. It must never activate when NODE_ENV is production or prod."
+        }
+      ],
+      "expected": []
+    },
+    {
+      "id": "auth-bypass-prod",
+      "title": "Dev bypass runs in production",
+      "summary": "fix(auth): allow the dev header outside the test environment",
+      "edits": [
+        {
+          "path": "src/auth/middleware/ecdsa-auth.guard.ts",
+          "find": "if (nodeEnv === 'development' && request.headers['x-dev-mode'] === 'true') {",
+          "replace": "if (nodeEnv !== 'test' && request.headers['x-dev-mode'] === 'true') {"
+        }
+      ],
+      "expected": [
+        {
+          "label": "x-dev-mode bypasses ECDSA when NODE_ENV is production",
+          "path": "src/auth/middleware/ecdsa-auth.guard.ts",
+          "criteria": ["AUTH-01"],
+          "severity": "MUST"
+        }
+      ]
+    },
+    {
+      "id": "auth-test-weakened",
+      "title": "Production bypass test now expects success",
+      "summary": "test(auth): stop asserting the production bypass rejection",
+      "edits": [
+        {
+          "path": "src/auth/middleware/ecdsa-auth.guard.spec.ts",
+          "find": "      expect(() => {\n        guard.canActivate(mockContext);\n      }).toThrow(UnauthorizedException);\n    });\n\n    it('should not skip authentication when x-dev-mode is not true', () => {",
+          "replace": "      expect(guard.canActivate(mockContext)).toBe(true);\n    });\n\n    it('should not skip authentication when x-dev-mode is not true', () => {"
+        }
+      ],
+      "expected": [
+        {
+          "label": "The production bypass test now asserts the guard allows the request",
+          "path": "src/auth/middleware/ecdsa-auth.guard.spec.ts",
+          "criteria": ["TEST-02", "TEST-07"],
+          "severity": "MUST"
+        }
+      ]
+    },
+    {
+      "id": "signed-string-drift",
+      "title": "Lambda signs a different string than the guard verifies",
+      "summary": "refactor(lambda): drop the body from the signed payload",
+      "edits": [
+        {
+          "path": "lambda/src/util/auth.ts",
+          "find": "const dataToSign = `${method}${path}${JSON.stringify(body)}${timestamp}`;",
+          "replace": "const dataToSign = `${method}${path}${timestamp}`;"
+        }
+      ],
+      "expected": [
+        {
+          "label": "Lambda signature no longer covers the body, so the guard rejects every call",
+          "path": "lambda/src/util/auth.ts",
+          "criteria": ["CON-05", "AUTH-03"],
+          "severity": "MUST"
+        }
+      ]
+    },
+    {
+      "id": "claude-skip-validation",
+      "title": "Model JSON is trusted without the shape check",
+      "summary": "refactor(detection): trust the model JSON",
+      "edits": [
+        {
+          "path": "src/detection/services/claude.service.ts",
+          "find": "      if (!this.isAnalysisResult(result)) {\n        throw new Error('Invalid response structure from Claude');\n      }\n\n",
+          "replace": ""
+        }
+      ],
+      "expected": [
+        {
+          "label": "Claude JSON is cast and returned without the shape check",
+          "path": "src/detection/services/claude.service.ts",
+          "criteria": ["LLM-01", "TS-02"],
+          "severity": "MUST"
+        }
+      ]
+    },
+    {
+      "id": "synchronize-on",
+      "title": "TypeORM synchronize turned on",
+      "summary": "chore(config): let TypeORM sync the schema on boot",
+      "edits": [
+        {
+          "path": "src/app.module.ts",
+          "find": "export const typeOrmSynchronize = false;",
+          "replace": "export const typeOrmSynchronize = true;"
+        }
+      ],
+      "expected": [
+        {
+          "label": "synchronize: true can alter the deployed schema on boot",
+          "path": "src/app.module.ts",
+          "criteria": ["DB-01"],
+          "severity": "MUST"
+        }
+      ]
+    },
+    {
+      "id": "porch-key-raw",
+      "title": "Porch object key uses the raw file name",
+      "summary": "refactor(urls): use the porch file name directly in the key",
+      "edits": [
+        {
+          "path": "src/urls/services/urls.service.ts",
+          "find": "    const safeName = this.sanitizePorchFileName(fileName);",
+          "replace": "    const safeName = fileName;"
+        }
+      ],
+      "expected": [
+        {
+          "label": "A file name with slashes can escape the porch/ prefix",
+          "path": "src/urls/services/urls.service.ts",
+          "criteria": ["AWS-01", "SEC-06"],
+          "severity": "MUST"
+        }
+      ]
+    },
+    {
+      "id": "lambda-drop-failures",
+      "title": "Failed SQS records are reported as success",
+      "summary": "fix(lambda): return 200 when some records fail so the batch is not retried",
+      "edits": [
+        {
+          "path": "lambda/src/index.ts",
+          "find": "    throw new Error('Some SQS events failed to process');",
+          "replace": "    return { statusCode: 200, body: JSON.stringify({ message: 'done', results }) };"
+        }
+      ],
+      "expected": [
+        {
+          "label": "Failed records are acknowledged, so SQS deletes them",
+          "path": "lambda/src/index.ts",
+          "criteria": ["LAM-01", "ERR-02"],
+          "severity": "MUST"
+        }
+      ]
+    },
+    {
+      "id": "workflow-injection",
+      "title": "Branch name interpolated into a run script",
+      "summary": "ci: log the branch being linted",
+      "edits": [
+        {
+          "path": ".github/workflows/pull-request.yml",
+          "find": "      - name: Run Linting\n        run: npm run lint\n",
+          "replace": "      - name: Run Linting\n        run: echo \"Linting ${{ github.head_ref }}\" && npm run lint\n"
+        }
+      ],
+      "expected": [
+        {
+          "label": "github.head_ref is attacker-controlled and interpolated into run:",
+          "path": ".github/workflows/pull-request.yml",
+          "criteria": ["CI-01"],
+          "severity": "MUST"
+        }
+      ]
+    },
+    {
+      "id": "python-shell",
+      "title": "ffmpeg concat goes through the shell",
+      "summary": "refactor(porch): build the ffmpeg command as a string",
+      "edits": [
+        {
+          "path": "pi/record-on-motion.py",
+          "find": "        # Re-encode: copy-concat across reset segment timestamps is unreliable.\n        subprocess.run(",
+          "replace": "        # Re-encode: copy-concat across reset segment timestamps is unreliable.\n        subprocess.run(f\"{ffmpeg_bin} -y {output_path}\", shell=True)\n        subprocess.run("
+        }
+      ],
+      "expected": [
+        {
+          "label": "shell=True runs a command string",
+          "path": "pi/record-on-motion.py",
+          "criteria": ["PY-01"],
+          "severity": "MUST"
+        }
+      ]
+    },
+    {
+      "id": "ssl-off-in-prod",
+      "title": "Production can disable RDS certificate verification",
+      "summary": "fix(config): honor SSL_REJECT_UNAUTHORIZED in production",
+      "edits": [
+        {
+          "path": "src/config/app.config.ts",
+          "find": "        if (isProdLike) {\n          return true;\n        }",
+          "replace": "        if (isProdLike) {\n          return env.SSL_REJECT_UNAUTHORIZED !== 'false';\n        }"
+        }
+      ],
+      "expected": [
+        {
+          "label": "SSL_REJECT_UNAUTHORIZED=false now disables CA verification in production",
+          "path": "src/config/app.config.ts",
+          "criteria": ["DB-08"],
+          "severity": "MUST"
+        }
+      ]
+    },
+    {
+      "id": "log-api-key",
+      "title": "Claude API key written to the log",
+      "summary": "chore(detection): log the key in use when analysis finishes",
+      "edits": [
+        {
+          "path": "src/detection/services/claude.service.ts",
+          "find": "Claude analysis completed:",
+          "replace": "Claude analysis completed with key ${process.env.CLAUDE_API_KEY}:"
+        }
+      ],
+      "expected": [
+        {
+          "label": "The Anthropic API key is interpolated into a log line",
+          "path": "src/detection/services/claude.service.ts",
+          "criteria": ["SEC-04", "LLM-03"],
+          "severity": "MUST"
+        }
+      ]
+    },
+    {
+      "id": "replay-window-stale-comment",
+      "title": "Replay window widened, comment still says five minutes",
+      "summary": "fix(auth): give devices a longer clock skew window",
+      "edits": [
+        {
+          "path": "src/auth/middleware/ecdsa-auth.guard.ts",
+          "find": "    const timeWindow = 5 * 60 * 1000; // 5 minutes",
+          "replace": "    const timeWindow = 30 * 60 * 1000; // 5 minutes"
+        }
+      ],
+      "expected": [
+        {
+          "label": "The replay window is 30 minutes while the comment says 5",
+          "path": "src/auth/middleware/ecdsa-auth.guard.ts",
+          "criteria": ["DOC-01", "AUTH-05"],
+          "severity": "SHOULD"
+        }
+      ]
+    },
+    {
+      "id": "cors-reflect",
+      "title": "CORS reflects any origin",
+      "summary": "fix(api): allow the porch page from any host",
+      "edits": [
+        {
+          "path": "src/main.ts",
+          "find": "      origin: config.corsAllowedOrigins,",
+          "replace": "      origin: true,"
+        }
+      ],
+      "expected": [
+        {
+          "label": "origin: true reflects the request origin instead of the configured list",
+          "path": "src/main.ts",
+          "criteria": ["API-08"],
+          "severity": "SHOULD"
+        }
+      ]
+    },
+    {
+      "id": "s3-key-no-decode",
+      "title": "S3 object keys are no longer decoded",
+      "summary": "refactor(lambda): use the S3 key as it arrives",
+      "edits": [
+        {
+          "path": "lambda/src/util/s3.ts",
+          "find": "key: decodeURIComponent(s3.object.key.replace(/\\+/g, ' ')),",
+          "replace": "key: s3.object.key,"
+        }
+      ],
+      "expected": [
+        {
+          "label": "A key containing a space or percent-encoding is used verbatim and misses the object",
+          "path": "lambda/src/util/s3.ts",
+          "criteria": ["LAM-03"],
+          "severity": "MUST"
+        }
+      ]
+    },
+    {
+      "id": "mixed-large",
+      "title": "Several defects in one diff",
+      "summary": "chore: small cleanups across auth, urls, ci, and detection",
+      "includes": [
+        "auth-bypass-prod",
+        "porch-key-raw",
+        "workflow-injection",
+        "log-api-key"
+      ],
+      "expected": []
+    }
+  ]
+}

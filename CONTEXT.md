@@ -106,6 +106,7 @@ These constraints apply to **every change** in this repository. No exceptions wi
 | **Commit message** | Husky `commit-msg` — commitlint (Conventional Commits + scope enum)                                                           | Block commit   |
 | **Push**           | Husky `pre-push` — `make preflight` (root + lambda quality)                                                                   | Block push     |
 | **PR / CI**        | GitHub Actions: lint, format-check, test (Jest 80%), build; lambda workflows; npm audit (high+, blocking once clean)          | Block merge    |
+| **Review**         | `pr-review` / `repo-review` skills against `docs/review/`; a ledger must pass `npm run review:check`                          | Block merge    |
 
 ### When to run what (avoid duplicate work)
 

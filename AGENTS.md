@@ -80,6 +80,9 @@ Prefer `make` targets. Run **`make`** or **`make help`** for a compact list.
 | `make preflight`      | Root + lambda lint/format/test/build             |
 | `make ci`             | Alias for `preflight`                            |
 | `make commit`         | Interactive Commitizen commit                    |
+| `make review-inventory` | Review file inventory (`KIND=pr` or `repo`)    |
+| `make review-check`   | Check a review ledger (`LEDGER=path`)            |
+| `make review-eval-validate` | Check seeded review cases still apply      |
 
 ### Local API / DB
 
@@ -249,7 +252,7 @@ controller → service → TypeORM repository / AWS SDK / Claude SDK
 
 Types: `feat`, `fix`, `refactor`, `test`, `docs`, `style`, `perf`, `chore`, `build`, `ci`, `revert`
 
-Scopes (commitlint enum): `auth`, `feed`, `detection`, `urls`, `health`, `common`, `config`, `lambda`, `ci`, `docs`, `deps`, `infra`, `docker`
+Scopes (commitlint enum): `auth`, `feed`, `detection`, `porch`, `urls`, `health`, `common`, `config`, `lambda`, `ci`, `docs`, `deps`, `infra`, `docker`
 
 Prefer `make commit` (Commitizen).
 
@@ -291,3 +294,4 @@ Before finishing work:
 - [ ] No secrets in logs or source
 - [ ] Conventional Commits with valid scope
 - [ ] Will pass `make preflight` before push
+- [ ] For a review, the ledger passes `npm run review:check`

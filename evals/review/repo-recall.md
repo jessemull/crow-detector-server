@@ -1,0 +1,18 @@
+# Repo review recall set
+
+> **AI agents — read this file when:** scoring a `repo-review` run. Do **not** read it before or during the review you are scoring; that defeats the measurement.
+
+Issues confirmed in this repository while porting the review system (November 2026, code read against commit `59d257f`). A full `repo-review` should report every open item. Score each as **found**, **found at a different severity**, or **missed**.
+
+This is a starter set from the files read during the port, not a finished audit. Add an item whenever a review misses a real defect, and mark an item `fixed (<commit>)` when the code changes rather than deleting it.
+
+| #   | Status | Location                                              | Issue                                                                                                                                                                                          | Expected criteria   | Expected severity |
+| --- | ------ | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- | ----------------- |
+| 1   | open   | `tsconfig.json`                                       | `noImplicitAny`, `strictBindCallApply`, `strictPropertyInitialization`, and `noFallthroughCasesInSwitch` are off, so a clean build misses those classes of bug                                | TS-07, GATE-10      | SHOULD            |
+| 2   | open   | `eslint.config.mjs`                                   | `no-explicit-any` is off, and `no-floating-promises` plus the `no-unsafe-*` rules are warnings. `npm run lint` does not fail on warnings                                                      | GATE-03, TS-01, TS-03 | SHOULD          |
+| 3   | open   | `tsconfig.build.json`                                 | The typecheck gate excludes `**/*spec.ts`, so the tests are not typechecked                                                                                                                    | GATE-04             | SHOULD            |
+| 4   | open   | `package.json` `lint-staged`                          | Only `*.ts` is formatted on commit, so YAML, Python, shell, Markdown, and JSON can drift                                                                                                      | CONV-07, CFG-06     | SHOULD            |
+| 5   | open   | `lambda/src/index.ts:36-48`                           | A failed record throws, and the handler never returns `batchItemFailures`, so SQS retries the whole batch including records already processed                                                  | LAM-01              | SHOULD            |
+| 6   | open   | `src/porch/guards/in-memory-rate-limit.guard.ts:61-64` | The client key is the first `X-Forwarded-For` hop, which a caller can set, so the public clip list limit can be sidestepped                                                                   | API-10              | SHOULD            |
+| 7   | open   | `.github/workflows/*.yml`                             | Actions are pinned to tags (`actions/checkout@v7`, `aws-actions/configure-aws-credentials@v6`), deploy jobs use static `AWS_ACCESS_KEY_ID`, and no workflow sets `permissions:`                | CI-02, CI-03, CI-05 | SHOULD            |
+| 8   | open   | `Dockerfile:3`                                        | `FROM node:26-alpine` is not pinned to a digest                                                                                                                                                | DOCK-03             | SHOULD            |
