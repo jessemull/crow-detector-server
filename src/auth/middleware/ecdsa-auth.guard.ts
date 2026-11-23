@@ -79,7 +79,10 @@ export class EcdsaAuthGuard implements CanActivate {
     const currentTime = Date.now();
     const timeWindow = 5 * 60 * 1000; // 5 minutes
 
-    if (Math.abs(currentTime - requestTime) > timeWindow) {
+    if (
+      !Number.isFinite(requestTime) ||
+      Math.abs(currentTime - requestTime) > timeWindow
+    ) {
       throw new UnauthorizedException('Request timestamp expired');
     }
 

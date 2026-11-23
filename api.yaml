@@ -568,6 +568,218 @@ paths:
         '500':
           description: Internal server error
 
+  /feeder/dispense:
+    post:
+      summary: Request a feeder dispense proof
+      description: |
+        Public route. Creates a dispense row when the 10-minute cooldown is clear.
+        The feeder host later claims the row and uploads a separate proof clip.
+        Apply scripts/db-seed/feeder-video.sql before serving this route.
+      tags:
+        - Feeder
+      responses:
+        '201':
+          description: Dispense requested
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DispenseRequest'
+        '400':
+          description: Cooldown is active
+        '429':
+          description: Too many requests
+        '503':
+          description: Cooldown check failed closed
+
+  /feeder/dispense/{id}:
+    get:
+      summary: Read a dispense request
+      description: Public status. Includes a short-lived proof URL once the clip is ready.
+      tags:
+        - Feeder
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Dispense status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DispenseRequest'
+        '404':
+          description: Dispense request not found
+        '429':
+          description: Too many requests
+    patch:
+      summary: Finish a dispense proof
+      description: Feeder host only. The row must already be recording.
+      tags:
+        - Feeder
+      security:
+        - ECDSA: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompleteDispenseDTO'
+      responses:
+        '200':
+          description: Dispense updated
+        '400':
+          description: The row is not recording, or the proof key is invalid
+        '401':
+          description: Unauthorized
+        '403':
+          description: Caller is not the feeder host
+        '404':
+          description: Dispense request not found
+
+  /feeder/dispense/pending:
+    get:
+      summary: Claim the next dispense proof
+      description: |
+        Feeder host only. Claims the oldest requested row, or a recording row
+        abandoned for more than five minutes. Returns `{ "request": null }` when
+        nothing is waiting.
+      tags:
+        - Feeder
+      security:
+        - ECDSA: []
+      responses:
+        '200':
+          description: Claim result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  request:
+                    nullable: true
+                    allOf:
+                      - $ref: '#/components/schemas/DispenseRequest'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Caller is not the feeder host
+
+  /feeder/clips:
+    get:
+      summary: List feeder visit clips
+      description: Public list of animal visits. Empty proofs and dropped visits are not included.
+      tags:
+        - Feeder
+      responses:
+        '200':
+          description: Visit list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FeederClip'
+        '429':
+          description: Too many requests
+
+  /feeder/classify:
+    post:
+      summary: Classify one feeder frame
+      description: |
+        Feeder host only. The JSON body can be larger than Fastify's default 1 MiB
+        limit and is capped at 4 MiB. Decoded frames over 2_000_000 bytes are rejected.
+      tags:
+        - Feeder
+      security:
+        - ECDSA: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClassifyFrameDTO'
+      responses:
+        '201':
+          description: Analysis result
+        '401':
+          description: Unauthorized
+        '403':
+          description: Caller is not the feeder host, or the frame is empty or too large
+
+  /feeder/visits:
+    post:
+      summary: Store an animal visit
+      description: Feeder host only. The video key must be a feeder mp4 of at most 1024 characters.
+      tags:
+        - Feeder
+      security:
+        - ECDSA: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFeederVisitDTO'
+      responses:
+        '201':
+          description: Visit stored
+        '400':
+          description: Invalid visit
+        '401':
+          description: Unauthorized
+        '403':
+          description: Caller is not the feeder host
+
+  /urls/feeder:
+    post:
+      summary: Create signed URL for feeder clip upload
+      description: |
+        Feeder host only. The presigned PUT is bound to video/mp4 and the
+        declared content length, up to 100 MiB.
+      tags:
+        - URLs
+      security:
+        - ECDSA: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFeederClipUrlDTO'
+      responses:
+        '201':
+          description: Signed URL created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  signedUrl:
+                    type: string
+                    format: uri
+                  key:
+                    type: string
+                  expiresAt:
+                    type: string
+                    format: date-time
+        '400':
+          description: Invalid file name, content type, or size
+        '401':
+          description: Unauthorized
+        '403':
+          description: Caller is not the feeder host
+
 components:
   securitySchemes:
     ECDSA:
@@ -782,6 +994,121 @@ components:
           type: string
           description: MIME type of the clip (optional)
           example: "video/mp4"
+
+    CreateFeederClipUrlDTO:
+      type: object
+      required:
+        - fileName
+        - contentLength
+      properties:
+        fileName:
+          type: string
+          description: Clip file name without path
+          example: "proof-req"
+        contentLength:
+          type: integer
+          minimum: 1
+          maximum: 104857600
+          description: Exact upload size in bytes. The presigned PUT is bound to this length.
+        contentType:
+          type: string
+          enum: [video/mp4]
+          description: Feeder clips are mp4 only
+
+    DispenseRequest:
+      type: object
+      required:
+        - id
+        - status
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [requested, recording, ready, failed]
+        proofClipUrl:
+          type: string
+          format: uri
+        expiresAt:
+          type: string
+          format: date-time
+
+    CompleteDispenseDTO:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [ready, failed]
+        proofKey:
+          type: string
+          maxLength: 1024
+          description: Required when status is ready. Must be a feeder mp4 key.
+
+    ClassifyFrameDTO:
+      type: object
+      required:
+        - imageBase64
+        - mediaType
+      properties:
+        imageBase64:
+          type: string
+          maxLength: 2800000
+        mediaType:
+          type: string
+          enum: [image/jpeg, image/png, image/webp]
+
+    CreateFeederVisitDTO:
+      type: object
+      required:
+        - videoKey
+        - animalCount
+      properties:
+        videoKey:
+          type: string
+          maxLength: 1024
+        animalCount:
+          type: integer
+          minimum: 1
+        crowCount:
+          type: integer
+          minimum: 0
+        dispenseRequestId:
+          type: string
+          format: uuid
+        detectedAnimals:
+          type: array
+          items:
+            $ref: '#/components/schemas/DetectedAnimal'
+
+    FeederClip:
+      type: object
+      required:
+        - id
+        - recordedAt
+        - animalCount
+        - crowCount
+        - playbackUrl
+        - expiresAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        recordedAt:
+          type: string
+          format: date-time
+        animalCount:
+          type: integer
+        crowCount:
+          type: integer
+        playbackUrl:
+          type: string
+          format: uri
+        expiresAt:
+          type: string
+          format: date-time
 
     PorchClip:
       type: object

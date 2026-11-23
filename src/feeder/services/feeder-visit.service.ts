@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { DetectedAnimal } from 'src/common/types';
 import { FeederVisit } from '../entity/feeder-visit.entity';
+import { assertFeederMp4Key } from './dispense-request.service';
 
 export const MAX_FEEDER_VISITS = 50;
 
@@ -22,12 +23,7 @@ export class FeederVisitService {
   ) {}
 
   async create(input: CreateFeederVisitInput): Promise<FeederVisit> {
-    if (
-      !input.videoKey.startsWith('feeder/') ||
-      !input.videoKey.endsWith('.mp4')
-    ) {
-      throw new BadRequestException('Visit video must be a feeder mp4 key');
-    }
+    assertFeederMp4Key(input.videoKey, 'Visit video must be a feeder mp4 key');
     if (!Number.isInteger(input.animalCount) || input.animalCount < 1) {
       throw new BadRequestException('A visit requires at least one animal');
     }

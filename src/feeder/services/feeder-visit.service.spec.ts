@@ -20,4 +20,13 @@ describe('FeederVisitService', () => {
       service.create({ videoKey: 'porch/a.mp4', animalCount: 1 }),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
+
+  it('rejects a feeder key longer than the S3 limit', async () => {
+    await expect(
+      service.create({
+        videoKey: `feeder/${'a'.repeat(1100)}.mp4`,
+        animalCount: 1,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
 });

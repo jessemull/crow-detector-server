@@ -8,6 +8,9 @@ import {
   CreateFeedImageUrlDto,
   CreateDetectionImageUrlDto,
   CreatePorchClipUrlDto,
+  CreateFeederClipUrlDto,
+  FEEDER_CLIP_CONTENT_TYPE,
+  FEEDER_CLIP_MAX_BYTES,
 } from '../dto';
 import { FeedEvent } from '../../feed/entity/feed-event.entity';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -41,10 +44,13 @@ export class UrlsService {
 
   async createFeedImageSignedUrl(createFeedImageUrlDto: CreateFeedImageUrlDto) {
     const { fileName, format, source, contentType } = createFeedImageUrlDto;
+    const safeName = this.sanitizeObjectFileName(
+      fileName,
+      'Invalid feed image file name',
+    );
 
     const timestamp = Date.now();
-    const uniqueFileName = `${timestamp}-${fileName}`;
-    const key = `feed/${uniqueFileName}.${format}`;
+    const key = `feed/${timestamp}-${safeName}.${format}`;
 
     const finalContentType = contentType || this.getContentType(format);
 
@@ -198,18 +204,29 @@ export class UrlsService {
   }
 
   async createFeederClipSignedUrl(
-    createPorchClipUrlDto: CreatePorchClipUrlDto,
+    createFeederClipUrlDto: CreateFeederClipUrlDto,
   ) {
-    const { fileName, contentType } = createPorchClipUrlDto;
+    const { fileName, contentType, contentLength } = createFeederClipUrlDto;
+    if (
+      !Number.isInteger(contentLength) ||
+      contentLength < 1 ||
+      contentLength > FEEDER_CLIP_MAX_BYTES
+    ) {
+      throw new BadRequestException('Feeder clip size is missing or too large');
+    }
+    if (contentType && contentType !== FEEDER_CLIP_CONTENT_TYPE) {
+      throw new BadRequestException('Feeder clips must be video/mp4');
+    }
+
     const safeName = this.sanitizePorchFileName(fileName);
     const timestamp = Date.now();
     const key = `feeder/${timestamp}-${safeName}.mp4`;
-    const finalContentType = contentType || 'video/mp4';
 
     const command = new PutObjectCommand({
       Bucket: this.bucketName,
       Key: key,
-      ContentType: finalContentType,
+      ContentType: FEEDER_CLIP_CONTENT_TYPE,
+      ContentLength: contentLength,
       ServerSideEncryption: 'AES256',
       Metadata: {
         'x-amz-meta-timestamp': timestamp.toString(),
@@ -246,10 +263,18 @@ export class UrlsService {
   private sanitizePorchFileName(fileName: string): string {
     const baseName = fileName.split(/[/\\]/).pop() || 'clip';
     const withoutExtension = baseName.replace(/\.mp4$/i, '');
-    const safeName = withoutExtension.replace(/[^a-zA-Z0-9._-]/g, '');
+    return this.sanitizeObjectFileName(
+      withoutExtension,
+      'Invalid porch clip file name',
+    );
+  }
+
+  private sanitizeObjectFileName(fileName: string, message: string): string {
+    const baseName = fileName.split(/[/\\]/).pop() || '';
+    const safeName = baseName.replace(/[^a-zA-Z0-9._-]/g, '');
 
     if (!safeName) {
-      throw new BadRequestException('Invalid porch clip file name');
+      throw new BadRequestException(message);
     }
 
     return safeName;

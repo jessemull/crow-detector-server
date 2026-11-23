@@ -181,6 +181,14 @@ describe('EcdsaAuthGuard', () => {
       }).toThrow(new UnauthorizedException('Request timestamp expired'));
     });
 
+    it('should throw UnauthorizedException when timestamp is not a number', () => {
+      mockRequest.headers['x-timestamp'] = 'not-a-timestamp';
+
+      expect(() => {
+        guard.canActivate(mockContext);
+      }).toThrow(new UnauthorizedException('Request timestamp expired'));
+    });
+
     it('should accept timestamp within the valid time window', () => {
       const validTimestamp = Date.now() - 2 * 60 * 1000;
       mockRequest.headers['x-timestamp'] = validTimestamp.toString();

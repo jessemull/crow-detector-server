@@ -11,6 +11,7 @@ import {
   CreateFeedImageUrlDto,
   CreateDetectionImageUrlDto,
   CreatePorchClipUrlDto,
+  CreateFeederClipUrlDto,
 } from './dto';
 import { UrlsService } from './services/urls.service';
 import { EcdsaAuthGuard } from '../auth/middleware/ecdsa-auth.guard';
@@ -42,7 +43,7 @@ export class UrlsController {
   @Post('feeder')
   @UseGuards(EcdsaAuthGuard)
   async createFeederClipSignedUrl(
-    @Body() createPorchClipUrlDto: CreatePorchClipUrlDto,
+    @Body() createFeederClipUrlDto: CreateFeederClipUrlDto,
     @Req() request: DeviceRequest,
   ) {
     if (request.deviceId !== 'pi-feeder' && request.deviceId !== 'dev-mode') {
@@ -51,7 +52,7 @@ export class UrlsController {
       );
     }
 
-    return this.urlsService.createFeederClipSignedUrl(createPorchClipUrlDto);
+    return this.urlsService.createFeederClipSignedUrl(createFeederClipUrlDto);
   }
 
   @Post('porch')

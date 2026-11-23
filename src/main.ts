@@ -8,12 +8,15 @@ import {
 import { logger } from './common/logger/logger.config';
 import { loadAppConfig } from './config/app.config';
 
+/** Classify frames are up to 2_800_000 base64 characters, above Fastify's 1 MiB default. */
+export const CLASSIFY_JSON_BODY_LIMIT_BYTES = 4 * 1024 * 1024;
+
 export async function bootstrap() {
   try {
     const config = loadAppConfig();
     const app = await NestFactory.create<NestFastifyApplication>(
       AppModule,
-      new FastifyAdapter(),
+      new FastifyAdapter({ bodyLimit: CLASSIFY_JSON_BODY_LIMIT_BYTES }),
     );
 
     app.useGlobalPipes(

@@ -88,6 +88,16 @@ Example: `DEPLOY_HOST=juzu-inui PORCH_GIT_REF=main ./scripts/deploy-porch-host.s
 
 SSH login key (Mac): `~/.ssh/id_ed25519_porch` — not the same as `~/keys/pi-porch-private.pem` (API ECDSA on the host).
 
+Feeder LAN recorder (host laptop/server, not Nest) — see `docs/DEVICES.md` and `pi/feeder.env.example`. This process does not read the porch variables.
+
+| Variable                    | Description                                      | Required | Default |
+| --------------------------- | ------------------------------------------------ | -------- | ------- |
+| `FEEDER_API_BASE_URL`       | API base for feeder dispense, classify, and upload | Yes   | - (bring-up: `https://api-dev.crittercanteen.com`) |
+| `FEEDER_RTSP_URL`           | Full RTSP URL for the feeder camera             | Yes      | - |
+| `PI_FEEDER_PRIVATE_KEY_PATH`| Path to the feeder private key on the host      | No       | `~/keys/pi-feeder-private.pem` |
+
+Host secrets live in `~/feeder.env` (`chmod 600`) and are never committed. Apply `scripts/db-seed/feeder-video.sql` before the routes are used. The default recorder loop claims dispense proofs only. `python3 pi/feeder-recorder.py --visit-once` records an animal visit, and `--dispense-id` links that visit to a proof.
+
 Legacy Pi helpers still exist: `npm run pi:sync` / `pi:start` / `pi:stop` (hardcoded old `critter-cam.local` paths). The outdoor porch path is **LAN host + RTSP**, not Pi CSI/PIR.
 
 ---

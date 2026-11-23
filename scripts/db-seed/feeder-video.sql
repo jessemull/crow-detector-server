@@ -1,4 +1,5 @@
--- Apply once against the API database. The running server does not auto-migrate.
+-- Apply once against the API database before serving feeder routes.
+-- The ECS image deploy does not run this file, and TypeORM synchronize stays off.
 -- Enum name matches TypeORM's default for DispenseRequest.status.
 DO $$
 BEGIN
@@ -25,3 +26,9 @@ CREATE TABLE IF NOT EXISTS feeder_visit (
   "dispenseRequestId" varchar,
   "createdAt" timestamptz NOT NULL DEFAULT now()
 );
+
+CREATE INDEX IF NOT EXISTS dispense_request_created_at_idx
+  ON dispense_request ("createdAt");
+
+CREATE INDEX IF NOT EXISTS dispense_request_status_created_idx
+  ON dispense_request (status, "createdAt");

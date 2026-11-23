@@ -4,9 +4,12 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  IsUUID,
+  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
+import { FEEDER_OBJECT_KEY_MAX_LENGTH } from '../services/dispense-request.service';
 
 class DetectedAnimalDto {
   @IsString()
@@ -22,6 +25,7 @@ class DetectedAnimalDto {
 
 export class CreateFeederVisitDto {
   @IsString()
+  @MaxLength(FEEDER_OBJECT_KEY_MAX_LENGTH)
   videoKey: string;
 
   @IsInt()
@@ -40,6 +44,6 @@ export class CreateFeederVisitDto {
   detectedAnimals?: DetectedAnimalDto[];
 
   @IsOptional()
-  @IsString()
+  @IsUUID()
   dispenseRequestId?: string;
 }

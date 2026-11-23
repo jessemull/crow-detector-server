@@ -3,6 +3,7 @@ import {
   CreateFeedImageUrlDto,
   CreateDetectionImageUrlDto,
   CreatePorchClipUrlDto,
+  CreateFeederClipUrlDto,
 } from './dto';
 import { ImageFormat } from '../common/types';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -193,9 +194,10 @@ describe('UrlsController', () => {
 
   describe('createFeederClipSignedUrl', () => {
     it('should create a feeder clip signed URL for pi-feeder', async () => {
-      const dto: CreatePorchClipUrlDto = {
+      const dto: CreateFeederClipUrlDto = {
         fileName: 'clip-20261122-201000',
         contentType: 'video/mp4',
+        contentLength: 4096,
       };
       const expectedResult = {
         signedUrl: 'https://test-bucket.s3.amazonaws.com/feeder/123-clip.mp4',
@@ -221,18 +223,24 @@ describe('UrlsController', () => {
         key: 'feeder/1-clip.mp4',
       });
 
-      await controller.createFeederClipSignedUrl({ fileName: 'clip-1' }, {
-        deviceId: 'dev-mode',
-      } as any);
+      await controller.createFeederClipSignedUrl(
+        { fileName: 'clip-1', contentLength: 128 },
+        {
+          deviceId: 'dev-mode',
+        } as any,
+      );
 
       expect(service.createFeederClipSignedUrl).toHaveBeenCalled();
     });
 
     it('should reject other devices', async () => {
       await expect(
-        controller.createFeederClipSignedUrl({ fileName: 'clip-1' }, {
-          deviceId: 'pi-porch',
-        } as any),
+        controller.createFeederClipSignedUrl(
+          { fileName: 'clip-1', contentLength: 128 },
+          {
+            deviceId: 'pi-porch',
+          } as any,
+        ),
       ).rejects.toThrow(ForbiddenException);
       expect(service.createFeederClipSignedUrl).not.toHaveBeenCalled();
     });

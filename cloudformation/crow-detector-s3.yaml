@@ -41,6 +41,9 @@ Resources:
             Prefix: porch/
             ExpirationInDays: 30
             NoncurrentVersionExpirationInDays: 7
+          # feeder/ clips expire in 30 days. The S3 stack applies this rule;
+          # the ECS image deploy does not. Review it with the public dispense
+          # route before production (docs/GOVERNANCE.md).
           - Id: DeleteOldFeederClips
             Status: Enabled
             Prefix: feeder/

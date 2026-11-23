@@ -2,7 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CreateFeedImageUrlDto, CreateDetectionImageUrlDto } from '../dto';
 import { ImageFormat } from '../../common/types';
-import { S3Client } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { Test, TestingModule } from '@nestjs/testing';
 import { UrlsService } from './urls.service';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -133,6 +133,16 @@ describe('UrlsService', () => {
       expect(result.metadata.source).toBe('pi-feeder-001');
       expect(result.metadata.type).toBe('feed');
       expect(result.metadata.timestamp).toBeGreaterThan(0);
+    });
+
+    it('should drop path segments from a feed file name', async () => {
+      const result = await service.createFeedImageSignedUrl({
+        fileName: '../secret name',
+        format: ImageFormat.JPG,
+        source: 'pi-feeder-001',
+      });
+
+      expect(result.key).toMatch(/^feed\/\d+-secretname\.jpg$/);
     });
 
     it('should use default content type when not provided', async () => {
@@ -279,17 +289,46 @@ describe('UrlsService', () => {
       const result = await service.createFeederClipSignedUrl({
         fileName: 'clip-20261122-201000',
         contentType: 'video/mp4',
+        contentLength: 4096,
       });
 
       expect(result.key).toMatch(/^feeder\/\d+-clip-20261122-201000\.mp4$/);
       expect(result.metadata.type).toBe('feeder');
       expect(result.bucket).toBe('test-bucket');
+      expect(PutObjectCommand).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ContentLength: 4096,
+          ContentType: 'video/mp4',
+        }),
+      );
+    });
+
+    it('should reject a feeder content type other than video/mp4', async () => {
+      await expect(
+        service.createFeederClipSignedUrl({
+          fileName: 'clip-1',
+          contentLength: 128,
+          contentType: 'image/jpeg',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should reject a feeder clip larger than the upload cap', async () => {
+      await expect(
+        service.createFeederClipSignedUrl({
+          fileName: 'clip-1',
+          contentLength: 100 * 1024 * 1024 + 1,
+        }),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw BadRequestException when signing fails', async () => {
       mockGetSignedUrl.mockRejectedValue(new Error('S3 error'));
       await expect(
-        service.createFeederClipSignedUrl({ fileName: 'clip-1' }),
+        service.createFeederClipSignedUrl({
+          fileName: 'clip-1',
+          contentLength: 128,
+        }),
       ).rejects.toThrow(BadRequestException);
     });
   });
