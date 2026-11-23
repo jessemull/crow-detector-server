@@ -8,9 +8,9 @@ description: >-
 
 # Security Review
 
-Read: `docs/SECURITY.md`, `CONTEXT.md` escalation rules.
+Read: `docs/SECURITY.md`, `docs/review/security.md`, `docs/review/auth.md`, and `CONTEXT.md` escalation rules.
 
-Security-sensitive changes require human review.
+Security-sensitive changes require human review. The criteria files are the checklist; this skill adds the searches. A search is a heuristic, so read every changed file as well.
 
 ---
 
