@@ -4,7 +4,12 @@ import { DetectionEvent } from './entity/detection-event.entity';
 import { DetectionEventService } from './services/detection-event.service';
 import { FeedEvent } from '../feed/entity/feed-event.entity';
 import { PatchDetectionDTO } from './dto/patch-detection.dto';
-import { Source, Status, ProcessingStatus } from '../common/types';
+import {
+  FeedEventStatus,
+  Source,
+  Status,
+  ProcessingStatus,
+} from '../common/types';
 import { Test, TestingModule } from '@nestjs/testing';
 
 describe('DetectionController', () => {
@@ -22,6 +27,7 @@ describe('DetectionController', () => {
     createdAt: new Date(),
     updatedAt: new Date(),
     detectionEvents: [],
+    feedEventStatus: FeedEventStatus.PENDING,
   };
 
   const mockDetectionEvent: DetectionEvent = {

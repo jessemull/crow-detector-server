@@ -1,54 +1,45 @@
-import { SQSEvent, Context } from 'aws-lambda';
+import { Context, SQSBatchResponse, SQSEvent } from 'aws-lambda';
 import { processSQSRecord } from './util';
-import { ApiCallResult } from './types';
 import { lambdaLogger } from './util/logger';
 
-export interface HandlerResult {
-  statusCode: number;
-  body: string;
-}
-
 /**
- * Async handler (Node.js 24+ Lambda runtimes no longer support callback-style handlers).
+ * Reports each failed record in batchItemFailures so SQS retries only those
+ * messages. A thrown error would retry the whole batch, including records
+ * that already succeeded.
  */
 export const handler = async (
   event: SQSEvent,
   context: Context,
-): Promise<HandlerResult> => {
+): Promise<SQSBatchResponse> => {
+  const records = event.Records ?? [];
+
   lambdaLogger.info('SQS event received', {
-    recordCount: event.Records?.length ?? 0,
+    recordCount: records.length,
     requestId: context.awsRequestId,
   });
 
-  try {
-    const results: ApiCallResult[] = [];
+  const batchItemFailures: SQSBatchResponse['batchItemFailures'] = [];
 
-    for (const record of event.Records) {
+  for (const record of records) {
+    try {
       const result = await processSQSRecord(record);
-      results.push(result);
+
+      if (!result.success) {
+        batchItemFailures.push({ itemIdentifier: record.messageId });
+      }
+    } catch (error) {
+      lambdaLogger.error('Error processing SQS record', {
+        error: error instanceof Error ? error.message : String(error),
+        messageId: record.messageId,
+      });
+      batchItemFailures.push({ itemIdentifier: record.messageId });
     }
-
-    lambdaLogger.info('SQS processing complete', {
-      failureCount: results.filter((result) => !result.success).length,
-      successCount: results.filter((result) => result.success).length,
-    });
-
-    const allSuccessful = results.every((result) => result.success);
-
-    if (allSuccessful) {
-      return {
-        statusCode: 200,
-        body: JSON.stringify({
-          message: 'All SQS events processed successfully',
-          results,
-        }),
-      };
-    }
-
-    throw new Error('Some SQS events failed to process');
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    lambdaLogger.error('Error processing SQS event', { error: errorMessage });
-    throw new Error(errorMessage, { cause: error });
   }
+
+  lambdaLogger.info('SQS processing complete', {
+    failureCount: batchItemFailures.length,
+    successCount: records.length - batchItemFailures.length,
+  });
+
+  return { batchItemFailures };
 };

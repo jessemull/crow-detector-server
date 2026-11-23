@@ -1,14 +1,16 @@
 import { ImageFormat } from '../../common/types';
 import { IsString, IsNotEmpty, IsEnum, IsOptional } from 'class-validator';
 
+// Fields are assigned by the validation pipe from the request body.
+
 export class CreateDetectionImageUrlDto {
   @IsString()
   @IsNotEmpty()
-  fileName: string;
+  fileName!: string;
 
   @IsEnum(ImageFormat)
   @IsNotEmpty()
-  format: ImageFormat;
+  format!: ImageFormat;
 
   @IsString()
   @IsOptional()

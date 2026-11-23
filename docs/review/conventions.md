@@ -16,7 +16,7 @@ Lint and Prettier cover formatting of `*.ts`. They do not cover names, commit sc
 - **CONV-04** (SHOULD) The commitlint scope enum, `docs/CONTRIBUTING.md`, and `AGENTS.md` list the same scopes. A new scope is added in all three. Verify: compare the lists.
 - **CONV-05** (NICE) Comment spacing follows `docs/COMMENTS.md`. Verify: read new standalone comments.
 - **CONV-06** (SHOULD) Shell scripts use `set -euo pipefail` and quote expansions. Python follows the surrounding style. Verify: read the first lines and the interpolations.
-- **CONV-07** (SHOULD) Changed YAML, Markdown, and JSON are formatted consistently even though lint-staged does not check them. Verify: inspection.
+- **CONV-07** (SHOULD) Changed YAML, Markdown, and JSON match Prettier, which lint-staged runs for those extensions. Changed Python and shell match the surrounding style by inspection, because Prettier has no parser for them. Verify: read the diff.
 
 ## Automatic-fail signals
 

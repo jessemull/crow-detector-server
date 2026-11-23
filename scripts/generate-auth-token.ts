@@ -23,13 +23,18 @@ function generatePrivateKey() {
   return { privateKey, publicKey };
 }
 
-function generateSignature(data, privateKey) {
+function generateSignature(data: string, privateKey: string): string {
   const sign = crypto.createSign('SHA256');
   sign.update(data);
   return sign.sign(privateKey, 'base64');
 }
 
-function generateAuthToken(method, path, body = {}, deviceId = 'pi-user') {
+function generateAuthToken(
+  method: string,
+  path: string,
+  body: object = {},
+  deviceId = 'pi-user',
+) {
   const timestamp = Date.now();
   const dataToSign = `${method}${path}${JSON.stringify(body)}${timestamp}`;
 
@@ -59,6 +64,20 @@ function generateAuthToken(method, path, body = {}, deviceId = 'pi-user') {
       'x-timestamp': timestamp.toString(),
     },
   };
+}
+
+function parseBody(raw: string | undefined): object {
+  if (!raw) {
+    return {};
+  }
+
+  const parsed: unknown = JSON.parse(raw);
+
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('Body must be a JSON object');
+  }
+
+  return parsed;
 }
 
 function main() {
@@ -98,7 +117,13 @@ function main() {
 
   const method = args[0];
   const path = args[1];
-  const body = args[2] ? JSON.parse(args[2]) : {};
+
+  if (!method || path === undefined) {
+    logger.error('Method and path are required');
+    process.exit(1);
+  }
+
+  const body = parseBody(args[2]);
   const deviceId = args[3] || 'pi-user';
 
   try {

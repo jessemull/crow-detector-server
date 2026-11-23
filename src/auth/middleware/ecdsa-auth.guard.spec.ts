@@ -20,7 +20,7 @@ import { logger } from 'src/common/logger/logger.config';
 describe('EcdsaAuthGuard', () => {
   let guard: EcdsaAuthGuard;
   let mockRequest: Partial<FastifyRequest> & {
-    body?: Record<string, unknown>;
+    body?: Record<string, unknown> | null;
     deviceId?: string;
     headers: Record<string, unknown>;
     requestTime?: number;

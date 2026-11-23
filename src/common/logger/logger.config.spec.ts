@@ -23,14 +23,15 @@ describe('Logger Configuration', () => {
     const bunyan = jest.requireMock('bunyan');
     mockCreateLogger = bunyan.createLogger;
     mockCreateLogger.mockClear();
-    mockCreateLogger.mockReturnValue({
+    const partialLogger: any = {
       info: jest.fn(),
       error: jest.fn(),
       warn: jest.fn(),
       debug: jest.fn(),
       trace: jest.fn(),
       fatal: jest.fn(),
-    });
+    };
+    mockCreateLogger.mockReturnValue(partialLogger);
   });
 
   afterEach(() => {

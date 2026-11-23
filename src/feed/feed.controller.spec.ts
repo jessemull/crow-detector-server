@@ -3,7 +3,12 @@ import { FeedController } from './feed.controller';
 import { FeedEvent } from './entity/feed-event.entity';
 import { FeedEventService } from './services/feed-event.service';
 import { PatchFeedDTO } from './dto/patch-feed.dto';
-import { Source, Status, ProcessingStatus } from '../common/types';
+import {
+  FeedEventStatus,
+  Source,
+  Status,
+  ProcessingStatus,
+} from '../common/types';
 import { Test, TestingModule } from '@nestjs/testing';
 
 describe('FeedController', () => {
@@ -21,6 +26,7 @@ describe('FeedController', () => {
     updatedAt: new Date(),
     processingStatus: ProcessingStatus.COMPLETED,
     faceDetected: false,
+    feedEventStatus: FeedEventStatus.PENDING,
   };
 
   const mockFeedEventService = {

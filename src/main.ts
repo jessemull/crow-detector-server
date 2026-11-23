@@ -8,12 +8,21 @@ import {
 import { logger } from './common/logger/logger.config';
 import { loadAppConfig } from './config/app.config';
 
+/**
+ * Trust only the socket peer (hop 0). The ALB appends the client address, and
+ * earlier X-Forwarded-For entries are supplied by the caller. Fastify's numeric
+ * trustProxy ignores forwarded headers entirely, so a hop function is required.
+ */
+export function trustImmediateProxy(_address: string, hop: number): boolean {
+  return hop === 0;
+}
+
 export async function bootstrap() {
   try {
     const config = loadAppConfig();
     const app = await NestFactory.create<NestFastifyApplication>(
       AppModule,
-      new FastifyAdapter(),
+      new FastifyAdapter({ trustProxy: trustImmediateProxy }),
     );
 
     app.useGlobalPipes(

@@ -1,4 +1,4 @@
-import { Between, Repository } from 'typeorm';
+import { Between, FindOptionsWhere, Repository } from 'typeorm';
 import { CreateDetectionDTO } from '../dto/create-detection.dto';
 import { DetectionEvent } from '../entity/detection-event.entity';
 import { DetectionImageProcessingService } from './detection-image-processing.service';
@@ -52,7 +52,7 @@ export class DetectionEventService {
     from?: string,
     to?: string,
   ): Promise<DetectionEvent[]> {
-    const where: Record<string, any> = {};
+    const where: FindOptionsWhere<DetectionEvent> = {};
 
     if (from && to) {
       where.createdAt = Between(new Date(from), new Date(to));

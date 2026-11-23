@@ -1,4 +1,4 @@
-import { Between, Repository } from 'typeorm';
+import { Between, FindOptionsWhere, Repository } from 'typeorm';
 import { CreateFeedDTO, PatchFeedDTO } from '../dto';
 import { FeedEvent } from '../entity/feed-event.entity';
 import { ImageProcessingService } from './image-processing.service';
@@ -213,7 +213,7 @@ export class FeedEventService {
   }
 
   async find(limit?: number, from?: string, to?: string): Promise<FeedEvent[]> {
-    const where: Record<string, any> = {};
+    const where: FindOptionsWhere<FeedEvent> = {};
 
     if (from && to) {
       where.createdAt = Between(new Date(from), new Date(to));

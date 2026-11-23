@@ -7,7 +7,7 @@ export function isImageFile(key: string): boolean {
 }
 
 export function isRelevantEvent(eventName: string): boolean {
-  return RELEVANT_EVENTS.includes(eventName as any);
+  return RELEVANT_EVENTS.some((event) => event === eventName);
 }
 
 export function getImageType(key: string): ImageType {

@@ -7,7 +7,12 @@ import { NotFoundException } from '@nestjs/common';
 import { PatchDetectionDTO } from '../dto/patch-detection.dto';
 import { Repository, Between } from 'typeorm';
 import { S3MetadataService } from '../../feed/services/s3-metadata.service';
-import { Source, Status, ProcessingStatus } from '../../common/types';
+import {
+  FeedEventStatus,
+  Source,
+  Status,
+  ProcessingStatus,
+} from '../../common/types';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 
@@ -26,6 +31,7 @@ describe('DetectionEventService', () => {
     updatedAt: new Date(),
     processingStatus: ProcessingStatus.COMPLETED,
     faceDetected: false,
+    feedEventStatus: FeedEventStatus.PENDING,
   };
 
   const mockDetectionEvent: DetectionEvent = {

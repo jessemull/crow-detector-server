@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { CreateDetectionDTO } from './dto/create-detection.dto';
 import { DetectionEventService } from './services/detection-event.service';
+import { DetectionEvent } from './entity/detection-event.entity';
 import { DetectionResponse } from 'src/common/types';
 import { EcdsaAuthGuard } from '../auth/middleware/ecdsa-auth.guard';
 import { PatchDetectionDTO } from './dto/patch-detection.dto';
@@ -35,7 +36,7 @@ export class DetectionController {
     @Query('limit') limit: number,
     @Query('from') from: string,
     @Query('to') to: string,
-  ): Promise<any[]> {
+  ): Promise<DetectionEvent[]> {
     return this.detectionEventService.find(limit, from, to);
   }
 
