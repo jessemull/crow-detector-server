@@ -8,7 +8,6 @@ describe('CreateDetectionImageUrlDto', () => {
       const dto = new CreateDetectionImageUrlDto();
       dto.fileName = 'motion-detected';
       dto.format = ImageFormat.PNG;
-      dto.feedEventId = 'feed-123';
       dto.contentType = 'image/png';
 
       const errors = await validate(dto);
@@ -19,8 +18,6 @@ describe('CreateDetectionImageUrlDto', () => {
       const dto = new CreateDetectionImageUrlDto();
       dto.fileName = 'motion-detected';
       dto.format = ImageFormat.JPG;
-      dto.feedEventId = 'feed-123';
-
       const errors = await validate(dto);
       expect(errors).toHaveLength(0);
     });
@@ -28,8 +25,6 @@ describe('CreateDetectionImageUrlDto', () => {
     it('should fail validation when fileName is missing', async () => {
       const dto = new CreateDetectionImageUrlDto();
       dto.format = ImageFormat.PNG;
-      dto.feedEventId = 'feed-123';
-
       const errors = await validate(dto);
       expect(errors).toHaveLength(1);
       expect(errors[0].constraints?.isNotEmpty).toBeDefined();
@@ -39,8 +34,6 @@ describe('CreateDetectionImageUrlDto', () => {
       const dto = new CreateDetectionImageUrlDto();
       dto.fileName = '';
       dto.format = ImageFormat.PNG;
-      dto.feedEventId = 'feed-123';
-
       const errors = await validate(dto);
       expect(errors).toHaveLength(1);
       expect(errors[0].constraints?.isNotEmpty).toBeDefined();
@@ -49,8 +42,6 @@ describe('CreateDetectionImageUrlDto', () => {
     it('should fail validation when format is missing', async () => {
       const dto = new CreateDetectionImageUrlDto();
       dto.fileName = 'motion-detected';
-      dto.feedEventId = 'feed-123';
-
       const errors = await validate(dto);
       expect(errors).toHaveLength(1);
       expect(errors[0].constraints?.isNotEmpty).toBeDefined();
@@ -60,8 +51,6 @@ describe('CreateDetectionImageUrlDto', () => {
       const dto = new CreateDetectionImageUrlDto();
       dto.fileName = 'motion-detected';
       dto.format = 'invalid-format' as any;
-      dto.feedEventId = 'feed-123';
-
       const errors = await validate(dto);
       expect(errors).toHaveLength(1);
       expect(errors[0].constraints?.isEnum).toBeDefined();

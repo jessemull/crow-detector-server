@@ -34,7 +34,7 @@ const REQUIRED_GATES = [
   {
     name: 'typecheck',
     command:
-      'npx tsc --noEmit -p tsconfig.build.json && (cd lambda && npx tsc --noEmit -p tsconfig.json)',
+      'npx tsc --noEmit -p tsconfig.build.json && npx tsc --noEmit -p tsconfig.spec.json && (cd lambda && npx tsc --noEmit -p tsconfig.json && npx tsc --noEmit -p tsconfig.spec.json)',
   },
   {
     name: 'format',

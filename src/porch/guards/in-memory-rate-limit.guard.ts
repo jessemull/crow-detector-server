@@ -59,13 +59,13 @@ export class InMemoryRateLimitGuard implements CanActivate {
   }
 
   private clientKey(request: FastifyRequest): string {
-    const forwarded = request.headers['x-forwarded-for'];
-    if (typeof forwarded === 'string' && forwarded.length > 0) {
-      return forwarded.split(',')[0].trim();
+    // request.ip is the address the trusted proxy appended. The raw header is
+    // caller-controlled and must not be the key.
+
+    if (typeof request.ip === 'string' && request.ip.length > 0) {
+      return request.ip;
     }
-    if (Array.isArray(forwarded) && forwarded[0]) {
-      return forwarded[0].split(',')[0].trim();
-    }
-    return request.ip || 'unknown';
+
+    return 'unknown';
   }
 }

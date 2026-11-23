@@ -14,10 +14,12 @@ import {
 } from 'src/common/types';
 import { DetectionEvent } from 'src/detection/entity/detection-event.entity';
 
+// Column values are assigned by TypeORM when a row is loaded, not by a constructor.
+
 @Entity('feed_event')
 export class FeedEvent {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @Column({
     nullable: true,
@@ -32,7 +34,7 @@ export class FeedEvent {
   confidence?: number;
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 
   @Column({ nullable: true })
   croppedImageUrl?: string;
@@ -44,20 +46,20 @@ export class FeedEvent {
       cascade: true,
     },
   )
-  detectionEvents: DetectionEvent[];
+  detectionEvents!: DetectionEvent[];
 
   @Column()
-  imageUrl: string;
+  imageUrl!: string;
 
   @Column({ nullable: true })
-  isAppropriate: boolean;
+  isAppropriate!: boolean;
 
   @Column({
     default: Source.BUTTON,
     enum: Source,
     type: 'enum',
   })
-  source: Source;
+  source!: Source;
 
   @Column({
     enum: Status,
@@ -67,14 +69,14 @@ export class FeedEvent {
   status?: Status;
 
   @UpdateDateColumn()
-  updatedAt: Date;
+  updatedAt!: Date;
 
   @Column({
     enum: ProcessingStatus,
     default: ProcessingStatus.PENDING,
     type: 'enum',
   })
-  processingStatus: ProcessingStatus;
+  processingStatus!: ProcessingStatus;
 
   @Column({ nullable: true })
   processingError?: string;
@@ -83,7 +85,7 @@ export class FeedEvent {
   moderationLabels?: string;
 
   @Column({ nullable: true })
-  faceDetected: boolean;
+  faceDetected!: boolean;
 
   @Column({ nullable: true })
   faceBoundingBox?: string;
@@ -102,7 +104,7 @@ export class FeedEvent {
     default: FeedEventStatus.PENDING,
     type: 'enum',
   })
-  feedEventStatus: FeedEventStatus;
+  feedEventStatus!: FeedEventStatus;
 
   @Column({ nullable: true })
   feederTriggeredAt?: Date;

@@ -1,4 +1,4 @@
-.PHONY: help lint format format-check test test-cov build clean commit \
+.PHONY: help lint format format-check test test-cov build clean commit typecheck \
 	lambda-lint lambda-format-check lambda-test lambda-build porch-test preflight ci \
 	review-inventory review-check review-eval-validate
 
@@ -23,6 +23,10 @@ test-cov: ## Run root Jest with coverage
 build: ## Nest production build
 	npm run build
 
+typecheck: ## Typecheck app, tests, and lambda
+	npm run typecheck
+	npm run typecheck --prefix lambda
+
 clean: ## Remove dist/
 	rm -rf dist
 
@@ -45,13 +49,15 @@ lambda-build: ## Lambda webpack build + zip
 porch-test: ## Porch recorder Python helper unit tests
 	npm run porch:test
 
-preflight: ## Root + lambda lint, format-check, test, build + porch tests
+preflight: ## Root + lambda lint, format-check, typecheck, test, build + porch tests
 	npm run lint
 	npm run format:check
+	npm run typecheck
 	npm test
 	npm run build
 	npm run lambda:lint
 	npm run lambda:format:check
+	npm run typecheck --prefix lambda
 	npm run lambda:test:coverage
 	npm run lambda:build
 	npm run lambda:package

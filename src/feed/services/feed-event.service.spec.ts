@@ -6,7 +6,12 @@ import { NotFoundException } from '@nestjs/common';
 import { PatchFeedDTO } from '../dto/patch-feed.dto';
 import { Repository, Between } from 'typeorm';
 import { S3MetadataService } from './s3-metadata.service';
-import { Source, Status, ProcessingStatus } from '../../common/types';
+import {
+  FeedEventStatus,
+  Source,
+  Status,
+  ProcessingStatus,
+} from '../../common/types';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
@@ -26,7 +31,8 @@ describe('FeedEventService', () => {
     updatedAt: new Date(),
     processingStatus: ProcessingStatus.PENDING,
     faceDetected: false,
-  } as FeedEvent;
+    feedEventStatus: FeedEventStatus.PENDING,
+  };
 
   const mockRepository = {
     create: jest.fn(),

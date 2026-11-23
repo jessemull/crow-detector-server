@@ -2,7 +2,7 @@
 
 > **AI agents — read this file when:** changing the review skills, the criteria in `docs/review/`, or the scripts in `scripts/review/`.
 
-The review system is only as good as what it catches. These evals measure that: seeded defects for PR reviews (`seeded-cases.json`) and known real issues for repo reviews (`repo-recall.md`). Run them before and after changing a review skill or the criteria, and keep the change only if recall does not drop.
+The review system is only as good as what it catches. These evals measure that with seeded defects for PR reviews (`seeded-cases.json`). Run them before and after changing a review skill or the criteria, and keep the change only if recall does not drop.
 
 ---
 
@@ -41,7 +41,7 @@ A case counts as found when a MUST, SHOULD, or VERIFY finding is at the expected
 
 ## Repo review recall
 
-`repo-recall.md` lists real issues confirmed in this repository. After a full `repo-review`, check each item against the report: found, found at a different severity, or missed. Missed items show which criteria or passes need strengthening. When an item is fixed in the code, mark it fixed rather than deleting it, so the list keeps its history.
+There is no recall set checked in. The previous one was removed after its open items were fixed. After a full `repo-review`, write a new `repo-recall.md` from issues the review should have found, and score later runs against it. Do not read that file before or during the review you are scoring.
 
 ---
 

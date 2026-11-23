@@ -19,15 +19,11 @@
     "incremental": true,
     "skipLibCheck": true,
     "strictNullChecks": true,
-    "strictPropertyInitialization": false,
+    "strictPropertyInitialization": true,
     "forceConsistentCasingInFileNames": true,
-    "noImplicitAny": false,
-    "strictBindCallApply": false,
-    "noFallthroughCasesInSwitch": false
+    "noImplicitAny": true,
+    "strictBindCallApply": true,
+    "noFallthroughCasesInSwitch": true
   },
-  "exclude": [
-    "lambda/**/*",
-    "node_modules",
-    "dist"
-  ]
+  "exclude": ["lambda/**/*", "node_modules", "dist"]
 }

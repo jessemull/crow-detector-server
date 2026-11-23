@@ -6,12 +6,12 @@
 
 ## How to review
 
-The compiler is lenient here, so a clean build proves less than it looks. `noImplicitAny`, `strictBindCallApply`, and `strictPropertyInitialization` are off, `noFallthroughCasesInSwitch` is off, tests are excluded from the build typecheck, and `no-explicit-any` is off in ESLint. Review types by reading them.
+`tsconfig.json` enables `noImplicitAny`, `strictBindCallApply`, `strictPropertyInitialization`, and `noFallthroughCasesInSwitch`. Production builds use `tsconfig.build.json`, which excludes tests. Tests are typechecked separately with `tsconfig.spec.json` and `lambda/tsconfig.spec.json`. ESLint errors on `any` in production code and on floating promises. A definite-assignment assertion (`!`) on a TypeORM column or a DTO field is expected, because those values are assigned by the framework. Review every other cast.
 
 ## Criteria
 
 - **TS-01** (MUST) No new `any` in production code without a comment justifying it. Tests may use `any`. Prefer `unknown` and a narrowing check at boundaries. Verify: search `: any` and `as any` outside tests.
-- **TS-02** (MUST) No assertion on untrusted data. JSON, env values, headers, and model output are validated before use, not cast with `as`. Verify: search ` as ` in scope and classify each one.
+- **TS-02** (MUST) No assertion on untrusted data. JSON, env values, headers, and model output are validated before use, not cast with `as`. Verify: search `as` in scope and classify each one.
 - **TS-03** (MUST) No floating promises. Every promise is awaited, returned, or handled, including Nest handlers that return promises. Verify: read each call to an `async` function.
 - **TS-04** (SHOULD) Non-null assertions (`!`) are justified by a check the reader can see. Verify: search `!` on expressions.
 - **TS-05** (SHOULD) Public service methods and controller handlers declare their return types. Verify: read the signatures.
