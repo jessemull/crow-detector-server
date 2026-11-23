@@ -40,7 +40,7 @@ Commits must remain atomic, intentional, reproducible, reviewable, and semantica
 
 Types: `feat`, `fix`, `refactor`, `test`, `docs`, `style`, `perf`, `chore`, `build`, `ci`, `revert`
 
-Scopes (commitlint): `auth`, `feed`, `detection`, `urls`, `health`, `common`, `config`, `lambda`, `ci`, `docs`, `deps`, `infra`, `docker`
+Scopes (commitlint): `auth`, `feed`, `detection`, `porch`, `urls`, `health`, `common`, `config`, `lambda`, `ci`, `docs`, `deps`, `infra`, `docker`
 
 Prefer `make commit` (Commitizen) for interactive commits.
 

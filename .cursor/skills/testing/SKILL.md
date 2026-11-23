@@ -8,7 +8,9 @@ description: >-
 
 # Testing
 
-Read: `docs/TESTING.md`, `AGENTS.md` § Testing Rules, `jest.config.js`, `lambda/jest.config.js`.
+Read: `docs/TESTING.md`, `docs/review/testing.md`, `AGENTS.md` (Testing Rules), `jest.config.js`, `lambda/jest.config.js`.
+
+When you are reviewing rather than writing tests, the bar is `docs/review/testing.md`: name the test that would fail if the changed branch broke, and treat a test that cannot fail as a finding.
 
 ---
 

@@ -1,7 +1,7 @@
 module.exports = {
   moduleFileExtensions: ['js', 'json', 'ts'],
   rootDir: '.',
-  testRegex: 'src/.*\\.spec\\.ts$',
+  testRegex: '(src/.*\\.spec\\.ts|scripts/review/.*\\.test\\.js)$',
   transform: {
     '^.+\\.(t|j)s$': 'ts-jest',
   },
@@ -14,7 +14,10 @@ module.exports = {
     '!src/**/index.ts',
     '!**/node_modules/**',
     '!**/dist/**',
-    '!**/coverage/**'
+    '!**/coverage/**',
+    'scripts/review/**/*.js',
+    '!scripts/review/**/*.test.js',
+    '!scripts/review/test-utils/**'
   ],
   coverageDirectory: 'coverage',
   coverageProvider: 'babel',

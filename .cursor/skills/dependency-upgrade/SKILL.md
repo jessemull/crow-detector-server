@@ -28,9 +28,11 @@ npm install <package>
 cd lambda && npm install <package>
 ```
 
-7. Run `make preflight`.
-8. Update docs if the dependency changes developer workflow.
-9. Commit with scope `deps` (e.g. `chore(deps): add foo`).
+7. On a major upgrade, read the installed package's changelog and type declarations under `node_modules/` and compare every call site in this repo with the new API. Unknown options are often ignored silently.
+8. Review install scripts: `npm approve-scripts --allow-scripts-pending` in the root and, when `lambda/` changed, in `lambda/`. Approve only scripts you can explain.
+9. Run `npm audit --audit-level=high` in each package you changed, then `make preflight`.
+10. Update docs if the dependency changes developer workflow.
+11. Commit with scope `deps` (e.g. `chore(deps): add foo`).
 
 ---
 

@@ -1,5 +1,6 @@
 .PHONY: help lint format format-check test test-cov build clean commit \
-	lambda-lint lambda-format-check lambda-test lambda-build porch-test preflight ci
+	lambda-lint lambda-format-check lambda-test lambda-build porch-test preflight ci \
+	review-inventory review-check review-eval-validate
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -57,3 +58,12 @@ preflight: ## Root + lambda lint, format-check, test, build + porch tests
 	npm run porch:test
 
 ci: preflight ## Alias for preflight
+
+review-inventory: ## Build a review inventory (KIND=pr|repo, BASE, LEDGER, WORKTREE=1)
+	node scripts/review/inventory.js --kind $(or $(KIND),pr) $(if $(BASE),--base $(BASE),) $(if $(LEDGER),--init $(LEDGER),) $(if $(WORKTREE),--worktree,)
+
+review-check: ## Check a review ledger (LEDGER=path)
+	node scripts/review/check-ledger.js $(LEDGER)
+
+review-eval-validate: ## Check seeded review cases still apply
+	node scripts/review/eval-case.js validate

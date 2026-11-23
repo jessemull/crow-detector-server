@@ -100,7 +100,7 @@ Resolve upward, never downward.
 | GitHub Actions PR workflow       | lint, format-check, test (Jest 80%), build; npm audit (high+, blocking once clean)                     | Yes (merge)   |
 | GitHub Actions lambda PR         | lambda lint, test, package                                                                             | Yes (merge)   |
 | GitHub Actions deploy workflows  | quality gates then deploy                                                                              | Yes (deploy)  |
-| PR review                        | Architecture, security, tests                                                                          | Yes (process) |
+| PR review                        | Architecture, security, tests, and the `docs/review/` criteria with a checked ledger | Yes (process) |
 
 Skipping hooks is not acceptable for shared branches — CI will catch violations regardless.
 
