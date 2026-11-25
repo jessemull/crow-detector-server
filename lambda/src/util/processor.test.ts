@@ -1,6 +1,6 @@
 import { SQSRecord } from 'aws-lambda';
 import { callAPI } from './api';
-import { extractS3Info } from './s3';
+import { extractS3Records } from './s3';
 import { isImageFile, isRelevantEvent } from './images';
 import { processSQSRecord } from './processor';
 
@@ -9,8 +9,8 @@ jest.mock('./s3');
 jest.mock('./images');
 
 const mockedCallAPI = callAPI as jest.MockedFunction<typeof callAPI>;
-const mockedExtractS3Info = extractS3Info as jest.MockedFunction<
-  typeof extractS3Info
+const mockedExtractS3Records = extractS3Records as jest.MockedFunction<
+  typeof extractS3Records
 >;
 const mockedIsImageFile = isImageFile as jest.MockedFunction<
   typeof isImageFile
@@ -42,12 +42,14 @@ describe('Processor Utility', () => {
       awsRegion: 'us-east-1',
     } as SQSRecord;
 
-    mockedExtractS3Info.mockReturnValue({
-      bucket: 'test-bucket',
-      key: 'feed/test-image.jpg',
-      size: 1024,
-      eventName: 'ObjectCreated:Put',
-    });
+    mockedExtractS3Records.mockReturnValue([
+      {
+        bucket: 'test-bucket',
+        key: 'feed/test-image.jpg',
+        size: 1024,
+        eventName: 'ObjectCreated:Put',
+      },
+    ]);
     mockedIsImageFile.mockReturnValue(true);
     mockedIsRelevantEvent.mockReturnValue(true);
     mockedCallAPI.mockResolvedValue();
@@ -68,7 +70,7 @@ describe('Processor Utility', () => {
         timestamp: expect.any(String),
       });
 
-      expect(mockedExtractS3Info).toHaveBeenCalledWith(mockRecord);
+      expect(mockedExtractS3Records).toHaveBeenCalledWith(mockRecord);
       expect(mockedIsImageFile).toHaveBeenCalledWith('feed/test-image.jpg');
       expect(mockedIsRelevantEvent).toHaveBeenCalledWith('ObjectCreated:Put');
       expect(mockedCallAPI).toHaveBeenCalledWith({
@@ -132,7 +134,7 @@ describe('Processor Utility', () => {
 
     it('should handle errors during processing', async () => {
       const testError = new Error('Test error message');
-      mockedExtractS3Info.mockImplementation(() => {
+      mockedExtractS3Records.mockImplementation(() => {
         throw testError;
       });
 
@@ -147,7 +149,7 @@ describe('Processor Utility', () => {
 
     it('should handle non-Error objects during processing', async () => {
       const testError = 'String error message';
-      mockedExtractS3Info.mockImplementation(() => {
+      mockedExtractS3Records.mockImplementation(() => {
         throw testError;
       });
 
@@ -158,6 +160,32 @@ describe('Processor Utility', () => {
         message: 'Failed to process: Unknown error',
         timestamp: expect.any(String),
       });
+    });
+
+    it('posts every S3 record and fails the message when a later record fails', async () => {
+      mockedExtractS3Records.mockReturnValue([
+        {
+          bucket: 'test-bucket',
+          key: 'feed/first.jpg',
+          size: 10,
+          eventName: 'ObjectCreated:Put',
+        },
+        {
+          bucket: 'test-bucket',
+          key: 'feed/second.jpg',
+          size: 11,
+          eventName: 'ObjectCreated:Put',
+        },
+      ]);
+      mockedCallAPI
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error('second failed'));
+
+      const result = await processSQSRecord(mockRecord);
+
+      expect(mockedCallAPI).toHaveBeenCalledTimes(2);
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('second failed');
     });
 
     it('should handle errors from callAPI', async () => {

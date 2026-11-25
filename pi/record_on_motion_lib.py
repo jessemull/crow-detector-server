@@ -13,6 +13,7 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import IO, Any
+from urllib.parse import urlsplit, urlunsplit
 
 
 def signed_payload(method: str, path: str, body: dict, timestamp: str) -> str:
@@ -97,12 +98,14 @@ def env_float(
 
 
 def rtsp_substream_url(rtsp_url: str) -> str:
-    """Prefer Tapo/ONVIF substream (stream2) when given a main stream URL."""
-    if "stream2" in rtsp_url:
+    """Prefer Tapo/ONVIF substream (stream2) when the RTSP path is stream1."""
+    parsed = urlsplit(rtsp_url)
+    path = parsed.path
+    if "stream2" in path or "stream1" not in path:
         return rtsp_url
-    if "stream1" in rtsp_url:
-        return rtsp_url.replace("stream1", "stream2", 1)
-    return rtsp_url
+    return urlunsplit(
+        parsed._replace(path=path.replace("stream1", "stream2", 1))
+    )
 
 
 def select_segments_overlapping_window(

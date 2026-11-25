@@ -32,9 +32,9 @@ describe('CreateFeedImageUrlDto', () => {
     );
   });
 
-  it('rejects a body larger than 15 MB', async () => {
+  it('rejects a body larger than 5 MB', async () => {
     const dto = validDto();
-    dto.contentLength = 15 * 1024 * 1024 + 1;
+    dto.contentLength = 5 * 1024 * 1024 + 1;
     const errors = await validate(dto);
     expect(errors.some((error) => error.property === 'contentLength')).toBe(
       true,

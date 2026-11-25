@@ -3,7 +3,7 @@ import { DetectionEvent } from '../entity/detection-event.entity';
 import { DetectionEventService } from './detection-event.service';
 import { DetectionImageProcessingService } from './detection-image-processing.service';
 import { FeedEvent } from '../../feed/entity/feed-event.entity';
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { PatchDetectionDTO } from '../dto/patch-detection.dto';
 import { Repository, Between } from 'typeorm';
 import { S3MetadataService } from '../../feed/services/s3-metadata.service';
@@ -298,6 +298,17 @@ describe('DetectionEventService', () => {
       expect(result).toBeDefined();
     });
 
+    it('rejects a processingStatus patch', async () => {
+      mockRepository.findOne.mockResolvedValue(mockDetectionEvent);
+
+      await expect(
+        service.update('test-uuid', {
+          processingStatus: ProcessingStatus.PENDING,
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockRepository.update).not.toHaveBeenCalled();
+    });
+
     it('should throw NotFoundException when detection event not found', async () => {
       const id = 'non-existent-uuid';
       const patchDetectionDTO: PatchDetectionDTO = {
@@ -435,6 +446,38 @@ describe('DetectionEventService', () => {
       expect(
         mockDetectionImageProcessingService.deleteStoredImage,
       ).toHaveBeenCalledWith('test-bucket', 'test-key');
+      expect(
+        mockDetectionImageProcessingService.deleteStoredImage.mock
+          .invocationCallOrder[0],
+      ).toBeLessThan(mockRepository.delete.mock.invocationCallOrder[0]);
+    });
+
+    it('keeps the row when the stored image cannot be deleted', async () => {
+      const eventId = 'test-uuid';
+      mockDetectionImageProcessingService.processImage.mockResolvedValue({
+        hasAnimals: false,
+        crowCount: 0,
+        animalCount: 0,
+        detectedAnimals: [],
+        processingDuration: 800,
+      });
+      mockDetectionImageProcessingService.deleteStoredImage.mockRejectedValue(
+        new Error('s3 delete failed'),
+      );
+      mockRepository.update.mockResolvedValue({ affected: 1 });
+
+      await expect(
+        (service as any).processImageAsync(eventId, 'test-bucket', 'test-key'),
+      ).rejects.toThrow('s3 delete failed');
+
+      expect(mockRepository.delete).not.toHaveBeenCalled();
+      expect(mockRepository.update).toHaveBeenCalledWith(
+        { id: eventId, processingStatus: ProcessingStatus.PROCESSING },
+        {
+          processingStatus: ProcessingStatus.FAILED,
+          processingError: 's3 delete failed',
+        },
+      );
     });
 
     it('should handle image processing errors and mark as failed', async () => {
@@ -514,6 +557,44 @@ describe('DetectionEventService', () => {
           processingError: 'S3 object not found',
         },
       );
+    });
+
+    it('starts a queued detection when a running job finishes', async () => {
+      let release: (value: unknown) => void = () => undefined;
+      const gate = new Promise((resolve) => {
+        release = resolve;
+      });
+      mockDetectionImageProcessingService.processImage.mockImplementation(
+        () => gate,
+      );
+      mockS3MetadataService.getObjectSize.mockResolvedValue(10);
+      mockRepository.update.mockResolvedValue({ affected: 1 });
+
+      for (let index = 0; index < 5; index += 1) {
+        (service as any).startProcessing(
+          `event-${index}`,
+          'bucket',
+          'detection/a.jpg',
+        );
+      }
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(
+        mockDetectionImageProcessingService.processImage,
+      ).toHaveBeenCalledTimes(4);
+
+      release({
+        hasAnimals: true,
+        crowCount: 1,
+        animalCount: 1,
+        detectedAnimals: [],
+        processingDuration: 1,
+      });
+      await new Promise((resolve) => setImmediate(resolve));
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(
+        mockDetectionImageProcessingService.processImage,
+      ).toHaveBeenCalledTimes(5);
     });
   });
 });

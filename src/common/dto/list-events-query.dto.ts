@@ -46,15 +46,15 @@ function IsRealCalendarDate(options?: ValidationOptions) {
           if (!match) {
             return false;
           }
-          const parsed = new Date(value);
-          if (Number.isNaN(parsed.getTime())) {
-            return false;
-          }
-          return (
-            parsed.getUTCFullYear() === Number(match[1]) &&
-            parsed.getUTCMonth() + 1 === Number(match[2]) &&
-            parsed.getUTCDate() === Number(match[3])
-          );
+          const year = Number(match[1]);
+          const month = Number(match[2]);
+          const day = Number(match[3]);
+          const calendar = new Date(Date.UTC(year, month - 1, day));
+          const realDay =
+            calendar.getUTCFullYear() === year &&
+            calendar.getUTCMonth() + 1 === month &&
+            calendar.getUTCDate() === day;
+          return realDay && !Number.isNaN(new Date(value).getTime());
         },
         defaultMessage: () => 'must be a real calendar date',
       },

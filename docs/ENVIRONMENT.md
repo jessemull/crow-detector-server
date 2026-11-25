@@ -120,13 +120,13 @@ Legacy Pi helpers still exist: `npm run pi:sync` / `pi:start` / `pi:stop` (hardc
 
 ## Lambda package
 
-| Variable                | Description                                  | Required |
-| ----------------------- | -------------------------------------------- | -------- |
-| `API_BASE_URL`          | Nest API base URL. There is no code default. | Yes      |
-| `DETECTION_ENDPOINT`    | Detection path (default `/detection`)        | No       |
-| `FEED_ENDPOINT`         | Feed path (default `/feed`)                  | No       |
-| `LAMBDA_S3_PRIVATE_KEY` | Base64 private key for ECDSA signing         | Yes      |
-| `NODE_ENV`              | `test` keeps the Lambda logger quiet         | No       |
+| Variable                | Description                                                                                                                    | Required |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------ | -------- |
+| `API_BASE_URL`          | Nest API base URL. There is no code default.                                                                                   | Yes      |
+| `DETECTION_ENDPOINT`    | Detection path (default `/detection`)                                                                                          | No       |
+| `FEED_ENDPOINT`         | Feed path (default `/feed`)                                                                                                    | No       |
+| `LAMBDA_S3_PRIVATE_KEY` | Base64 private key for ECDSA signing. CloudFormation resolves `crow-detector-keys-${Environment}` key `lambda-s3-private-key`. | Yes      |
+| `NODE_ENV`              | `test` keeps the Lambda logger quiet                                                                                           | No       |
 
 Webpack may embed defaults for local packaging; runtime env in AWS should set real values.
 

@@ -683,4 +683,53 @@ describe('FeedEventService', () => {
       );
     });
   });
+
+  describe('readable images and the in-flight queue', () => {
+    it('drops an image URL whose key is outside feed/', async () => {
+      const event = {
+        ...mockFeedEvent,
+        id: 'bad-url',
+        imageUrl: 'https://bucket.s3.amazonaws.com/feed/../secret.jpg',
+      };
+      mockRepository.findOne.mockResolvedValue(event);
+
+      const result = await service.findById(event.id);
+
+      expect(result.imageUrl).toBe('');
+    });
+
+    it('starts a queued feed when a running job finishes', async () => {
+      const imageProcessing = (
+        service as unknown as {
+          imageProcessingService: { processImage: jest.Mock };
+        }
+      ).imageProcessingService;
+      let release: (value: unknown) => void = () => undefined;
+      const gate = new Promise((resolve) => {
+        release = resolve;
+      });
+      imageProcessing.processImage.mockImplementation(() => gate);
+      mockRepository.update.mockResolvedValue({ affected: 1 });
+
+      for (let index = 0; index < 5; index += 1) {
+        (service as any).startProcessing(
+          `event-${index}`,
+          'bucket',
+          'feed/a.jpg',
+        );
+      }
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(imageProcessing.processImage).toHaveBeenCalledTimes(4);
+
+      release({
+        faceDetection: { faceDetected: false },
+        contentModeration: { isAppropriate: true, labels: [], confidence: 0 },
+        processingDuration: 1,
+      });
+      await new Promise((resolve) => setImmediate(resolve));
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(imageProcessing.processImage).toHaveBeenCalledTimes(5);
+    });
+  });
 });

@@ -7,19 +7,19 @@
 
 ## Repository Overview
 
-| Field            | Value                                                              |
-| ---------------- | ------------------------------------------------------------------ |
-| **Project**      | Crow Detector — interactive crow feeder backend                    |
-| **Architecture** | NestJS modular monolith (ECS Fargate) + nested `lambda/` package   |
-| **Language**     | TypeScript (strict) on Node.js 26 (API); Lambda runtime Node.js 24 |
-| **Storage**      | PostgreSQL (TypeORM) + S3                                          |
-| **Vision / AI**  | AWS Rekognition + Anthropic Claude                                 |
-| **Auth**         | ECDSA device authentication                                        |
-| **IaC**          | CloudFormation                                                     |
-| **Testing**      | Jest with 80% global coverage thresholds                           |
-| **Analysis**     | ESLint + Prettier                                                  |
-| **CI/CD**        | GitHub Actions                                                     |
-| **Git Hooks**    | Husky + lint-staged + Conventional Commits                         |
+| Field            | Value                                                                                                                                    |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| **Project**      | Crow Detector — interactive crow feeder backend                                                                                          |
+| **Architecture** | NestJS modular monolith (ECS Fargate) + nested `lambda/` package                                                                         |
+| **Language**     | TypeScript on Node.js 26 (API); Lambda runtime Node.js 24. Root tsconfig leaves `"strict": true` off. `lambda/tsconfig.json` enables it. |
+| **Storage**      | PostgreSQL (TypeORM) + S3                                                                                                                |
+| **Vision / AI**  | AWS Rekognition + Anthropic Claude                                                                                                       |
+| **Auth**         | ECDSA device authentication                                                                                                              |
+| **IaC**          | CloudFormation                                                                                                                           |
+| **Testing**      | Jest with 80% global coverage thresholds                                                                                                 |
+| **Analysis**     | ESLint + Prettier                                                                                                                        |
+| **CI/CD**        | GitHub Actions                                                                                                                           |
+| **Git Hooks**    | Husky + lint-staged + Conventional Commits                                                                                               |
 
 ### Repository Structure
 
@@ -86,18 +86,18 @@ Prefer `make` targets. Run **`make`** or **`make help`** for a compact list.
 
 ### Local API / DB
 
-| Command                                               | Description                                                                                                                      |
-| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run start:dev`                                   | Nest watch + SSH tunnel to RDS                                                                                                   |
-| `npm run db:seed`                                     | Seed database                                                                                                                    |
-| `npm run db:reset`                                    | Reset + seed                                                                                                                     |
-| `npm run auth:token`                                  | Generate ECDSA auth token helper                                                                                                 |
-| `npm run pi:sync`                                     | Legacy: copy recorder + `porch.env` over SSH, then restart                                                                       |
-| `npm run pi:start`                                    | Legacy: restart the porch recorder over SSH (no copy)                                                                            |
-| `npm run pi:stop`                                     | Legacy: stop the porch recorder over SSH                                                                                         |
-| `./scripts/deploy-porch-host.sh`                      | LAN host: SSH `git pull` + restart `porch-recorder` (`DEPLOY_HOST=juzu-inui`; repo default `~/Development/crow-detector-server`) |
-| `python3 pi/record-on-motion.py --once`               | One RTSP clip + upload (host bring-up)                                                                                           |
-| `python3 -m unittest pi/test_record_on_motion_lib.py` | Porch recorder helper unit tests                                                                                                 |
+| Command                                             | Description                                                                                                                      |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run start:dev`                                 | Nest watch + SSH tunnel to RDS                                                                                                   |
+| `npm run db:seed`                                   | Seed database                                                                                                                    |
+| `npm run db:reset`                                  | Clear feed and detection rows. Does not reseed.                                                                                  |
+| `npm run auth:token`                                | Generate ECDSA auth token helper                                                                                                 |
+| `npm run pi:sync`                                   | Legacy: copy recorder + `porch.env` over SSH, then restart                                                                       |
+| `npm run pi:start`                                  | Legacy: restart the porch recorder over SSH (no copy)                                                                            |
+| `npm run pi:stop`                                   | Legacy: stop the porch recorder over SSH                                                                                         |
+| `./scripts/deploy-porch-host.sh`                    | LAN host: SSH `git pull` + restart `porch-recorder` (`DEPLOY_HOST=juzu-inui`; repo default `~/Development/crow-detector-server`) |
+| `python3 pi/record-on-motion.py --once`             | One RTSP clip + upload (host bring-up)                                                                                           |
+| `python3 -m unittest discover -s pi -p 'test_*.py'` | Porch recorder helper unit tests                                                                                                 |
 
 ---
 

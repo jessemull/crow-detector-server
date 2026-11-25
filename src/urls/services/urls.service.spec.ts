@@ -136,6 +136,13 @@ describe('UrlsService', () => {
       expect(result.metadata.source).toBe('pi-feeder-001');
       expect(result.metadata.type).toBe('feed');
       expect(result.metadata.timestamp).toBeGreaterThan(0);
+      expect(mockGetSignedUrl).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.any(Object),
+        expect.objectContaining({
+          signableHeaders: new Set(['content-type']),
+        }),
+      );
     });
 
     it('should use default content type when not provided', async () => {

@@ -81,7 +81,7 @@ The **Crow Detector** is an interactive system that allows users to feed crows t
 
 ## System Architecture
 
-The system employs a **microservices architecture** with the following key components:
+The server is a **modular monolith** with the following key components:
 
 ### Backend Services
 
@@ -240,7 +240,7 @@ The project includes database management scripts for development and testing:
 - **Test Connection**: `npm run db:test` - Verify database connectivity.
 - **Synchronize Schema**: `npm run db:synchronize` - Update database schema.
 - **Seed Data**: `npm run db:seed` - Populate database with test data.
-- **Reset Database**: `npm run db:reset` - Clear all data and reset schema.
+- **Reset Database**: `npm run db:reset` - Clear feed and detection rows. It does not reseed or change the schema.
 
 ### Database Schema
 
@@ -336,8 +336,7 @@ The system provides comprehensive animal detection and analysis capabilities thr
 
 ### Analysis Components
 
-- **Claude Haiku**: Looks at the animal photo and returns the names and counts.
-- **Fallback Detection**: Local processing when external services are unavailable.
+- **Claude Haiku**: Looks at the animal photo and returns the names and counts. A missing API key fails the detection.
 - **Error Handling**: Comprehensive error tracking and retry mechanisms.
 
 ### Data Captured
@@ -558,8 +557,7 @@ Infrastructure is managed using AWS CloudFormation templates with environment-sp
 The system integrates with external AI services for advanced image analysis:
 
 - **Anthropic Claude**: AI-powered animal species classification and crow detection.
-- **API Integration**: Secure communication with Claude's API for image analysis.
-- **Fallback Processing**: Local detection algorithms when AI services are unavailable.
+- **API Integration**: Secure communication with Claude's API for image analysis. A missing API key fails the detection.
 
 ### Required AWS Secrets
 
@@ -569,7 +567,10 @@ The following secrets must be configured in AWS Secrets Manager:
   - `pi-user-public-key`
   - `pi-motion-public-key`
   - `pi-feeder-public-key`
+  - `pi-porch-public-key`
   - `lambda-s3-public-key`
+- **`crow-detector-keys-{environment}`**: Lambda signing key for that environment (`dev` or `prod`)
+  - `lambda-s3-private-key`
 - **`crow-detector-db-{environment}`**: Database credentials
   - `username`
   - `password`

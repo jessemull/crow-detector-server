@@ -93,7 +93,13 @@ describe('HealthController', () => {
 
       await controller.checkDatabase();
 
+      const checks = mockHealthService.check.mock.calls[0][0] as Array<
+        () => Promise<unknown>
+      >;
+      await checks[0]();
+
       expect(healthService.check).toHaveBeenCalledWith([expect.any(Function)]);
+      expect(dbHealthIndicator.pingCheck).toHaveBeenCalledWith('database');
     });
 
     it('should return database health check result', async () => {

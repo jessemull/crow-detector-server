@@ -85,6 +85,8 @@ export class ImageProcessingService {
     this.logger.info(`Starting image processing for s3://${bucket}/${key}`);
 
     try {
+      await this.assertStoredImageSize(bucket, key);
+
       // Step 1: Content moderation check...
 
       const contentModeration = await this.checkContentModeration(bucket, key);
@@ -128,9 +130,27 @@ export class ImageProcessingService {
     } catch (error) {
       this.logger.error(
         `Image processing failed: ${error instanceof Error ? error.message : String(error)}`,
-        error instanceof Error ? error.stack : undefined,
       );
       throw error;
+    }
+  }
+
+  private async assertStoredImageSize(
+    bucket: string,
+    key: string,
+  ): Promise<void> {
+    const head = await this.s3.send(
+      new HeadObjectCommand({ Bucket: bucket, Key: key }),
+    );
+    if (
+      head.ContentLength === undefined ||
+      head.ContentLength > MAX_IMAGE_BYTES
+    ) {
+      throw new Error(
+        head.ContentLength === undefined
+          ? 'Image content length is missing'
+          : `Image is ${head.ContentLength} bytes; the limit is ${MAX_IMAGE_BYTES}`,
+      );
     }
   }
 
