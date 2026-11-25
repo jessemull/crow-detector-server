@@ -1,7 +1,7 @@
 # Multi-stage build for production.
 
 # Manifest list for node:26-alpine, so a retagged image cannot change the build.
-FROM node:26-alpine@sha256:6bd9ab43c0ec0190ca7b2b193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS builder
+FROM node:26-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS builder
 
 # Set working directory.
 
@@ -25,7 +25,7 @@ RUN npm run build
 
 # Production stage.
 
-FROM node:26-alpine@sha256:6bd9ab43c0ec0190ca7b2b193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS production
+FROM node:26-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS production
 
 # Install dumb-init for proper signal handling.
 

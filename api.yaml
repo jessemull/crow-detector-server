@@ -192,6 +192,8 @@ paths:
           description: Unauthorized - invalid authentication
         '404':
           description: Detection event not found
+        '409':
+          description: The detection changed before the update was applied
         '500':
           description: Internal server error
 
@@ -343,6 +345,8 @@ paths:
           description: Unauthorized - invalid authentication
         '404':
           description: Feed event not found
+        '409':
+          description: The feed event changed before the update was applied
         '500':
           description: Internal server error
 
@@ -373,6 +377,8 @@ paths:
           description: Feed event not found
         '401':
           description: Unauthorized - invalid authentication
+        '409':
+          description: The feed event is not failed, so it cannot be reprocessed
         '500':
           description: Internal server error
 
@@ -458,6 +464,8 @@ paths:
           description: Unauthorized - invalid authentication
         '404':
           description: Feed event not found
+        '409':
+          description: The feed event cannot move to that status from its current status
         '500':
           description: Internal server error
 
@@ -728,6 +736,8 @@ components:
       properties:
         confidence:
           type: number
+          minimum: 0
+          maximum: 1
           example: 0.87
         croppedImageUrl:
           type: string
@@ -952,8 +962,7 @@ components:
           example: 'https://example.com/images/feed.jpg'
         croppedImageUrl:
           type: string
-          format: uri
-          description: URL of the cropped feed image (stored in processed/ directory)
+          description: Presigned URL for the cropped image. The stored value is a key under processed/.
           example: 'https://example.com/images/processed/feed-cropped.jpg'
         isAppropriate:
           type: boolean

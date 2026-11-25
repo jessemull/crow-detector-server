@@ -57,6 +57,7 @@ export async function processSQSRecord(
   } catch (error) {
     lambdaLogger.error('Error processing S3 record', {
       error: error instanceof Error ? error.message : String(error),
+      messageId: record.messageId,
     });
     return {
       success: false,

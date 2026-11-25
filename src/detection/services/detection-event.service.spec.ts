@@ -55,6 +55,7 @@ describe('DetectionEventService', () => {
 
   const mockDetectionImageProcessingService = {
     processImage: jest.fn(),
+    deleteStoredImage: jest.fn(),
   };
 
   const mockS3MetadataService = {
@@ -121,7 +122,7 @@ describe('DetectionEventService', () => {
       const result = await service.create(createDetectionDTO);
 
       expect(repository.create).toHaveBeenCalledWith({
-        imageUrl: createDetectionDTO.imageUrl,
+        imageUrl: 'https://test-bucket.s3.amazonaws.com/test-key',
         processingStatus: ProcessingStatus.PENDING,
       });
       expect(repository.save).toHaveBeenCalledWith(createdEvent);
@@ -431,6 +432,9 @@ describe('DetectionEventService', () => {
         id: eventId,
         processingStatus: ProcessingStatus.PROCESSING,
       });
+      expect(
+        mockDetectionImageProcessingService.deleteStoredImage,
+      ).toHaveBeenCalledWith('test-bucket', 'test-key');
     });
 
     it('should handle image processing errors and mark as failed', async () => {

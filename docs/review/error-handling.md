@@ -10,7 +10,7 @@ List every operation in scope that can fail. For each, answer: what fails, who n
 
 ## Criteria
 
-- **ERR-01** (MUST) Required configuration fails closed. Missing database settings, the Claude key, or a device public key prevent startup or reject the request outside development, and never fall back to a dummy key or a skipped check. Verify: read each config read and the branch that handles it missing.
+- **ERR-01** (MUST) Required configuration fails closed. Missing database settings, the Claude key, or a device public key prevent startup or reject the request outside development, test, and ECS `dev`, and never fall back to a dummy key or a skipped check. Verify: read each config read and the branch that handles it missing.
 - **ERR-02** (MUST) No swallowed errors. Every `catch` handles, reports, or rethrows, and an intentional swallow has a comment saying why. Verify: search `catch` in scope and read each block.
 - **ERR-03** (MUST) Domain failures map to the right HTTP exception. A bad signature is 401, a missing resource is 404, a conflict is 409, and a validation failure is 400. A 200 that hides a failure is a defect. Verify: read each thrown exception and each returned status.
 - **ERR-04** (SHOULD) Error responses and logs do not leak internals: SQL, stack traces, key material, signed URLs, or upstream response bodies. Verify: read every message string and logged object.

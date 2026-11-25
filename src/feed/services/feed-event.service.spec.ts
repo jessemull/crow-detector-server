@@ -635,11 +635,12 @@ describe('FeedEventService', () => {
         mockFeedEvent.imageUrl,
       );
 
-      expect(repository.update).toHaveBeenCalledWith(
+      expect(repository.update).toHaveBeenNthCalledWith(
+        1,
         { id: eventId, processingStatus: ProcessingStatus.FAILED },
         {
           processingStatus: ProcessingStatus.PENDING,
-          processingError: undefined,
+          processingError: '',
         },
       );
     });

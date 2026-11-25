@@ -1,5 +1,5 @@
 import { ConfigService } from '@nestjs/config';
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import {
   GetObjectCommand,
   HeadObjectCommand,
@@ -21,32 +21,46 @@ export class S3MetadataService {
   }
 
   async extractMetadataFromUrl(imageUrl: string): Promise<S3Metadata> {
+    this.logger.info('Parsing S3 object reference');
+
+    let url: URL;
     try {
-      // Parse S3 URL: https://bucket-name.s3.region.amazonaws.com/key...
+      url = new URL(imageUrl);
+    } catch {
+      throw new BadRequestException('Invalid S3 URL format');
+    }
 
-      this.logger.info('Parsing S3 object reference');
+    const hostnameParts = url.hostname.split('.');
+    if (
+      hostnameParts.length < 4 ||
+      !hostnameParts[1]?.startsWith('s3') ||
+      url.pathname.length < 2
+    ) {
+      throw new BadRequestException('Invalid S3 URL format');
+    }
 
-      const url = new URL(imageUrl);
-      const hostnameParts = url.hostname.split('.');
+    const bucket = hostnameParts[0];
+    const configured = this.configService.get<string>('s3BucketName');
+    if (configured && bucket !== configured) {
+      throw new BadRequestException(
+        'Image URL must use the configured S3 bucket',
+      );
+    }
 
-      if (hostnameParts.length < 4 || !hostnameParts[1].startsWith('s3')) {
-        this.logger.error(
-          `Invalid hostname format: length=${hostnameParts.length}, s3 part=${hostnameParts[1]}`,
-        );
-        throw new Error('Invalid S3 URL format');
-      }
-
-      const bucket = hostnameParts[0];
-      const key = decodeURIComponent(url.pathname.substring(1));
-
-      // Extract metadata from S3 object and key path...
-
+    const key = decodeURIComponent(url.pathname.substring(1));
+    try {
       return await this.extractMetadataFromS3Object(bucket, key);
     } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      if (error instanceof Error && isKeyFormatError(error.message)) {
+        throw new BadRequestException(error.message);
+      }
       this.logger.error(
-        `Failed to extract metadata from URL: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to read S3 object metadata: ${error instanceof Error ? error.message : String(error)}`,
       );
-      throw new Error('Invalid S3 URL format', { cause: error });
+      throw error;
     }
   }
 
@@ -191,6 +205,13 @@ export class S3MetadataService {
       { expiresIn: expiresInSeconds },
     );
   }
+}
+
+function isKeyFormatError(message: string): boolean {
+  return (
+    message.startsWith('Invalid S3 key') ||
+    message.startsWith('Could not extract timestamp')
+  );
 }
 
 export function isAllowedObjectKey(

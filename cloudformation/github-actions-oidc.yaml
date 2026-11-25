@@ -49,20 +49,45 @@ Resources:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
               StringLike:
-                token.actions.githubusercontent.com:sub: !Sub 'repo:${GitHubOrg}/${GitHubRepo}:ref:refs/heads/main'
+                token.actions.githubusercontent.com:sub:
+                  - !Sub 'repo:${GitHubOrg}/${GitHubRepo}:ref:refs/heads/main'
+                  - !Sub 'repo:${GitHubOrg}/${GitHubRepo}:environment:dev'
+                  - !Sub 'repo:${GitHubOrg}/${GitHubRepo}:environment:prod'
       Policies:
         - PolicyName: DeployCrowDetector
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
-              - Sid: CloudFormation
+              - Sid: NamedCrowDetectorResources
                 Effect: Allow
                 Action:
-                  - cloudformation:*
                   - ecs:*
                   - ecr:*
                   - elasticloadbalancing:*
                   - logs:*
+                  - s3:*
+                  - lambda:*
+                  - sqs:*
+                  - rds:*
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:cluster/crow-detector-*'
+                  - !Sub 'arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:service/crow-detector-*/*'
+                  - !Sub 'arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:task-definition/crow-detector-*:*'
+                  - !Sub 'arn:${AWS::Partition}:ecr:${AWS::Region}:${AWS::AccountId}:repository/crow-detector*'
+                  - !Sub 'arn:${AWS::Partition}:elasticloadbalancing:${AWS::Region}:${AWS::AccountId}:loadbalancer/app/crow-detector-*/*'
+                  - !Sub 'arn:${AWS::Partition}:elasticloadbalancing:${AWS::Region}:${AWS::AccountId}:targetgroup/crow-detector-*/*'
+                  - !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/ecs/crow-detector-*'
+                  - !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/crow-detector-*'
+                  - !Sub 'arn:${AWS::Partition}:s3:::crow-detector-*'
+                  - !Sub 'arn:${AWS::Partition}:s3:::crow-detector-*/*'
+                  - !Sub 'arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:crow-detector-*'
+                  - !Sub 'arn:${AWS::Partition}:sqs:${AWS::Region}:${AWS::AccountId}:crow-detector-*'
+                  - !Sub 'arn:${AWS::Partition}:rds:${AWS::Region}:${AWS::AccountId}:db:crow-detector-*'
+              - Sid: AccountDeployActions
+                Effect: Allow
+                Action:
+                  - cloudformation:*
+                  - ecr:GetAuthorizationToken
                   - iam:PassRole
                   - iam:GetRole
                   - iam:CreateRole
@@ -74,10 +99,6 @@ Resources:
                   - iam:GetRolePolicy
                   - iam:TagRole
                   - iam:UntagRole
-                  - s3:*
-                  - lambda:*
-                  - sqs:*
-                  - rds:*
                   - secretsmanager:GetSecretValue
                   - secretsmanager:DescribeSecret
                 Resource: '*'

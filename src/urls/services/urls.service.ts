@@ -238,10 +238,10 @@ export class UrlsService {
 
 function presignPutOptions(): {
   expiresIn: number;
-  unhoistableHeaders: Set<string>;
+  signableHeaders: Set<string>;
 } {
   return {
     expiresIn: 900,
-    unhoistableHeaders: new Set(['content-type']),
+    signableHeaders: new Set(['content-type']),
   };
 }

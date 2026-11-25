@@ -26,7 +26,7 @@ Resolve upward, never downward.
 
 ### Language and type safety
 
-- **TypeScript checks are mandatory:** `strictNullChecks`, `strictPropertyInitialization`, `noImplicitAny`, `strictBindCallApply`, and `noFallthroughCasesInSwitch`. `"strict": true` is not enabled.
+- **TypeScript checks are mandatory:** `strictNullChecks`, `strictPropertyInitialization`, `noImplicitAny`, `strictBindCallApply`, and `noFallthroughCasesInSwitch`. The root tsconfig leaves `"strict": true` off. `lambda/tsconfig.json` enables it.
 - **No `any` in production code** without a justification comment. Tests may relax this.
 - Prefer explicit types on public APIs.
 

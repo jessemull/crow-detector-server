@@ -22,9 +22,9 @@ Copy `.env.example` to `.env` for local development. **Never commit `.env`.**
 | ------------------------- | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- | --------------- |
 | `RDS_HOST`                | Postgres hostname                                                                                                     | Yes except `development`, `test`, and ECS `dev` | -               |
 | `RDS_PORT`                | Postgres port                                                                                                         | No                                              | `5432`          |
-| `RDS_DATABASE`            | Database name                                                                                                         | Yes                                             | -               |
-| `RDS_USERNAME`            | Database user                                                                                                         | Yes                                             | -               |
-| `RDS_PASSWORD`            | Database password                                                                                                     | Yes                                             | -               |
+| `RDS_DATABASE`            | Database name                                                                                                         | Yes except `development`, `test`, and ECS `dev` | -               |
+| `RDS_USERNAME`            | Database user                                                                                                         | Yes except `development`, `test`, and ECS `dev` | -               |
+| `RDS_PASSWORD`            | Database password                                                                                                     | Yes except `development`, `test`, and ECS `dev` | -               |
 | `SSL_REJECT_UNAUTHORIZED` | Opt out of RDS CA verify (`false` only). Ignored in `production`/`prod` (always verify). Non-prod temporary use only. | No                                              | verify (`true`) |
 
 In ECS, username/password come from Secrets Manager; host/name from CloudFormation exports.
@@ -51,11 +51,10 @@ Local helpers may also use filesystem paths (scripts only):
 | `PI_MOTION_PRIVATE_KEY_PATH` | Path to motion private key |
 | `PI_FEEDER_PRIVATE_KEY_PATH` | Path to feeder private key |
 | `PI_PORCH_PRIVATE_KEY_PATH`  | Path to porch private key  |
-| `PI_*_PUBLIC_KEY_PATH`       | Path variants for scripts  |
 
-| Variable               | Description                                      | Required | Default                                                                                         |
-| ---------------------- | ------------------------------------------------ | -------- | ----------------------------------------------------------------------------------------------- |
-| `CORS_ALLOWED_ORIGINS` | Comma-separated origins for the public clip list | No       | Critter Canteen site (+ localhost `:3000` / `:8080` when `NODE_ENV` is not `prod`/`production`) |
+| Variable               | Description                                      | Required | Default                                                                                                              |
+| ---------------------- | ------------------------------------------------ | -------- | -------------------------------------------------------------------------------------------------------------------- |
+| `CORS_ALLOWED_ORIGINS` | Comma-separated origins for the public clip list | No       | Critter Canteen site (+ `localhost` and `127.0.0.1` on `:3000` / `:8080` when `NODE_ENV` is not `prod`/`production`) |
 
 Porch LAN recorder (host laptop/server, not Nest) — see `docs/DEVICES.md` and `pi/porch.env.example`:
 
@@ -121,13 +120,13 @@ Legacy Pi helpers still exist: `npm run pi:sync` / `pi:start` / `pi:stop` (hardc
 
 ## Lambda package
 
-| Variable                | Description                           | Required |
-| ----------------------- | ------------------------------------- | -------- |
-| `API_BASE_URL`          | Nest API base URL                     | Yes      |
-| `DETECTION_ENDPOINT`    | Detection path (default `/detection`) | No       |
-| `FEED_ENDPOINT`         | Feed path (default `/feed`)           | No       |
-| `LAMBDA_S3_PRIVATE_KEY` | Base64 private key for ECDSA signing  | Yes      |
-| `NODE_ENV`              | Controls verbose logging in tests     | No       |
+| Variable                | Description                                  | Required |
+| ----------------------- | -------------------------------------------- | -------- |
+| `API_BASE_URL`          | Nest API base URL. There is no code default. | Yes      |
+| `DETECTION_ENDPOINT`    | Detection path (default `/detection`)        | No       |
+| `FEED_ENDPOINT`         | Feed path (default `/feed`)                  | No       |
+| `LAMBDA_S3_PRIVATE_KEY` | Base64 private key for ECDSA signing         | Yes      |
+| `NODE_ENV`              | `test` keeps the Lambda logger quiet         | No       |
 
 Webpack may embed defaults for local packaging; runtime env in AWS should set real values.
 

@@ -10,7 +10,7 @@ Model output is untrusted input. A count, a label, or a JSON blob from Claude or
 
 ## Criteria
 
-- **LLM-01** (MUST) The Claude API key is required outside development and has no dummy fallback. A missing key fails the request or skips the call visibly; it does not invent a count. Verify: read the config branch and the service's missing-key path.
+- **LLM-01** (MUST) The Claude API key is required outside development, test, and ECS `dev` and has no dummy fallback. A missing key fails the request or skips the call visibly; it does not invent a count. Verify: read the config branch and the service's missing-key path.
 - **LLM-02** (MUST) The key, any key prefix, and the raw credential are never logged. Verify: read every log in the Claude and Rekognition services.
 - **LLM-03** (MUST) Model output is validated before use: expected JSON shape, numeric ranges, and allowed labels. A parse failure is an error, not a default of "no animals" or "allow". Verify: read the parser and the branch that handles malformed output.
 - **LLM-04** (SHOULD) Calls set `max_tokens`, a timeout, and a bounded retry. A hang or a 529/429 must not block the worker forever. Verify: read the SDK call options against the installed `@anthropic-ai/sdk` types.

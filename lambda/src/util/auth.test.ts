@@ -87,6 +87,9 @@ describe('Auth module', () => {
         'x-signature': 'valid-signature',
         'x-timestamp': '1234567890',
       });
+      expect(mockUpdate).toHaveBeenCalledWith(
+        `POST/test${JSON.stringify({ foo: 'bar' })}1234567890`,
+      );
     });
 
     it('throws error when private key is missing', () => {

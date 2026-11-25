@@ -49,9 +49,9 @@ export class EcdsaAuthGuard implements CanActivate {
 
     // Extract required headers...
 
-    const deviceId = request.headers['x-device-id'] as string;
-    const signature = request.headers['x-signature'] as string;
-    const timestamp = request.headers['x-timestamp'] as string;
+    const deviceId = singleHeader(request.headers['x-device-id']);
+    const signature = singleHeader(request.headers['x-signature']);
+    const timestamp = singleHeader(request.headers['x-timestamp']);
 
     // Validate required headers...
 
@@ -136,4 +136,10 @@ export class EcdsaAuthGuard implements CanActivate {
       return false;
     }
   }
+}
+
+function singleHeader(
+  value: string | string[] | undefined,
+): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
 }

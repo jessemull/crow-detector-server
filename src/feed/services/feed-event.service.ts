@@ -17,6 +17,7 @@ import { createLogger } from 'src/common/logger/logger.config';
 import { ConfigService } from '@nestjs/config';
 
 const FEED_INSERT_LOCK = 48291;
+const MAX_IN_FLIGHT = 4;
 
 const FEED_STATUS_FROM: Partial<Record<FeedEventStatus, FeedEventStatus>> = {
   [FeedEventStatus.FEEDING]: FeedEventStatus.PENDING,
@@ -28,6 +29,7 @@ const FEED_STATUS_FROM: Partial<Record<FeedEventStatus, FeedEventStatus>> = {
 @Injectable()
 export class FeedEventService {
   private readonly logger = createLogger(FeedEventService.name);
+  private inFlight = 0;
 
   constructor(
     @InjectRepository(FeedEvent)
@@ -52,6 +54,7 @@ export class FeedEventService {
       );
 
       let created = false;
+      let restart = false;
       const savedEvent = await this.feedEventRepository.manager.transaction(
         async (manager) => {
           await manager.query('SELECT pg_advisory_xact_lock($1)', [
@@ -60,6 +63,7 @@ export class FeedEventService {
           const repo = manager.getRepository(FeedEvent);
           const existing = await repo.findOne({ where: { imageUrl } });
           if (existing) {
+            restart = await this.markForRestart(repo, existing);
             return existing;
           }
 
@@ -91,16 +95,8 @@ export class FeedEventService {
         },
       );
 
-      if (created) {
-        void this.processImageAsync(
-          savedEvent.id,
-          s3Metadata.bucket,
-          s3Metadata.key,
-        ).catch((error: unknown) => {
-          this.logger.error(
-            `Async image processing rejected for ${savedEvent.id}: ${error instanceof Error ? error.message : String(error)}`,
-          );
-        });
+      if (created || restart) {
+        this.startProcessing(savedEvent.id, s3Metadata.bucket, s3Metadata.key);
       }
 
       return this.withReadableImages(savedEvent);
@@ -132,7 +128,8 @@ export class FeedEventService {
       return;
     }
     const cooldownMs = cooldownHours * 60 * 60 * 1000;
-    const timeSinceLastFeed = Date.now() - lastFeedEvent.createdAt.getTime();
+    const now = Date.now();
+    const timeSinceLastFeed = now - lastFeedEvent.createdAt.getTime();
 
     if (timeSinceLastFeed < cooldownMs) {
       const remainingHours = Math.ceil(
@@ -214,10 +211,16 @@ export class FeedEventService {
 
       // Update the feed event...
 
-      await this.feedEventRepository.update(
+      const completed = await this.feedEventRepository.update(
         { id: eventId, processingStatus: ProcessingStatus.PROCESSING },
         updateData,
       );
+      if (!completed.affected) {
+        this.logger.warn(
+          `Feed event ${eventId} changed before processing results were stored`,
+        );
+        return;
+      }
 
       this.logger.info(`Image processing completed for event ${eventId}`);
     } catch (error) {
@@ -272,6 +275,18 @@ export class FeedEventService {
     if (key && isAllowedObjectKey(key, 'feed/')) {
       event.imageUrl = await this.s3MetadataService.presignGet(key, 'feed/');
     }
+    if (event.photoUrl) {
+      const photoKey = objectKey(event.photoUrl);
+      if (photoKey && isAllowedObjectKey(photoKey, 'feed/')) {
+        event.photoUrl = await this.s3MetadataService.presignGet(
+          photoKey,
+          'feed/',
+        );
+      } else {
+        this.logger.warn(`Ignoring photo URL outside feed/ for ${event.id}`);
+        event.photoUrl = undefined;
+      }
+    }
     if (
       event.croppedImageUrl &&
       isAllowedObjectKey(event.croppedImageUrl, 'processed/')
@@ -301,6 +316,11 @@ export class FeedEventService {
       throw new NotFoundException(`Feed event with id ${id} not found!`);
     }
 
+    if (patchFeedDTO.processingStatus !== undefined) {
+      throw new BadRequestException(
+        'processingStatus is updated by image processing',
+      );
+    }
     if (
       patchFeedDTO.croppedImageUrl &&
       !isAllowedObjectKey(patchFeedDTO.croppedImageUrl, 'processed/')
@@ -338,7 +358,7 @@ export class FeedEventService {
       { id: eventId, processingStatus: ProcessingStatus.FAILED },
       {
         processingStatus: ProcessingStatus.PENDING,
-        processingError: undefined,
+        processingError: '',
       },
     );
     if (!reset.affected) {
@@ -347,15 +367,7 @@ export class FeedEventService {
       );
     }
 
-    void this.processImageAsync(
-      eventId,
-      s3Metadata.bucket,
-      s3Metadata.key,
-    ).catch((error: unknown) => {
-      this.logger.error(
-        `Async reprocess rejected for ${eventId}: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    });
+    this.startProcessing(eventId, s3Metadata.bucket, s3Metadata.key);
   }
 
   async getLatestFeedEventStatus(): Promise<{
@@ -406,6 +418,12 @@ export class FeedEventService {
       case 'PHOTO_TAKEN':
         updateData.photoTakenAt = new Date();
         if (photoUrl) {
+          const photoKey = objectKey(photoUrl);
+          if (!photoKey || !isAllowedObjectKey(photoKey, 'feed/')) {
+            throw new BadRequestException(
+              'photoUrl must be an image URL under feed/',
+            );
+          }
           updateData.photoUrl = photoUrl;
         }
         break;
@@ -431,6 +449,47 @@ export class FeedEventService {
     }
 
     return this.findById(id);
+  }
+
+  private async markForRestart(
+    repo: Repository<FeedEvent>,
+    existing: FeedEvent,
+  ): Promise<boolean> {
+    const status = existing.processingStatus;
+    if (
+      status !== ProcessingStatus.PENDING &&
+      status !== ProcessingStatus.PROCESSING &&
+      status !== ProcessingStatus.FAILED
+    ) {
+      return false;
+    }
+    if (status === ProcessingStatus.PENDING) {
+      return true;
+    }
+    const reset = await repo.update(
+      { id: existing.id, processingStatus: status },
+      { processingStatus: ProcessingStatus.PENDING, processingError: '' },
+    );
+    return (reset.affected ?? 0) > 0;
+  }
+
+  private startProcessing(eventId: string, bucket: string, key: string): void {
+    if (this.inFlight >= MAX_IN_FLIGHT) {
+      this.logger.warn(
+        `Feed event ${eventId} stays pending because ${MAX_IN_FLIGHT} image jobs are already running`,
+      );
+      return;
+    }
+    this.inFlight += 1;
+    void this.processImageAsync(eventId, bucket, key)
+      .catch((error: unknown) => {
+        this.logger.error(
+          `Async image processing rejected for ${eventId}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      })
+      .finally(() => {
+        this.inFlight -= 1;
+      });
   }
 }
 

@@ -399,6 +399,7 @@ describe('ImageProcessingService', () => {
       };
       mockS3Send.mockResolvedValue({
         Body: mockBody,
+        ContentLength: 16,
       });
 
       const sharp = jest.requireMock('sharp');
@@ -444,6 +445,7 @@ describe('ImageProcessingService', () => {
       };
       mockS3Send.mockResolvedValue({
         Body: mockBody,
+        ContentLength: 16,
       });
 
       const sharp = jest.requireMock('sharp');
@@ -482,6 +484,7 @@ describe('ImageProcessingService', () => {
       };
       mockS3Send.mockResolvedValue({
         Body: mockBody,
+        ContentLength: 16,
       });
 
       const sharp = jest.requireMock('sharp');
@@ -501,6 +504,7 @@ describe('ImageProcessingService', () => {
       };
       mockS3Send.mockResolvedValue({
         Body: mockBody,
+        ContentLength: 16,
       });
 
       const sharp = jest.requireMock('sharp');

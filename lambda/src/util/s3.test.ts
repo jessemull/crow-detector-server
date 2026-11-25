@@ -46,6 +46,17 @@ describe('S3 Utility', () => {
       expect(result.key).toBe('test key+with spaces.jpg');
     });
 
+    it('decodes a raw plus in the key as a space', () => {
+      const mockRecord = createMockSQSRecord(
+        'test-bucket',
+        'feed/photo+1.jpg',
+        'ObjectCreated:Put',
+        1024,
+      );
+
+      expect(extractS3Info(mockRecord).key).toBe('feed/photo 1.jpg');
+    });
+
     it('should handle missing size and default to 0', () => {
       const mockRecord = createMockSQSRecord(
         'test-bucket',

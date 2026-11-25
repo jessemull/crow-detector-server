@@ -43,6 +43,10 @@ jobs:
           ENVIRONMENT: ${{ github.event.inputs.environment }}
           CONTAINER_IMAGE: ${{ github.event.inputs.container_image }}
         run: |
+          if [ -z "${CONTAINER_IMAGE}" ]; then
+            echo "container_image is required" >&2
+            exit 1
+          fi
           echo "Rolling back ${ENVIRONMENT} to ${CONTAINER_IMAGE}"
           aws cloudformation deploy \
             --template-file cloudformation/crow-detector-ecs-task.yaml \

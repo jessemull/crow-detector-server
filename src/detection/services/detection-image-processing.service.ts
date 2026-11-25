@@ -1,4 +1,5 @@
 import { ConfigService } from '@nestjs/config';
+import sharp from 'sharp';
 import {
   DeleteObjectCommand,
   GetObjectCommand,
@@ -12,6 +13,7 @@ import { AnimalDetectionResult } from 'src/common/types';
 import { AnimalPhotoMediaType, ClaudeService } from './claude.service';
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_INPUT_PIXELS = 20_000_000;
 
 @Injectable()
 export class DetectionImageProcessingService {
@@ -38,17 +40,11 @@ export class DetectionImageProcessingService {
     try {
       // Amazon's label list called a raccoon a cat, so the photo goes to Haiku.
       const image = await this.readImage(bucket, key);
+      await this.assertDimensions(image);
       const result = await this.claudeService.analyzeAnimalPhoto(
         image,
         this.mediaType(key),
       );
-
-      if (!result.hasAnimals) {
-        await this.deleteImage(bucket, key);
-        this.logger.info(
-          `No animals detected, deleted image s3://${bucket}/${key}`,
-        );
-      }
 
       const processingDuration = Date.now() - startTime;
       this.logger.info(`Animal detection completed in ${processingDuration}ms`);
@@ -60,7 +56,6 @@ export class DetectionImageProcessingService {
     } catch (error) {
       this.logger.error(
         `Animal detection failed: ${error instanceof Error ? error.message : String(error)}`,
-        error instanceof Error ? error.stack : undefined,
       );
       throw error;
     }
@@ -91,7 +86,10 @@ export class DetectionImageProcessingService {
   }
 
   private assertImageSize(size: number | undefined): void {
-    if (size !== undefined && size > MAX_IMAGE_BYTES) {
+    if (size === undefined) {
+      throw new Error('Image content length is missing');
+    }
+    if (size > MAX_IMAGE_BYTES) {
       throw new Error('Image is too large');
     }
   }
@@ -116,7 +114,17 @@ export class DetectionImageProcessingService {
     throw new Error('Unsupported image type');
   }
 
-  private async deleteImage(bucket: string, key: string): Promise<void> {
+  private async assertDimensions(image: Buffer): Promise<void> {
+    const metadata = await sharp(image, {
+      limitInputPixels: MAX_INPUT_PIXELS,
+    }).metadata();
+    const pixels = (metadata.width ?? 0) * (metadata.height ?? 0);
+    if (!metadata.width || !metadata.height || pixels > MAX_INPUT_PIXELS) {
+      throw new Error('Image dimensions are too large');
+    }
+  }
+
+  async deleteStoredImage(bucket: string, key: string): Promise<void> {
     try {
       const command = new DeleteObjectCommand({ Bucket: bucket, Key: key });
       await this.s3.send(command);

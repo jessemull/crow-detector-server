@@ -38,7 +38,12 @@ describe('DetectionImageProcessingService', () => {
     get: jest.fn(),
   };
 
-  const imageBytes = new Uint8Array([1, 2, 3]);
+  const imageBytes = Uint8Array.from(
+    Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+      'base64',
+    ),
+  );
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -165,7 +170,7 @@ describe('DetectionImageProcessingService', () => {
       const result = await service.processImage('bucket', 'detection/mug.jpg');
 
       expect(result.hasAnimals).toBe(false);
-      expect(mockS3Client.send).toHaveBeenCalledWith(
+      expect(mockS3Client.send).not.toHaveBeenCalledWith(
         expect.any(DeleteObjectCommand),
       );
     });
@@ -214,23 +219,20 @@ describe('DetectionImageProcessingService', () => {
       ).rejects.toThrow('Claude API rate limit exceeded');
     });
 
-    it('should fail when a rejected photo cannot be deleted', async () => {
+    it('returns no animals without deleting the object itself', async () => {
       mockClaudeService.analyzeAnimalPhoto.mockResolvedValue({
         hasAnimals: false,
         crowCount: 0,
         animalCount: 0,
         detectedAnimals: [],
       });
-      mockS3Client.send
-        .mockResolvedValueOnce({ ContentLength: imageBytes.byteLength })
-        .mockResolvedValueOnce({
-          Body: { transformToByteArray: () => Promise.resolve(imageBytes) },
-        })
-        .mockRejectedValueOnce(new Error('Delete failed'));
 
-      await expect(
-        service.processImage('bucket', 'detection/mug.jpg'),
-      ).rejects.toThrow('Delete failed');
+      const result = await service.processImage('bucket', 'detection/mug.jpg');
+
+      expect(result.hasAnimals).toBe(false);
+      expect(mockS3Client.send).not.toHaveBeenCalledWith(
+        expect.any(DeleteObjectCommand),
+      );
     });
   });
 });

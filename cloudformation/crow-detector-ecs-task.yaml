@@ -11,26 +11,17 @@ Parameters:
 
   ContainerImage:
     Type: String
+    MinLength: 1
     Description: The URI of the container image to deploy
 
 Mappings:
   EnvConfig:
     dev:
-      Subnets:
-        - !ImportValue 'aws-infra-private-subnet-1-id' # us-west-2a
-        - !ImportValue 'aws-infra-private-subnet-2-id' # us-west-2b
-        - !ImportValue 'aws-infra-private-subnet-3-id' # us-west-2c
-        - !ImportValue 'aws-infra-private-subnet-4-id' # us-west-2d
       SecurityGroupExport: aws-infra-ecs-sg-id
       LogLevel: 'info'
       Cpu: 256
       Memory: 512
     prod:
-      Subnets:
-        - !ImportValue 'aws-infra-private-subnet-1-id' # us-west-2a
-        - !ImportValue 'aws-infra-private-subnet-2-id' # us-west-2b
-        - !ImportValue 'aws-infra-private-subnet-3-id' # us-west-2c
-        - !ImportValue 'aws-infra-private-subnet-4-id' # us-west-2d
       SecurityGroupExport: aws-infra-ecs-sg-id
       LogLevel: 'warn'
       Cpu: 512

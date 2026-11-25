@@ -13,13 +13,19 @@ import {
 import { ListEventsQueryDto } from 'src/common/dto/list-events-query.dto';
 import { createdAtFilter } from 'src/common/dto/list-range';
 import { PatchDetectionDTO } from '../dto/patch-detection.dto';
-import { S3MetadataService } from 'src/feed/services/s3-metadata.service';
+import {
+  isAllowedObjectKey,
+  S3MetadataService,
+} from 'src/feed/services/s3-metadata.service';
 import { createLogger } from 'src/common/logger/logger.config';
 import { ProcessingStatus } from 'src/common/types';
+
+const MAX_IN_FLIGHT = 4;
 
 @Injectable()
 export class DetectionEventService {
   private readonly logger = createLogger(DetectionEventService.name);
+  private inFlight = 0;
 
   constructor(
     @InjectRepository(DetectionEvent)
@@ -33,34 +39,28 @@ export class DetectionEventService {
   async create(
     createDetectionDTO: CreateDetectionDTO,
   ): Promise<DetectionEvent> {
-    const { imageUrl } = createDetectionDTO;
+    const metadata = await this.s3MetadataService.extractMetadataFromUrl(
+      createDetectionDTO.imageUrl,
+    );
+    this.assertDetectionKey(metadata.type);
+    const canonical = canonicalObjectUrl(metadata.bucket, metadata.key);
 
     const existing = await this.detectionEventRepository.findOne({
-      where: { imageUrl },
+      where: [
+        { imageUrl: canonical },
+        { imageUrl: createDetectionDTO.imageUrl },
+      ],
       relations: ['feedEvent'],
     });
     if (existing) {
-      if (
-        existing.processingStatus === ProcessingStatus.FAILED ||
-        existing.processingStatus === ProcessingStatus.PENDING
-      ) {
-        const metadata =
-          await this.s3MetadataService.extractMetadataFromUrl(imageUrl);
-        this.assertDetectionKey(metadata.type);
-        if (existing.processingStatus === ProcessingStatus.FAILED) {
-          await this.detectionEventRepository.update(
-            { id: existing.id, processingStatus: ProcessingStatus.FAILED },
-            { processingStatus: ProcessingStatus.PENDING, processingError: '' },
-          );
-        }
-        this.startProcessing(existing.id, metadata.bucket, metadata.key);
-      }
-      return existing;
+      const resumed = await this.resumeIfNeeded(
+        existing,
+        metadata.bucket,
+        metadata.key,
+      );
+      return this.withReadableImages(resumed);
     }
 
-    const metadata =
-      await this.s3MetadataService.extractMetadataFromUrl(imageUrl);
-    this.assertDetectionKey(metadata.type);
     const feedEvent = metadata.feedEventId
       ? await this.feedEventRepository.findOne({
           where: { id: metadata.feedEventId },
@@ -68,7 +68,7 @@ export class DetectionEventService {
       : null;
 
     const event = this.detectionEventRepository.create({
-      imageUrl,
+      imageUrl: canonical,
       processingStatus: ProcessingStatus.PENDING,
       ...(feedEvent ? { feedEvent } : {}),
     });
@@ -81,18 +81,26 @@ export class DetectionEventService {
         throw error;
       }
       const raced = await this.detectionEventRepository.findOne({
-        where: { imageUrl },
+        where: [
+          { imageUrl: canonical },
+          { imageUrl: createDetectionDTO.imageUrl },
+        ],
         relations: ['feedEvent'],
       });
       if (!raced) {
         throw error;
       }
-      return raced;
+      const resumed = await this.resumeIfNeeded(
+        raced,
+        metadata.bucket,
+        metadata.key,
+      );
+      return this.withReadableImages(resumed);
     }
 
     this.startProcessing(savedEvent.id, metadata.bucket, metadata.key);
 
-    return savedEvent;
+    return this.withReadableImages(savedEvent);
   }
 
   async find(query: ListEventsQueryDto): Promise<DetectionEvent[]> {
@@ -102,12 +110,13 @@ export class DetectionEventService {
       where.createdAt = createdAt;
     }
 
-    return this.detectionEventRepository.find({
+    const events = await this.detectionEventRepository.find({
       order: { createdAt: 'DESC' },
       take: query.limit,
       where,
       relations: ['feedEvent'],
     });
+    return Promise.all(events.map((event) => this.withReadableImages(event)));
   }
 
   async findById(id: string): Promise<DetectionEvent> {
@@ -120,7 +129,7 @@ export class DetectionEventService {
       throw new NotFoundException(`Detection event with id ${id} not found!`);
     }
 
-    return event;
+    return this.withReadableImages(event);
   }
 
   async update(
@@ -181,11 +190,19 @@ export class DetectionEventService {
           id: eventId,
           processingStatus: ProcessingStatus.PROCESSING,
         });
-        if (removed.affected) {
-          this.logger.info(
-            `No animals detected, deleted detection event ${eventId}`,
+        if (!removed.affected) {
+          this.logger.warn(
+            `Detection event ${eventId} changed before the empty result was removed`,
           );
+          return;
         }
+        await this.detectionImageProcessingService.deleteStoredImage(
+          bucket,
+          key,
+        );
+        this.logger.info(
+          `No animals detected, deleted detection event ${eventId}`,
+        );
         return;
       }
 
@@ -228,12 +245,105 @@ export class DetectionEventService {
     }
   }
 
-  private startProcessing(eventId: string, bucket: string, key: string): void {
-    this.processImageAsync(eventId, bucket, key).catch((error: unknown) => {
-      this.logger.error(
-        `Image processing failed for detection event ${eventId}: ${error instanceof Error ? error.message : String(error)}`,
+  private async resumeIfNeeded(
+    event: DetectionEvent,
+    bucket: string,
+    key: string,
+  ): Promise<DetectionEvent> {
+    const status = event.processingStatus;
+    if (
+      status !== ProcessingStatus.FAILED &&
+      status !== ProcessingStatus.PENDING &&
+      status !== ProcessingStatus.PROCESSING
+    ) {
+      return event;
+    }
+    if (status !== ProcessingStatus.PENDING) {
+      const reset = await this.detectionEventRepository.update(
+        { id: event.id, processingStatus: status },
+        { processingStatus: ProcessingStatus.PENDING, processingError: '' },
       );
+      if (!reset.affected) {
+        const current = await this.detectionEventRepository.findOne({
+          where: { id: event.id },
+          relations: ['feedEvent'],
+        });
+        return current ?? event;
+      }
+    }
+    this.startProcessing(event.id, bucket, key);
+    const refreshed = await this.detectionEventRepository.findOne({
+      where: { id: event.id },
+      relations: ['feedEvent'],
     });
+    return refreshed ?? event;
+  }
+
+  private async withReadableImages(
+    event: DetectionEvent,
+  ): Promise<DetectionEvent> {
+    const key = objectKey(event.imageUrl);
+    if (key && isAllowedObjectKey(key, 'detection/')) {
+      event.imageUrl = await this.s3MetadataService.presignGet(
+        key,
+        'detection/',
+      );
+    }
+    if (event.feedEvent) {
+      const feedKey = objectKey(event.feedEvent.imageUrl);
+      if (feedKey && isAllowedObjectKey(feedKey, 'feed/')) {
+        event.feedEvent.imageUrl = await this.s3MetadataService.presignGet(
+          feedKey,
+          'feed/',
+        );
+      }
+      if (
+        event.feedEvent.croppedImageUrl &&
+        isAllowedObjectKey(event.feedEvent.croppedImageUrl, 'processed/')
+      ) {
+        event.feedEvent.croppedImageUrl =
+          await this.s3MetadataService.presignGet(
+            event.feedEvent.croppedImageUrl,
+            'processed/',
+          );
+      }
+    }
+    return event;
+  }
+
+  private startProcessing(eventId: string, bucket: string, key: string): void {
+    if (this.inFlight >= MAX_IN_FLIGHT) {
+      this.logger.warn(
+        `Detection event ${eventId} stays pending because ${MAX_IN_FLIGHT} image jobs are already running`,
+      );
+      return;
+    }
+    this.inFlight += 1;
+    this.processImageAsync(eventId, bucket, key)
+      .catch((error: unknown) => {
+        this.logger.error(
+          `Image processing failed for detection event ${eventId}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      })
+      .finally(() => {
+        this.inFlight -= 1;
+      });
+  }
+}
+
+function canonicalObjectUrl(bucket: string, key: string): string {
+  const encoded = key
+    .split('/')
+    .map((segment) => encodeURIComponent(segment))
+    .join('/');
+  return `https://${bucket}.s3.amazonaws.com/${encoded}`;
+}
+
+function objectKey(imageUrl: string): string | undefined {
+  try {
+    return decodeURIComponent(new URL(imageUrl).pathname.substring(1));
+  } catch {
+    return undefined;
   }
 }
 

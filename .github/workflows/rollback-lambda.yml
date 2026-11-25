@@ -33,6 +33,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
+      - name: Reject an empty zip name
+        run: |
+          if [ -z "${S3_ZIP_FILE}" ] || [[ "${S3_ZIP_FILE}" == *"/"* ]]; then
+            echo "s3_zip_file must be a file name" >&2
+            exit 1
+          fi
+
       - name: Set Up AWS CLI
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a
         with:

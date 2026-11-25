@@ -13,6 +13,9 @@ Parameters:
     Default: crow-detector-images
     Description: Base name for the S3 bucket
 
+Conditions:
+  IsProd: !Equals [!Ref Environment, prod]
+
 Resources:
   CrowDetectorImagesBucket:
     Type: AWS::S3::Bucket
@@ -45,11 +48,14 @@ Resources:
         CorsRules:
           - AllowedHeaders: ['*']
             AllowedMethods: [GET, PUT, HEAD]
-            AllowedOrigins:
-              - https://www.crittercanteen.com
-              - https://crittercanteen.com
-              - http://localhost:3000
-              - http://127.0.0.1:3000
+            AllowedOrigins: !If
+              - IsProd
+              - - https://www.crittercanteen.com
+                - https://crittercanteen.com
+              - - https://www.crittercanteen.com
+                - https://crittercanteen.com
+                - http://localhost:3000
+                - http://127.0.0.1:3000
             MaxAge: 3000
       NotificationConfiguration:
         QueueConfigurations:

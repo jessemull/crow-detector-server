@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
   IsEnum,
@@ -32,21 +32,30 @@ export class DetectedAnimalDto {
 export class PatchDetectionDTO {
   @IsOptional()
   @IsNumber()
+  @Min(0)
+  @Max(1)
+  @Transform(({ value }) => blankToUndefined(value))
   @Type(() => Number)
   confidence?: number;
 
   @IsOptional()
   @IsNumber()
+  @Min(0)
+  @Transform(({ value }) => blankToUndefined(value))
   @Type(() => Number)
   crowCount?: number;
 
   @IsOptional()
   @IsNumber()
+  @Min(0)
+  @Transform(({ value }) => blankToUndefined(value))
   @Type(() => Number)
   animalCount?: number;
 
   @IsOptional()
   @IsNumber()
+  @Min(0)
+  @Transform(({ value }) => blankToUndefined(value))
   @Type(() => Number)
   processingDuration?: number;
 
@@ -67,6 +76,15 @@ export class PatchDetectionDTO {
 
   @IsOptional()
   @IsNumber()
+  @Min(0)
+  @Transform(({ value }) => blankToUndefined(value))
   @Type(() => Number)
   originalImageSize?: number;
+}
+
+function blankToUndefined(value: unknown): unknown {
+  if (value === null || value === '') {
+    return undefined;
+  }
+  return value;
 }

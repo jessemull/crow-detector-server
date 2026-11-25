@@ -161,7 +161,7 @@ describe('S3MetadataService', () => {
 
       await expect(
         service.extractMetadataFromUrl(urlWithInvalidKey),
-      ).rejects.toThrow('Invalid S3 URL format');
+      ).rejects.toThrow('Invalid S3 key format');
     });
 
     it('should throw error when filename lacks timestamp', async () => {
@@ -170,22 +170,22 @@ describe('S3MetadataService', () => {
 
       await expect(
         service.extractMetadataFromUrl(urlWithInvalidFilename),
-      ).rejects.toThrow('Invalid S3 URL format');
+      ).rejects.toThrow('Could not extract timestamp from filename');
     });
 
     it('should handle S3 headObject errors', async () => {
       mockS3Send.mockRejectedValueOnce(new Error('S3 access denied'));
 
       await expect(service.extractMetadataFromUrl(validUrl)).rejects.toThrow(
-        'Invalid S3 URL format',
+        'S3 access denied',
       );
     });
 
     it('should handle S3 headObject string errors', async () => {
       mockS3Send.mockRejectedValueOnce('String S3 access denied');
 
-      await expect(service.extractMetadataFromUrl(validUrl)).rejects.toThrow(
-        'Invalid S3 URL format',
+      await expect(service.extractMetadataFromUrl(validUrl)).rejects.toBe(
+        'String S3 access denied',
       );
     });
   });

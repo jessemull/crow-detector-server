@@ -133,30 +133,20 @@ function main() {
     logger.info(`Device ID: ${deviceId}`);
     logger.info(`Method: ${method}`);
     logger.info(`Path: ${path}`);
-    logger.info(`Body: ${JSON.stringify(body)}`);
     logger.info(`Timestamp: ${auth.timestamp}`);
-    logger.info(`Data to sign: ${auth.dataToSign}`);
-    logger.info(`Signature: ${auth.signature}`);
-
-    logger.info('\n=== cURL Headers ===');
-    logger.info(`-H "x-device-id: ${auth.headers['x-device-id']}"`);
-    logger.info(`-H "x-signature: ${auth.headers['x-signature']}"`);
-    logger.info(`-H "x-timestamp: ${auth.headers['x-timestamp']}"`);
-
-    logger.info('\n=== Full cURL Example ===');
 
     const bodyArg =
       Object.keys(body).length > 0
         ? `-d ${shellSingleQuote(JSON.stringify(body))}`
         : '';
-
-    logger.info(
-      `curl -X ${shellSingleQuote(method)} ${shellSingleQuote(`https://api-dev.crittercanteen.com${path}`)} ${bodyArg} \\`,
-    );
-    logger.info(`  -H "Content-Type: application/json" \\`);
-    logger.info(`  -H "x-device-id: ${auth.headers['x-device-id']}" \\`);
-    logger.info(`  -H "x-signature: ${auth.headers['x-signature']}" \\`);
-    logger.info(`  -H "x-timestamp: ${auth.headers['x-timestamp']}"`);
+    const curl = [
+      `curl -X ${shellSingleQuote(method)} ${shellSingleQuote(`https://api-dev.crittercanteen.com${path}`)} ${bodyArg}`,
+      `-H ${shellSingleQuote('Content-Type: application/json')}`,
+      `-H ${shellSingleQuote(`x-device-id: ${auth.headers['x-device-id']}`)}`,
+      `-H ${shellSingleQuote(`x-signature: ${auth.headers['x-signature']}`)}`,
+      `-H ${shellSingleQuote(`x-timestamp: ${auth.headers['x-timestamp']}`)}`,
+    ].join(' \\\n  ');
+    process.stdout.write(`${curl}\n`);
   } catch (error) {
     logger.error(
       { error: error instanceof Error ? error.message : String(error) },

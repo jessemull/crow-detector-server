@@ -5,6 +5,8 @@ import {
   IsOptional,
   IsString,
   Matches,
+  Max,
+  Min,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ProcessingStatus, Source, Status } from 'src/common/types';
@@ -12,7 +14,9 @@ import { ProcessingStatus, Source, Status } from 'src/common/types';
 export class PatchFeedDTO {
   @IsOptional()
   @IsNumber()
-  @Transform(({ value }) => Number(value))
+  @Min(0)
+  @Max(1)
+  @Transform(({ value }) => optionalNumber(value))
   confidence?: number;
 
   @IsOptional()
@@ -54,16 +58,26 @@ export class PatchFeedDTO {
 
   @IsOptional()
   @IsNumber()
-  @Transform(({ value }) => Number(value))
+  @Min(0)
+  @Transform(({ value }) => optionalNumber(value))
   originalImageSize?: number;
 
   @IsOptional()
   @IsNumber()
-  @Transform(({ value }) => Number(value))
+  @Min(0)
+  @Transform(({ value }) => optionalNumber(value))
   processedImageSize?: number;
 
   @IsOptional()
   @IsNumber()
-  @Transform(({ value }) => Number(value))
+  @Min(0)
+  @Transform(({ value }) => optionalNumber(value))
   processingDuration?: number;
+}
+
+function optionalNumber(value: unknown): number | undefined {
+  if (value === null || value === undefined || value === '') {
+    return undefined;
+  }
+  return Number(value);
 }

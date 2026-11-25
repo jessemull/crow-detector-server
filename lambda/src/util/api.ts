@@ -1,5 +1,5 @@
 import {
-  API_BASE_URL,
+  requireApiBaseUrl,
   DETECTION_ENDPOINT,
   FEED_ENDPOINT,
   API_TIMEOUT_MS,
@@ -27,7 +27,7 @@ export async function callAPI(s3Info: S3ObjectInfo): Promise<void> {
 
   try {
     const authHeaders = generateAuthHeaders('POST', endpoint, payload);
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const response = await fetch(`${requireApiBaseUrl()}${endpoint}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -39,7 +39,12 @@ export async function callAPI(s3Info: S3ObjectInfo): Promise<void> {
     });
 
     if (response.status === 409) {
-      throw new Error('API call failed with status: 409');
+      clearTimeout(timeoutId);
+      lambdaLogger.info('API conflict is final and will not be retried', {
+        imageType,
+        status: 409,
+      });
+      return;
     }
 
     if (!response.ok) {

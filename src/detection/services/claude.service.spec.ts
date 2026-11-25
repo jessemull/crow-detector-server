@@ -258,7 +258,6 @@ describe('ClaudeService', () => {
       ).rejects.toThrow('Claude API rate limit exceeded');
       expect(mockLogger.error).toHaveBeenCalledWith(
         'Claude analysis failed: Claude API rate limit exceeded',
-        expect.any(String),
       );
     });
   });

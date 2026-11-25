@@ -13,7 +13,7 @@ Read every changed workflow in full, not just the hunk. Untrusted values are `gi
 - **CI-01** (MUST) No untrusted value is interpolated into `run:`. It is passed through `env:` and referenced as a shell variable. Verify: search `${{` inside `run:` blocks.
 - **CI-02** (SHOULD) Every job sets `permissions:` to what it uses, and deploy jobs set `timeout-minutes` and `concurrency`. Verify: read the top of each job.
 - **CI-03** (SHOULD) Third-party actions are pinned to a commit SHA. First-party `actions/*` tags are called out, not silently accepted as equivalent. Verify: list `uses:` lines.
-- **CI-04** (SHOULD) AWS credentials come from OIDC role assumption. Static keys are a SHOULD while `docs/SECURITY.md` still allows them, and a MUST if a new long-lived key is introduced. Verify: read the credentials step.
+- **CI-04** (SHOULD) AWS credentials come from OIDC role assumption. A new long-lived key is a MUST. Verify: read the credentials step.
 - **CI-05** (MUST) A secret expression cannot fall through to the wrong environment (`inputs.environment == 'dev' && secrets.A || secrets.B` uses B whenever A is empty). Verify: read each `secrets.` expression.
 - **CI-06** (MUST) The image tag that is deployed is the tag that was built, and it is not `latest` alone. Rollback deploys a previously recorded tag, and an empty input does not deploy or delete. Verify: trace the tag from build to `docker push` to the task definition.
 - **CI-07** (MUST) PR workflows run the same gates as `make preflight` for the files they claim to cover: root lint, format, test, porch tests, build, and audit; lambda lint, test, format, and audit. A workflow that skips one of these needs a stated reason. Verify: compare the steps with the Makefile.

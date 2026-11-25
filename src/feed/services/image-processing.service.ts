@@ -244,11 +244,13 @@ export class ImageProcessingService {
         new HeadObjectCommand({ Bucket: bucket, Key: key }),
       );
       if (
-        head.ContentLength !== undefined &&
+        head.ContentLength === undefined ||
         head.ContentLength > MAX_IMAGE_BYTES
       ) {
         throw new Error(
-          `Image is ${head.ContentLength} bytes; the limit is ${MAX_IMAGE_BYTES}`,
+          head.ContentLength === undefined
+            ? 'Image content length is missing'
+            : `Image is ${head.ContentLength} bytes; the limit is ${MAX_IMAGE_BYTES}`,
         );
       }
       const s3Object = await this.s3.send(

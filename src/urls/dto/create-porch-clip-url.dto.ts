@@ -2,6 +2,7 @@ import {
   IsInt,
   IsNotEmpty,
   IsString,
+  Matches,
   Max,
   MaxLength,
   Min,
@@ -15,6 +16,7 @@ export class CreatePorchClipUrlDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(120)
+  @Matches(/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/)
   fileName!: string;
 
   @IsInt()
