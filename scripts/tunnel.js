@@ -12,13 +12,29 @@ program
   .version('1.0.0');
 
 program
-  .option('-h, --host <host>', 'Bastion host IP or DNS', process.env.BASTION_HOST)
-  .option('-u, --user <user>', 'SSH username', process.env.SSH_USER || 'ec2-user')
-  .option('-k, --key <key>', 'SSH key path', process.env.SSH_KEY_PATH || '~/.ssh/aws-key.pem')
+  .option(
+    '-h, --host <host>',
+    'Bastion host IP or DNS',
+    process.env.BASTION_HOST,
+  )
+  .option(
+    '-u, --user <user>',
+    'SSH username',
+    process.env.SSH_USER || 'ec2-user',
+  )
+  .option(
+    '-k, --key <key>',
+    'SSH key path',
+    process.env.SSH_KEY_PATH || '~/.ssh/aws-key.pem',
+  )
   .option('-p, --port <port>', 'SSH port', '22')
   .option('-l, --local-port <port>', 'Local port for forwarding')
   .option('-r, --remote-port <port>', 'Remote port for forwarding')
-  .option('-d, --destination <host>', 'Destination host for forwarding', process.env.DESTINATION_HOST || process.env.RDS_HOST)
+  .option(
+    '-d, --destination <host>',
+    'Destination host for forwarding',
+    process.env.DESTINATION_HOST || process.env.RDS_HOST,
+  )
   .option('-t, --type <type>', 'Tunnel type (rds, ssh, custom)', 'ssh')
   .option('-v, --verbose', 'Verbose output', false)
   .option('--dry-run', 'Show command without executing', false);
@@ -30,7 +46,9 @@ const options = program.opts();
 // Validate required options...
 
 if (!options.host) {
-  console.error('Error: Bastion host is required. Set BASTION_HOST env var or use --host option.');
+  console.error(
+    'Error: Bastion host is required. Set BASTION_HOST env var or use --host option.',
+  );
   process.exit(1);
 }
 
@@ -44,12 +62,22 @@ if (options.type === 'rds' || (options.localPort && options.remotePort)) {
 }
 
 function buildCommand() {
-  let command = ['ssh', '-i', options.key, `${options.user}@${options.host}`, '-p', options.port];
+  let command = [
+    'ssh',
+    '-i',
+    options.key,
+    `${options.user}@${options.host}`,
+    '-p',
+    options.port,
+  ];
 
   // Add port forwarding if specified...
 
   if (options.localPort && options.remotePort && options.destination) {
-    command.push('-L', `${options.localPort}:${options.destination}:${options.remotePort}`);
+    command.push(
+      '-L',
+      `${options.localPort}:${options.destination}:${options.remotePort}`,
+    );
   }
 
   // Add verbose flag if requested...
@@ -61,10 +89,12 @@ function buildCommand() {
   // Add additional SSH options for better experience...
 
   command.push(
-    '-o', 'StrictHostKeyChecking=no',
-    '-o', 'UserKnownHostsFile=/dev/null',
-    '-o', 'ServerAliveInterval=60',
-    '-o', 'ServerAliveCountMax=3'
+    '-o',
+    'StrictHostKeyChecking=accept-new',
+    '-o',
+    'ServerAliveInterval=60',
+    '-o',
+    'ServerAliveCountMax=3',
   );
 
   return command;
@@ -72,7 +102,7 @@ function buildCommand() {
 
 function executeTunnel() {
   const command = buildCommand();
-  
+
   if (options.dryRun) {
     console.log('Dry run - would execute:');
     console.log(command.join(' '));
@@ -95,13 +125,15 @@ function executeTunnel() {
   console.log('');
 
   if (options.localPort && options.remotePort && options.destination) {
-    console.log(`Port forwarding: localhost:${options.localPort} -> ${options.destination}:${options.remotePort}`);
+    console.log(
+      `Port forwarding: localhost:${options.localPort} -> ${options.destination}:${options.remotePort}`,
+    );
     console.log('');
   }
 
   const sshProcess = spawn(command[0], command.slice(1), {
     stdio: 'inherit',
-    shell: false
+    shell: false,
   });
 
   sshProcess.on('error', (error) => {

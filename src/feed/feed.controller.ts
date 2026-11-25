@@ -4,6 +4,7 @@ import {
   Get,
   Headers,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -49,14 +50,16 @@ export class FeedController {
 
   @Get(':id')
   @UseGuards(EcdsaAuthGuard)
-  async getFeedEventById(@Param('id') id: string): Promise<FeedEvent> {
+  async getFeedEventById(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<FeedEvent> {
     return this.feedEventService.findById(id);
   }
 
   @Patch(':id')
   @UseGuards(EcdsaAuthGuard)
   async updateFeedEvent(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() patchFeedDTO: PatchFeedDTO,
   ): Promise<FeedResponse> {
     const event = await this.feedEventService.update(id, patchFeedDTO);
@@ -68,7 +71,9 @@ export class FeedController {
 
   @Post('reprocess/:id')
   @UseGuards(EcdsaAuthGuard)
-  async reprocessImage(@Param('id') id: string): Promise<FeedResponse> {
+  async reprocessImage(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<FeedResponse> {
     await this.feedEventService.reprocessImage(id);
     return {
       data: null,
@@ -77,6 +82,7 @@ export class FeedController {
   }
 
   @Get('status/latest')
+  @UseGuards(EcdsaAuthGuard)
   async getLatestFeedEventStatus() {
     const status = await this.feedEventService.getLatestFeedEventStatus();
     if (!status) {
@@ -94,7 +100,7 @@ export class FeedController {
   @Patch('status/:id')
   @UseGuards(EcdsaAuthGuard)
   async updateFeedEventStatus(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() updateFeedStatusDto: UpdateFeedStatusDto,
   ): Promise<FeedResponse> {
     const event = await this.feedEventService.updateFeedEventStatus(

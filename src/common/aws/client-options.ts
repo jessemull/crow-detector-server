@@ -16,3 +16,20 @@ export function awsClientOptions(region: string): {
     }),
   };
 }
+
+/**
+ * Presigning a body-less PutObject must not checksum empty bytes.
+ * WHEN_REQUIRED skips the default CRC32 until the caller supplies a body.
+ */
+export function s3ClientOptions(region: string): {
+  region: string;
+  requestHandler: NodeHttpHandler;
+  requestChecksumCalculation: 'WHEN_REQUIRED';
+  responseChecksumValidation: 'WHEN_REQUIRED';
+} {
+  return {
+    ...awsClientOptions(region),
+    requestChecksumCalculation: 'WHEN_REQUIRED',
+    responseChecksumValidation: 'WHEN_REQUIRED',
+  };
+}

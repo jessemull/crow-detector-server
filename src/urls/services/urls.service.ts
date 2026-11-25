@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -14,7 +15,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { awsClientOptions } from 'src/common/aws/client-options';
+import { s3ClientOptions } from 'src/common/aws/client-options';
 import { logger } from 'src/common/logger/logger.config';
 
 @Injectable()
@@ -28,7 +29,7 @@ export class UrlsService {
     private readonly feedEventRepository: Repository<FeedEvent>,
   ) {
     this.s3Client = new S3Client(
-      awsClientOptions(
+      s3ClientOptions(
         this.configService.get<string>('awsRegion') || 'us-west-2',
       ),
     );
@@ -63,9 +64,11 @@ export class UrlsService {
     });
 
     try {
-      const signedUrl = await getSignedUrl(this.s3Client, command, {
-        expiresIn: 900, // 15 minutes
-      });
+      const signedUrl = await getSignedUrl(
+        this.s3Client,
+        command,
+        presignPutOptions(),
+      );
 
       return {
         signedUrl,
@@ -83,7 +86,9 @@ export class UrlsService {
         { error: error instanceof Error ? error.message : String(error) },
         'Failed to generate feed image signed URL',
       );
-      throw new BadRequestException('Failed to generate feed image signed URL');
+      throw new InternalServerErrorException(
+        'Failed to generate feed image signed URL',
+      );
     }
   }
 
@@ -126,9 +131,11 @@ export class UrlsService {
     });
 
     try {
-      const signedUrl = await getSignedUrl(this.s3Client, command, {
-        expiresIn: 900, // 15 minutes
-      });
+      const signedUrl = await getSignedUrl(
+        this.s3Client,
+        command,
+        presignPutOptions(),
+      );
 
       return {
         signedUrl,
@@ -146,7 +153,7 @@ export class UrlsService {
         { error: error instanceof Error ? error.message : String(error) },
         'Failed to generate detection image signed URL',
       );
-      throw new BadRequestException(
+      throw new InternalServerErrorException(
         'Failed to generate detection image signed URL',
       );
     }
@@ -171,9 +178,11 @@ export class UrlsService {
     });
 
     try {
-      const signedUrl = await getSignedUrl(this.s3Client, command, {
-        expiresIn: 900,
-      });
+      const signedUrl = await getSignedUrl(
+        this.s3Client,
+        command,
+        presignPutOptions(),
+      );
 
       return {
         signedUrl,
@@ -190,7 +199,9 @@ export class UrlsService {
         { error: error instanceof Error ? error.message : String(error) },
         'Failed to generate porch clip signed URL',
       );
-      throw new BadRequestException('Failed to generate porch clip signed URL');
+      throw new InternalServerErrorException(
+        'Failed to generate porch clip signed URL',
+      );
     }
   }
 
@@ -223,4 +234,14 @@ export class UrlsService {
         return 'application/octet-stream';
     }
   }
+}
+
+function presignPutOptions(): {
+  expiresIn: number;
+  unhoistableHeaders: Set<string>;
+} {
+  return {
+    expiresIn: 900,
+    unhoistableHeaders: new Set(['content-type']),
+  };
 }

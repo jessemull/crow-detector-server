@@ -27,6 +27,8 @@ export class ClaudeService {
     // Do not construct the SDK with a dummy key — callers must check configuration.
     this.anthropic = new Anthropic({
       apiKey: apiKey || '',
+      timeout: 30_000,
+      maxRetries: 2,
     });
   }
 

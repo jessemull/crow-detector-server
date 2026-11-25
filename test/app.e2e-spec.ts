@@ -26,7 +26,7 @@ describe('HTTP contract (e2e)', () => {
   };
 
   const detectionEvent = {
-    id: 'detection-1',
+    id: '11111111-1111-4111-8111-111111111111',
     imageUrl: 'https://example.com/animal.jpg',
     processingStatus: ProcessingStatus.PENDING,
   };
@@ -96,6 +96,7 @@ describe('HTTP contract (e2e)', () => {
   it('GET /feed/status/latest returns data null when empty', () => {
     return request(app.getHttpServer())
       .get('/feed/status/latest')
+      .set('x-dev-mode', 'true')
       .expect(200)
       .expect((res) => {
         expect(res.body.data).toBeNull();
@@ -145,7 +146,7 @@ describe('HTTP contract (e2e)', () => {
 
   it('GET /detection/:id returns data and message', () => {
     return request(app.getHttpServer())
-      .get('/detection/detection-1')
+      .get(`/detection/${detectionEvent.id}`)
       .set('x-dev-mode', 'true')
       .expect(200)
       .expect((res) => {

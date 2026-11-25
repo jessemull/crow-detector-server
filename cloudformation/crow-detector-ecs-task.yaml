@@ -138,6 +138,7 @@ Resources:
         AwsvpcConfiguration:
           AssignPublicIp: DISABLED
           SecurityGroups:
+            # aws-infra-ecs-sg must allow port 3000 only from the ALB. This repo does not own that group.
             - !ImportValue 'aws-infra-ecs-sg-id'
           Subnets:
             - !ImportValue 'aws-infra-private-subnet-1-id' # us-west-2a

@@ -83,6 +83,7 @@ class MotionScoreTests(unittest.TestCase):
 
     def test_motion_threshold(self) -> None:
         self.assertTrue(motion_detected(0.05, 0.035))
+        self.assertTrue(motion_detected(0.035, 0.035))
         self.assertFalse(motion_detected(0.01, 0.035))
 
 

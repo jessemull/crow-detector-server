@@ -136,7 +136,7 @@ Prefer `make` targets. Run **`make`** or **`make help`** for a compact list.
 
 - Never swallow errors with empty `catch` blocks.
 - Log errors with context via bunyan (`src/common/logger`).
-- Fail fast on missing required configuration in non-development environments.
+- Fail fast on missing required configuration unless `NODE_ENV` is `development`, `test`, or ECS `dev`.
 - Map domain failures to appropriate Nest HTTP exceptions.
 
 ### Immutability & Style

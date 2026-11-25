@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -43,7 +44,7 @@ export class DetectionController {
   @Get(':id')
   @UseGuards(EcdsaAuthGuard)
   async getDetectionEventById(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ): Promise<DetectionResponse> {
     const event = await this.detectionEventService.findById(id);
     return {
@@ -55,7 +56,7 @@ export class DetectionController {
   @Patch(':id')
   @UseGuards(EcdsaAuthGuard)
   async updateCrowDetectedEvent(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() patchDetectionDTO: PatchDetectionDTO,
   ): Promise<DetectionResponse> {
     const event = await this.detectionEventService.update(

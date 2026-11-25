@@ -9,6 +9,7 @@ same stream for motion. On motion, retain overlapping segments, join, upload.
 from __future__ import annotations
 
 import argparse
+import http.client
 import base64
 import json
 import os
@@ -293,6 +294,8 @@ def upload_and_remove(path: Path, *, attempts: int = 3) -> None:
         except (
             OSError,
             urllib.error.URLError,
+            http.client.IncompleteRead,
+            json.JSONDecodeError,
             KeyError,
             subprocess.SubprocessError,
         ) as error:
@@ -409,7 +412,14 @@ def run_loop() -> None:
                             keep_after_epoch=time.time()
                             - float(LOCAL_RETENTION),
                         )
-                except (RuntimeError, OSError, subprocess.SubprocessError) as error:
+                except (
+                    RuntimeError,
+                    OSError,
+                    urllib.error.URLError,
+                    http.client.IncompleteRead,
+                    json.JSONDecodeError,
+                    subprocess.SubprocessError,
+                ) as error:
                     # Empty/failed harvest or transient ffmpeg — stay alive.
                     print(f"retain/upload error (continuing): {error}")
                     time.sleep(2.0)

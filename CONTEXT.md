@@ -48,7 +48,7 @@ These constraints apply to **every change** in this repository. No exceptions wi
 
 ### Language & Type Safety
 
-- **TypeScript checks**: `strictNullChecks`, `strictPropertyInitialization`, `noImplicitAny`, `strictBindCallApply`, and `noFallthroughCasesInSwitch` are on. Do not weaken them. `"strict": true` is not enabled.
+- **TypeScript checks**: `strictNullChecks`, `strictPropertyInitialization`, `noImplicitAny`, `strictBindCallApply`, and `noFallthroughCasesInSwitch` are on. Do not weaken them. The root `tsconfig.json` does not enable `"strict": true`. `lambda/tsconfig.json` does.
 - **No `any` without justification**: avoid unjustified `any` in production code (relaxed in `*.spec.ts` / `*.test.ts`)
 - **Named exports preferred**: follow existing Nest module patterns
 
@@ -84,7 +84,7 @@ These constraints apply to **every change** in this repository. No exceptions wi
 
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
 │  S3 upload      │ ──► │  SQS + Lambda   │ ──► │  Nest API       │
-│  (Pi / client)  │     │  (ECDSA signed) │     │  /feed|/detect  │
+│  (Pi / client)  │     │  (ECDSA signed) │     │ /feed|/detection│
 └─────────────────┘     └─────────────────┘     └─────────────────┘
 ```
 

@@ -1,18 +1,22 @@
-import { Between, FindOptionsWhere, Repository } from 'typeorm';
+import { FindOptionsWhere, Repository } from 'typeorm';
 import { CreateFeedDTO, PatchFeedDTO } from '../dto';
 import { FeedEvent } from '../entity/feed-event.entity';
 import { ImageProcessingService } from './image-processing.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { ListEventsQueryDto } from 'src/common/dto/list-events-query.dto';
+import { createdAtFilter } from 'src/common/dto/list-range';
 import { ProcessingStatus, FeedEventStatus } from 'src/common/types';
-import { S3MetadataService } from './s3-metadata.service';
+import { isAllowedObjectKey, S3MetadataService } from './s3-metadata.service';
 import { createLogger } from 'src/common/logger/logger.config';
 import { ConfigService } from '@nestjs/config';
+
+const FEED_INSERT_LOCK = 48291;
 
 const FEED_STATUS_FROM: Partial<Record<FeedEventStatus, FeedEventStatus>> = {
   [FeedEventStatus.FEEDING]: FeedEventStatus.PENDING,
@@ -50,6 +54,9 @@ export class FeedEventService {
       let created = false;
       const savedEvent = await this.feedEventRepository.manager.transaction(
         async (manager) => {
+          await manager.query('SELECT pg_advisory_xact_lock($1)', [
+            FEED_INSERT_LOCK,
+          ]);
           const repo = manager.getRepository(FeedEvent);
           const existing = await repo.findOne({ where: { imageUrl } });
           if (existing) {
@@ -67,9 +74,20 @@ export class FeedEventService {
             processingStatus: ProcessingStatus.PENDING,
             feedEventStatus: FeedEventStatus.PENDING,
             originalImageSize,
-            createdAt: new Date(s3Metadata.timestamp),
           });
-          return repo.save(event);
+          try {
+            return await repo.save(event);
+          } catch (error) {
+            if (!isUniqueViolation(error)) {
+              throw error;
+            }
+            created = false;
+            const raced = await repo.findOne({ where: { imageUrl } });
+            if (!raced) {
+              throw error;
+            }
+            return raced;
+          }
         },
       );
 
@@ -85,7 +103,7 @@ export class FeedEventService {
         });
       }
 
-      return savedEvent;
+      return this.withReadableImages(savedEvent);
     } catch (error) {
       this.logger.error(
         `Failed to create feed event: ${error instanceof Error ? error.message : String(error)}`,
@@ -108,8 +126,11 @@ export class FeedEventService {
       return;
     }
 
-    const cooldownHours =
-      this.configService.get<number>('feedCooldownHours') || 4;
+    const configured = this.configService.get<number>('feedCooldownHours');
+    const cooldownHours = configured ?? 4;
+    if (cooldownHours === 0) {
+      return;
+    }
     const cooldownMs = cooldownHours * 60 * 60 * 1000;
     const timeSinceLastFeed = Date.now() - lastFeedEvent.createdAt.getTime();
 
@@ -220,11 +241,9 @@ export class FeedEventService {
 
   async find(query: ListEventsQueryDto): Promise<FeedEvent[]> {
     const where: FindOptionsWhere<FeedEvent> = {};
-
-    if (query.from && query.to) {
-      where.createdAt = Between(new Date(query.from), new Date(query.to));
-    } else if (query.from) {
-      where.createdAt = Between(new Date(query.from), new Date());
+    const createdAt = createdAtFilter(query);
+    if (createdAt) {
+      where.createdAt = createdAt;
     }
 
     const events = await this.feedEventRepository.find({
@@ -232,7 +251,7 @@ export class FeedEventService {
       take: query.limit,
       where,
     });
-    return Promise.all(events.map((event) => this.withReadableCrop(event)));
+    return Promise.all(events.map((event) => this.withReadableImages(event)));
   }
 
   async findById(id: string): Promise<FeedEvent> {
@@ -245,16 +264,28 @@ export class FeedEventService {
       throw new NotFoundException(`Feed event with id ${id} not found!`);
     }
 
-    return this.withReadableCrop(feedEvent);
+    return this.withReadableImages(feedEvent);
   }
 
-  private async withReadableCrop(event: FeedEvent): Promise<FeedEvent> {
-    if (!event.croppedImageUrl || event.croppedImageUrl.includes('://')) {
-      return event;
+  private async withReadableImages(event: FeedEvent): Promise<FeedEvent> {
+    const key = objectKey(event.imageUrl);
+    if (key && isAllowedObjectKey(key, 'feed/')) {
+      event.imageUrl = await this.s3MetadataService.presignGet(key, 'feed/');
     }
-    event.croppedImageUrl = await this.s3MetadataService.presignGet(
-      event.croppedImageUrl,
-    );
+    if (
+      event.croppedImageUrl &&
+      isAllowedObjectKey(event.croppedImageUrl, 'processed/')
+    ) {
+      event.croppedImageUrl = await this.s3MetadataService.presignGet(
+        event.croppedImageUrl,
+        'processed/',
+      );
+    } else if (event.croppedImageUrl) {
+      this.logger.warn(
+        `Ignoring cropped image outside processed/ for ${event.id}`,
+      );
+      event.croppedImageUrl = undefined;
+    }
     return event;
   }
 
@@ -270,9 +301,24 @@ export class FeedEventService {
       throw new NotFoundException(`Feed event with id ${id} not found!`);
     }
 
-    // Allow updating any field for dev/debugging purposes...
+    if (
+      patchFeedDTO.croppedImageUrl &&
+      !isAllowedObjectKey(patchFeedDTO.croppedImageUrl, 'processed/')
+    ) {
+      throw new BadRequestException(
+        'croppedImageUrl must be a key under processed/',
+      );
+    }
 
-    await this.feedEventRepository.update(id, patchFeedDTO);
+    const result = await this.feedEventRepository.update(
+      { id, processingStatus: feedEvent.processingStatus },
+      patchFeedDTO,
+    );
+    if (!result.affected) {
+      throw new ConflictException(
+        `Feed event ${id} changed before the update was applied`,
+      );
+    }
 
     return this.findById(id);
   }
@@ -369,11 +415,13 @@ export class FeedEventService {
 
     const nextStatus = status as FeedEventStatus;
     const fromStatus = FEED_STATUS_FROM[nextStatus];
+    if (!fromStatus) {
+      throw new ConflictException(
+        `Feed event ${id} cannot move to ${status} from its current status`,
+      );
+    }
     const result = await this.feedEventRepository.update(
-      {
-        id,
-        ...(fromStatus ? { feedEventStatus: fromStatus } : {}),
-      },
+      { id, feedEventStatus: fromStatus },
       updateData,
     );
     if (!result.affected) {
@@ -384,4 +432,19 @@ export class FeedEventService {
 
     return this.findById(id);
   }
+}
+
+function objectKey(imageUrl: string): string | undefined {
+  try {
+    const path = new URL(imageUrl).pathname.substring(1);
+    return decodeURIComponent(path);
+  } catch {
+    return undefined;
+  }
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  const candidate = error as { code?: string; driverError?: { code?: string } };
+  const code = candidate.driverError?.code ?? candidate.code;
+  return code === '23505' || code === 'SQLITE_CONSTRAINT';
 }

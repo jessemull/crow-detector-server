@@ -143,7 +143,7 @@ The **Crow Detector Server** is built using modern technologies to ensure reliab
 - **AWS ECS**: Container orchestration for server deployment.
 - **AWS CloudFormation**: Infrastructure as Code for resource management.
 - **AWS IAM**: Identity and access management for secure resource access.
-- **AWS Rekognition**: AI-powered image analysis and animal detection.
+- **AWS Rekognition**: Content moderation and face detection for feed photos. Animal identification uses Claude.
 
 ### Development Tools
 
@@ -161,9 +161,8 @@ The **Crow Detector Server** is built using modern technologies to ensure reliab
 
 ### AI & Machine Learning
 
-- **Claude AI**: Anthropic's Claude for advanced animal species classification.
-- **Fallback Processing**: Local detection algorithms when AI services are unavailable.
-- **Confidence Scoring**: Multi-level confidence assessment for detection accuracy.
+- **Claude AI**: Anthropic's Claude counts the living animals in a detection photo.
+- **Confidence Scoring**: The model returns a confidence from 0 to 100 for each kind.
 
 ## Setup Instructions
 
@@ -605,21 +604,7 @@ The S3 bucket is configured with:
 
 ## License
 
-    Apache License
-    Version 2.0, January 2004
-    http://www.apache.org/licenses/
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This package is `UNLICENSED`. See `package.json`.
 
 ---
 

@@ -6,7 +6,7 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { awsClientOptions } from 'src/common/aws/client-options';
+import { s3ClientOptions } from 'src/common/aws/client-options';
 import { Source, S3Metadata } from 'src/common/types';
 import { createLogger } from 'src/common/logger/logger.config';
 
@@ -17,20 +17,17 @@ export class S3MetadataService {
 
   constructor(private readonly configService: ConfigService) {
     const region = this.configService.get<string>('awsRegion') || 'us-west-2';
-    this.s3 = new S3Client(awsClientOptions(region));
+    this.s3 = new S3Client(s3ClientOptions(region));
   }
 
   async extractMetadataFromUrl(imageUrl: string): Promise<S3Metadata> {
     try {
       // Parse S3 URL: https://bucket-name.s3.region.amazonaws.com/key...
 
-      this.logger.info(`Parsing S3 URL: ${imageUrl}`);
+      this.logger.info('Parsing S3 object reference');
 
       const url = new URL(imageUrl);
-      this.logger.info(`URL parsed successfully: ${url.hostname}`);
-
       const hostnameParts = url.hostname.split('.');
-      this.logger.info(`Hostname parts: ${JSON.stringify(hostnameParts)}`);
 
       if (hostnameParts.length < 4 || !hostnameParts[1].startsWith('s3')) {
         this.logger.error(
@@ -40,9 +37,7 @@ export class S3MetadataService {
       }
 
       const bucket = hostnameParts[0];
-      const key = url.pathname.substring(1); // Remove leading slash
-
-      this.logger.info(`Extracted bucket: ${bucket}, key: ${key}`);
+      const key = decodeURIComponent(url.pathname.substring(1));
 
       // Extract metadata from S3 object and key path...
 
@@ -178,7 +173,14 @@ export class S3MetadataService {
   }
 
   /** Short-lived read URL. Callers store the object key, not this URL. */
-  async presignGet(key: string, expiresInSeconds = 900): Promise<string> {
+  async presignGet(
+    key: string,
+    allowedPrefix: string,
+    expiresInSeconds = 900,
+  ): Promise<string> {
+    if (!isAllowedObjectKey(key, allowedPrefix)) {
+      throw new Error(`Refusing to presign a key outside ${allowedPrefix}`);
+    }
     const bucket = this.configService.get<string>('s3BucketName');
     if (!bucket) {
       throw new Error('s3BucketName (S3_BUCKET_NAME) is required');
@@ -189,4 +191,16 @@ export class S3MetadataService {
       { expiresIn: expiresInSeconds },
     );
   }
+}
+
+export function isAllowedObjectKey(
+  key: string,
+  allowedPrefix: string,
+): boolean {
+  return (
+    key.startsWith(allowedPrefix) &&
+    !key.includes('..') &&
+    !key.includes('://') &&
+    !key.includes('\\')
+  );
 }

@@ -206,7 +206,7 @@ describe('DetectionEventService', () => {
       const from = '2024-01-01';
       const to = '2024-12-31';
       const fromDate = new Date(from);
-      const toDate = new Date(to);
+      const toDate = new Date('2024-12-31T23:59:59.999Z');
       mockRepository.find.mockResolvedValue(mockEvents);
 
       const result = await service.find({

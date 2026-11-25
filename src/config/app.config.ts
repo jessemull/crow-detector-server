@@ -53,7 +53,7 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     awsRegion: env.AWS_REGION || 'us-west-2',
     claudeApiKey: env.CLAUDE_API_KEY,
     claudeModel: env.CLAUDE_MODEL || 'claude-haiku-5-5',
-    feedCooldownHours: parseInt(env.FEED_COOLDOWN_HOURS || '4', 10),
+    feedCooldownHours: parseFeedCooldownHours(env.FEED_COOLDOWN_HOURS),
     logLevel: env.LOG_LEVEL || 'info',
     nodeEnv: env.NODE_ENV || '',
     port: parseInt(env.PORT || '3000', 10) || 3000,
@@ -84,6 +84,14 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       piUser: env.PI_USER_PUBLIC_KEY,
     },
   };
+}
+
+function parseFeedCooldownHours(raw: string | undefined): number {
+  const parsed = Number.parseInt(raw ?? '4', 10);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new Error('FEED_COOLDOWN_HOURS must be a non-negative integer');
+  }
+  return parsed;
 }
 
 function parseCorsOrigins(env: NodeJS.ProcessEnv): string[] {

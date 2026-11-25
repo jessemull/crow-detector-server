@@ -1,4 +1,7 @@
-import { BadRequestException } from '@nestjs/common';
+import {
+  BadRequestException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CreateFeedImageUrlDto, CreateDetectionImageUrlDto } from '../dto';
 import { ImageFormat } from '../../common/types';
@@ -115,7 +118,7 @@ describe('UrlsService', () => {
         fileName: 'test-image',
         format: ImageFormat.JPG,
         source: 'pi-feeder-001',
-        contentType: 'image/jpeg',
+        contentLength: 1024,
       };
 
       const result = await service.createFeedImageSignedUrl(
@@ -140,6 +143,7 @@ describe('UrlsService', () => {
         fileName: 'test-image',
         format: ImageFormat.PNG,
         source: 'pi-feeder-001',
+        contentLength: 1024,
       };
 
       await service.createFeedImageSignedUrl(createFeedImageUrlDto);
@@ -156,6 +160,7 @@ describe('UrlsService', () => {
         fileName: 'test-image',
         format: ImageFormat.JPG,
         source: 'pi-feeder-001',
+        contentLength: 1024,
       };
 
       const error = new Error('S3 error');
@@ -163,7 +168,7 @@ describe('UrlsService', () => {
 
       await expect(
         service.createFeedImageSignedUrl(createFeedImageUrlDto),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InternalServerErrorException);
     });
   });
 
@@ -172,7 +177,7 @@ describe('UrlsService', () => {
       const createDetectionImageUrlDto: CreateDetectionImageUrlDto = {
         fileName: 'motion-detected',
         format: ImageFormat.PNG,
-        contentType: 'image/png',
+        contentLength: 1024,
       };
 
       const mockFeedEvent = { id: 'feed-123', createdAt: new Date() };
@@ -201,6 +206,7 @@ describe('UrlsService', () => {
       const createDetectionImageUrlDto: CreateDetectionImageUrlDto = {
         fileName: 'motion-detected',
         format: ImageFormat.JPG,
+        contentLength: 1024,
       };
 
       const mockFeedEvent = { id: 'feed-123', createdAt: new Date() };
@@ -219,6 +225,7 @@ describe('UrlsService', () => {
       const createDetectionImageUrlDto: CreateDetectionImageUrlDto = {
         fileName: 'motion-detected',
         format: ImageFormat.PNG,
+        contentLength: 1024,
       };
 
       const mockFeedEvent = { id: 'feed-123', createdAt: new Date() };
@@ -229,13 +236,14 @@ describe('UrlsService', () => {
 
       await expect(
         service.createDetectionImageSignedUrl(createDetectionImageUrlDto),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InternalServerErrorException);
     });
 
     it('should throw NotFoundException when no feed events exist', async () => {
       const createDetectionImageUrlDto: CreateDetectionImageUrlDto = {
         fileName: 'motion-detected',
         format: ImageFormat.PNG,
+        contentLength: 1024,
       };
 
       mockFeedEventRepository.find.mockResolvedValue([]);
@@ -252,7 +260,7 @@ describe('UrlsService', () => {
     it('should create a porch clip signed URL under porch/', async () => {
       const result = await service.createPorchClipSignedUrl({
         fileName: 'clip-20261114-210000',
-        contentType: 'video/mp4',
+        contentLength: 1200,
       });
 
       expect(result.key).toMatch(/^porch\/\d+-clip-20261114-210000\.mp4$/);
@@ -262,15 +270,21 @@ describe('UrlsService', () => {
 
     it('should reject an empty sanitized file name', async () => {
       await expect(
-        service.createPorchClipSignedUrl({ fileName: '!!!' }),
+        service.createPorchClipSignedUrl({
+          fileName: '!!!',
+          contentLength: 1200,
+        }),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw BadRequestException when signing fails', async () => {
       mockGetSignedUrl.mockRejectedValue(new Error('S3 error'));
       await expect(
-        service.createPorchClipSignedUrl({ fileName: 'clip-1' }),
-      ).rejects.toThrow(BadRequestException);
+        service.createPorchClipSignedUrl({
+          fileName: 'clip-1',
+          contentLength: 1200,
+        }),
+      ).rejects.toThrow(InternalServerErrorException);
     });
   });
 
@@ -317,6 +331,7 @@ describe('UrlsService', () => {
         fileName: 'test-image',
         format: ImageFormat.JPG,
         source: 'pi-feeder-001',
+        contentLength: 1024,
       };
 
       await service.createFeedImageSignedUrl(createFeedImageUrlDto);
@@ -334,6 +349,7 @@ describe('UrlsService', () => {
       const createDetectionImageUrlDto: CreateDetectionImageUrlDto = {
         fileName: 'motion-detected',
         format: ImageFormat.PNG,
+        contentLength: 1024,
       };
 
       const mockFeedEvent = { id: 'feed-123', createdAt: new Date() };

@@ -34,19 +34,26 @@ describe('FeedEventService', () => {
     feedEventStatus: FeedEventStatus.PENDING,
   };
 
-  const mockRepository = {
+  const mockRepository: {
+    create: jest.Mock;
+    find: jest.Mock;
+    findOne: jest.Mock;
+    save: jest.Mock;
+    update: jest.Mock;
+    manager: { query: jest.Mock; transaction: jest.Mock };
+  } = {
     create: jest.fn(),
     find: jest.fn(),
     findOne: jest.fn(),
     save: jest.fn(),
     update: jest.fn().mockResolvedValue({ affected: 1 }),
     manager: {
-      transaction: jest.fn(
-        async (
-          work: (manager: {
-            getRepository: () => typeof mockRepository;
-          }) => Promise<unknown>,
-        ) => work({ getRepository: () => mockRepository }),
+      query: jest.fn().mockResolvedValue([]),
+      transaction: jest.fn(async (work: (manager: any) => Promise<unknown>) =>
+        work({
+          getRepository: () => mockRepository,
+          query: jest.fn().mockResolvedValue([]),
+        }),
       ),
     },
   };
@@ -77,6 +84,7 @@ describe('FeedEventService', () => {
               type: 'feed' as const,
             }),
             getObjectSize: jest.fn().mockResolvedValue(1024),
+            presignGet: jest.fn((key: string) => Promise.resolve(key)),
           },
         },
         {
@@ -276,7 +284,7 @@ describe('FeedEventService', () => {
       const from = '2024-01-01';
       const to = '2024-12-31';
       const fromDate = new Date(from);
-      const toDate = new Date(to);
+      const toDate = new Date('2024-12-31T23:59:59.999Z');
       mockRepository.find.mockResolvedValue(mockEvents);
 
       const result = await service.find({
@@ -349,7 +357,7 @@ describe('FeedEventService', () => {
       const id = 'test-uuid';
       const patchFeedDTO: PatchFeedDTO = {
         confidence: 0.95,
-        croppedImageUrl: 'https://example.com/cropped.jpg',
+        croppedImageUrl: 'processed/crop.jpg',
         status: Status.REJECTED,
       };
 
@@ -367,11 +375,10 @@ describe('FeedEventService', () => {
       expect(repository.findOne).toHaveBeenCalledWith({
         where: { id },
       });
-      expect(repository.update).toHaveBeenCalledWith(id, {
-        confidence: patchFeedDTO.confidence,
-        croppedImageUrl: patchFeedDTO.croppedImageUrl,
-        status: patchFeedDTO.status,
-      });
+      expect(repository.update).toHaveBeenCalledWith(
+        { id, processingStatus: ProcessingStatus.PENDING },
+        patchFeedDTO,
+      );
       expect(result).toBeDefined();
     });
 
@@ -379,7 +386,7 @@ describe('FeedEventService', () => {
       const id = 'non-existent-uuid';
       const patchFeedDTO: PatchFeedDTO = {
         confidence: 0.95,
-        croppedImageUrl: 'https://example.com/cropped.jpg',
+        croppedImageUrl: 'processed/crop.jpg',
         status: Status.REJECTED,
       };
 
@@ -397,7 +404,7 @@ describe('FeedEventService', () => {
       const id = 'test-uuid';
       const patchFeedDTO: PatchFeedDTO = {
         confidence: 0.95,
-        croppedImageUrl: 'https://example.com/cropped.jpg',
+        croppedImageUrl: 'processed/crop.jpg',
         status: Status.REJECTED,
       };
 

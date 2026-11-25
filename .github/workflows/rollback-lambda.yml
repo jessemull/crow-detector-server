@@ -34,7 +34,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Set Up AWS CLI
-        uses: aws-actions/configure-aws-credentials@4a1596c86fd706dc0521e32f0121ad1a6d1adb74
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-west-2
@@ -61,12 +61,23 @@ jobs:
               --region us-west-2
           else
             echo "S3 bucket stack already exists, updating if needed..."
-            aws cloudformation update-stack \
+            set +e
+            update_output=$(aws cloudformation update-stack \
               --stack-name "$S3_BUCKET_STACK_NAME" \
               --template-body file://$S3_BUCKET_TEMPLATE \
               --parameters ParameterKey=Environment,ParameterValue="$ENVIRONMENT" \
               --capabilities CAPABILITY_NAMED_IAM \
-              --region us-west-2 || echo "No updates needed for S3 bucket stack"
+              --region us-west-2 2>&1)
+            update_status=$?
+            set -e
+            if [[ $update_status -ne 0 ]]; then
+              if [[ "$update_output" == *"No updates are to be performed"* ]]; then
+                echo "No updates needed for S3 bucket stack"
+              else
+                echo "$update_output" >&2
+                exit "$update_status"
+              fi
+            fi
           fi
 
       - name: Check Change Set Update/Create
@@ -123,7 +134,7 @@ jobs:
           MAX_RETRIES=30
           RETRY_COUNT=0
           DONE_STATUSES=("CREATE_COMPLETE" "UPDATE_COMPLETE")
-          FAILED_STATUSES=("CREATE_FAILED" "UPDATE_FAILED" "ROLLBACK_FAILED")
+          FAILED_STATUSES=("CREATE_FAILED" "UPDATE_FAILED" "ROLLBACK_FAILED" "ROLLBACK_COMPLETE" "UPDATE_ROLLBACK_COMPLETE" "UPDATE_ROLLBACK_FAILED")
           while true; do
             STATUS=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --region us-west-2 --query "Stacks[0].StackStatus" --output text)
             echo "Status: $STATUS"

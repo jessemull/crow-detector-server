@@ -17,6 +17,22 @@ Commands:
   apply <id> [--force]      Apply a case to the working tree (clean, non-main branch only)
   score <id> <ledger.json>  Score a review ledger against a case's expected findings`;
 
+const resolveInsideRepo = (cwd, relativePath) => {
+  if (
+    typeof relativePath !== 'string' ||
+    path.isAbsolute(relativePath) ||
+    relativePath.split(/[/\\]/).includes('..')
+  ) {
+    throw new Error(`Refusing path outside the repository: ${relativePath}`);
+  }
+  const root = path.resolve(cwd);
+  const target = path.resolve(root, relativePath);
+  if (target !== root && !target.startsWith(`${root}${path.sep}`)) {
+    throw new Error(`Refusing path outside the repository: ${relativePath}`);
+  }
+  return target;
+};
+
 const countOccurrences = (text, search) => {
   if (search === '') {
     return 0;
@@ -180,7 +196,7 @@ const main = (argv, deps = {}) => {
   const stdout = deps.stdout || ((text) => process.stdout.write(`${text}\n`));
   const stderr = deps.stderr || ((text) => process.stderr.write(`${text}\n`));
   const readText = (relativePath) => {
-    const absolute = path.join(cwd, relativePath);
+    const absolute = resolveInsideRepo(cwd, relativePath);
     return fsImpl.existsSync(absolute)
       ? fsImpl.readFileSync(absolute, 'utf8')
       : null;
@@ -253,7 +269,7 @@ const main = (argv, deps = {}) => {
         return 1;
       }
       for (const [relativePath, text] of files) {
-        fsImpl.writeFileSync(path.join(cwd, relativePath), text);
+        fsImpl.writeFileSync(resolveInsideRepo(cwd, relativePath), text);
       }
       stdout(
         `Applied ${id} to ${files.size} file(s). Commit it on this branch, then run pr-review against the parent commit.`,

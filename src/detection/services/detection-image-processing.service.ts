@@ -6,7 +6,7 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { Injectable } from '@nestjs/common';
-import { awsClientOptions } from 'src/common/aws/client-options';
+import { s3ClientOptions } from 'src/common/aws/client-options';
 import { createLogger } from 'src/common/logger/logger.config';
 import { AnimalDetectionResult } from 'src/common/types';
 import { AnimalPhotoMediaType, ClaudeService } from './claude.service';
@@ -24,7 +24,7 @@ export class DetectionImageProcessingService {
   ) {
     const region = this.configService.get<string>('awsRegion') || 'us-west-2';
 
-    this.s3 = new S3Client(awsClientOptions(region));
+    this.s3 = new S3Client(s3ClientOptions(region));
   }
 
   async processImage(
@@ -107,7 +107,13 @@ export class DetectionImageProcessingService {
     if (lower.endsWith('.webp')) {
       return 'image/webp';
     }
-    return 'image/jpeg';
+    if (lower.endsWith('.bmp')) {
+      throw new Error('BMP images are not supported');
+    }
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) {
+      return 'image/jpeg';
+    }
+    throw new Error('Unsupported image type');
   }
 
   private async deleteImage(bucket: string, key: string): Promise<void> {

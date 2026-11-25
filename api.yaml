@@ -203,6 +203,14 @@ paths:
         - Feed
       security:
         - ECDSA: []
+      parameters:
+        - name: x-skip-cooldown
+          in: header
+          required: false
+          schema:
+            type: string
+            enum: ['true', 'false']
+          description: Authenticated devices may send true to skip the feed cooldown
       requestBody:
         required: true
         content:
@@ -355,7 +363,7 @@ paths:
             type: string
             format: uuid
       responses:
-        '200':
+        '201':
           description: Image reprocessing started successfully
           content:
             application/json:
@@ -374,6 +382,8 @@ paths:
       description: Retrieve the status of the most recent feed event for feeder control
       tags:
         - Feed
+      security:
+        - ECDSA: []
       responses:
         '200':
           description: Latest status, or data null when no feed events exist
@@ -408,6 +418,8 @@ paths:
                   message:
                     type: string
                     description: Response message
+        '401':
+          description: Unauthorized - invalid authentication
         '500':
           description: Internal server error
 
@@ -464,7 +476,7 @@ paths:
             schema:
               $ref: '#/components/schemas/CreateFeedImageUrlDTO'
       responses:
-        '200':
+        '201':
           description: Signed URL created successfully
           content:
             application/json:
@@ -475,10 +487,25 @@ paths:
                     type: string
                     format: uri
                     description: Pre-signed URL for image upload
+                  key:
+                    type: string
+                    description: Object key under feed/
+                  bucket:
+                    type: string
                   expiresAt:
                     type: string
                     format: date-time
                     description: When the signed URL expires
+                  metadata:
+                    type: object
+                    properties:
+                      timestamp:
+                        type: integer
+                      source:
+                        type: string
+                      type:
+                        type: string
+                        enum: [feed]
         '400':
           description: Bad request - invalid input data
         '401':
@@ -501,7 +528,7 @@ paths:
             schema:
               $ref: '#/components/schemas/CreateDetectionImageUrlDTO'
       responses:
-        '200':
+        '201':
           description: Signed URL created successfully
           content:
             application/json:
@@ -512,14 +539,31 @@ paths:
                     type: string
                     format: uri
                     description: Pre-signed URL for image upload
+                  key:
+                    type: string
+                    description: Object key under detection/
+                  bucket:
+                    type: string
                   expiresAt:
                     type: string
                     format: date-time
                     description: When the signed URL expires
+                  metadata:
+                    type: object
+                    properties:
+                      timestamp:
+                        type: integer
+                      feedEventId:
+                        type: string
+                      type:
+                        type: string
+                        enum: [detection]
         '400':
           description: Bad request - invalid input data
         '401':
           description: Unauthorized - invalid authentication
+        '404':
+          description: No feed event exists yet, so a detection key cannot be assigned
         '500':
           description: Internal server error
 
@@ -538,7 +582,7 @@ paths:
             schema:
               $ref: '#/components/schemas/CreatePorchClipUrlDTO'
       responses:
-        '200':
+        '201':
           description: Signed URL created successfully
           content:
             application/json:
@@ -550,13 +594,25 @@ paths:
                     format: uri
                   key:
                     type: string
+                  bucket:
+                    type: string
                   expiresAt:
                     type: string
                     format: date-time
+                  metadata:
+                    type: object
+                    properties:
+                      timestamp:
+                        type: integer
+                      type:
+                        type: string
+                        enum: [porch]
         '400':
           description: Bad request - invalid input data
         '401':
           description: Unauthorized - invalid authentication
+        '403':
+          description: The authenticated device is not the porch camera
         '500':
           description: Internal server error
 
@@ -672,18 +728,35 @@ components:
       properties:
         confidence:
           type: number
-          format: float
-          minimum: 0
-          maximum: 1
-          description: Confidence score of the feed detection (0.0 to 1.0)
           example: 0.87
         croppedImageUrl:
           type: string
-          format: uri
-          description: URL of the cropped feed image
-          example: 'https://example.com/images/feed-cropped.jpg'
+          pattern: '^processed/[A-Za-z0-9][A-Za-z0-9._-]{0,200}$'
+          description: Object key under processed/, not a URL
+          example: processed/123-test_cropped.jpg
+        isAppropriate:
+          type: boolean
+        source:
+          $ref: '#/components/schemas/Source'
         status:
           $ref: '#/components/schemas/Status'
+        processingStatus:
+          type: string
+          enum: [PENDING, PROCESSING, COMPLETED, FAILED]
+        processingError:
+          type: string
+        moderationLabels:
+          type: string
+        faceDetected:
+          type: boolean
+        faceBoundingBox:
+          type: string
+        originalImageSize:
+          type: integer
+        processedImageSize:
+          type: integer
+        processingDuration:
+          type: integer
 
     UpdateFeedStatusDTO:
       type: object
@@ -692,53 +765,13 @@ components:
       properties:
         status:
           type: string
-          enum: [PENDING, FEEDING, FEEDING_COMPLETE, PHOTO_TAKEN, COMPLETE]
-          description: New feeder status for the feed event
+          enum: [FEEDING, FEEDING_COMPLETE, PHOTO_TAKEN, COMPLETE]
+          description: Next feeder status. PENDING is not a legal target.
           example: 'FEEDING'
         photoUrl:
           type: string
-          format: uri
-          description: URL of the verification photo (optional, used with PHOTO_TAKEN status)
+          description: Optional verification photo URL stored with PHOTO_TAKEN
           example: 'https://example.com/images/verification.jpg'
-        isAppropriate:
-          type: boolean
-          description: Whether the feed image is appropriate
-          example: true
-        source:
-          $ref: '#/components/schemas/Source'
-        processingStatus:
-          type: string
-          enum: [PENDING, PROCESSING, COMPLETED, FAILED]
-          description: Current processing status of the image
-          example: 'COMPLETED'
-        processingError:
-          type: string
-          description: Error message if processing failed
-          example: 'Image processing timeout'
-        moderationLabels:
-          type: string
-          description: JSON string of content moderation labels
-          example: '["Safe Content"]'
-        faceDetected:
-          type: boolean
-          description: Whether a face was detected in the image
-          example: true
-        faceBoundingBox:
-          type: string
-          description: JSON string of face bounding box coordinates
-          example: '{"Width":0.3,"Height":0.4,"Left":0.2,"Top":0.1}'
-        originalImageSize:
-          type: integer
-          description: Size of the original image in bytes
-          example: 210453
-        processedImageSize:
-          type: integer
-          description: Size of the processed image in bytes
-          example: 9842
-        processingDuration:
-          type: integer
-          description: Time taken to process the image in milliseconds
-          example: 1325
 
     CreateFeedImageUrlDTO:
       type: object

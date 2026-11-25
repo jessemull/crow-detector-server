@@ -3,14 +3,23 @@ import { DetectionEvent } from '../../src/detection/entity/detection-event.entit
 import { FeedEvent } from '../../src/feed/entity/feed-event.entity';
 import { FeedEventSeeder, DetectionEventSeeder } from './seeders';
 import { createLogger } from '../../src/common/logger/logger.config';
+import { buildRdsSslOptions } from '../../src/config/rds-ca';
 
-function postgresSsl(): { rejectUnauthorized: boolean } {
+function assertLocalDatabase(operation: string): void {
+  const nodeEnv = process.env.NODE_ENV;
+  if (nodeEnv !== 'development' && nodeEnv !== 'test') {
+    throw new Error(
+      `Refusing to ${operation} unless NODE_ENV is development or test`,
+    );
+  }
+}
+
+function postgresSsl(): { rejectUnauthorized: boolean; ca?: string } {
   const isProdLike =
     process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'prod';
-  return {
-    rejectUnauthorized:
-      isProdLike || process.env.SSL_REJECT_UNAUTHORIZED !== 'false',
-  };
+  return buildRdsSslOptions(
+    isProdLike || process.env.SSL_REJECT_UNAUTHORIZED !== 'false',
+  );
 }
 
 export class DatabaseSeeder {
@@ -50,6 +59,7 @@ export class DatabaseSeeder {
   }
 
   async seed(): Promise<void> {
+    assertLocalDatabase('seed');
     try {
       this.logger.info('Starting database seeding...');
 
@@ -67,6 +77,7 @@ export class DatabaseSeeder {
   }
 
   async reset(): Promise<void> {
+    assertLocalDatabase('reset');
     try {
       this.logger.info('Starting database reset...');
 
@@ -84,12 +95,7 @@ export class DatabaseSeeder {
   }
 
   async synchronize(): Promise<void> {
-    const nodeEnv = process.env.NODE_ENV;
-    if (nodeEnv === 'production' || nodeEnv === 'prod') {
-      throw new Error(
-        'Refusing to drop tables when NODE_ENV is production or prod',
-      );
-    }
+    assertLocalDatabase('synchronize');
 
     try {
       this.logger.info('Starting database synchronization...');

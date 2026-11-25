@@ -38,14 +38,8 @@ export async function callAPI(s3Info: S3ObjectInfo): Promise<void> {
       signal: controller.signal,
     });
 
-    clearTimeout(timeoutId);
-
     if (response.status === 409) {
-      lambdaLogger.info('API reported a duplicate; acknowledging', {
-        imageType,
-        status: response.status,
-      });
-      return;
+      throw new Error('API call failed with status: 409');
     }
 
     if (!response.ok) {
@@ -53,6 +47,7 @@ export async function callAPI(s3Info: S3ObjectInfo): Promise<void> {
     }
 
     await response.json();
+    clearTimeout(timeoutId);
 
     lambdaLogger.info('API call succeeded', {
       imageType,

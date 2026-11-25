@@ -7,7 +7,7 @@ dotenv.config();
 module.exports = {
   entry: "./src/index.ts",
   devtool: false,
-  target: "node",
+  target: "node24",
   output: {
     filename: "index.js",
     libraryTarget: "commonjs2",

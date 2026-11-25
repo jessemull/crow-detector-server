@@ -5,14 +5,14 @@ import { DetectionEvent } from '../../src/detection/entity/detection-event.entit
 import { FeedEvent } from '../../src/feed/entity/feed-event.entity';
 import { config } from 'dotenv';
 import { createLogger } from '../../src/common/logger/logger.config';
+import { buildRdsSslOptions } from '../../src/config/rds-ca';
 
-function postgresSsl(): { rejectUnauthorized: boolean } {
+function postgresSsl(): { rejectUnauthorized: boolean; ca?: string } {
   const isProdLike =
     process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'prod';
-  return {
-    rejectUnauthorized:
-      isProdLike || process.env.SSL_REJECT_UNAUTHORIZED !== 'false',
-  };
+  return buildRdsSslOptions(
+    isProdLike || process.env.SSL_REJECT_UNAUTHORIZED !== 'false',
+  );
 }
 
 config();

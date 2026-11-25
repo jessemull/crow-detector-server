@@ -4,6 +4,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  Matches,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ProcessingStatus, Source, Status } from 'src/common/types';
@@ -16,6 +17,7 @@ export class PatchFeedDTO {
 
   @IsOptional()
   @IsString()
+  @Matches(/^processed\/[A-Za-z0-9][A-Za-z0-9._-]{0,200}$/)
   croppedImageUrl?: string;
 
   @IsOptional()

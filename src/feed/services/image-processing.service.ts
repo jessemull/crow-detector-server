@@ -6,6 +6,7 @@ import {
 import {
   S3Client,
   GetObjectCommand,
+  HeadObjectCommand,
   PutObjectCommand,
 } from '@aws-sdk/client-s3';
 import sharp from 'sharp';
@@ -16,11 +17,36 @@ import {
   ContentModerationResult,
   ImageProcessingResult,
 } from 'src/common/types';
-import { awsClientOptions } from 'src/common/aws/client-options';
+import {
+  awsClientOptions,
+  s3ClientOptions,
+} from 'src/common/aws/client-options';
 import { createLogger } from 'src/common/logger/logger.config';
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_INPUT_PIXELS = 20_000_000;
+
+/** Legacy Rekognition names and the current L1/L2 names for the same categories. */
+const BLOCKED_MODERATION_NAMES = new Set([
+  'explicit nudity',
+  'explicit',
+  'explicit sexual activity',
+  'sex toys',
+  'violence',
+  'graphic violence or gore',
+  'physical violence',
+  'weapon violence',
+  'weapons',
+  'hate symbols',
+  'nazi party',
+  'white supremacy',
+  'extremist',
+  'drugs',
+  'drugs & tobacco',
+  'drug products',
+  'drug use',
+  'gambling',
+]);
 
 @Injectable()
 export class ImageProcessingService {
@@ -31,9 +57,8 @@ export class ImageProcessingService {
   constructor(private readonly configService: ConfigService) {
     const region = this.configService.get<string>('awsRegion') || 'us-west-2';
 
-    const clientOptions = awsClientOptions(region);
-    this.rekognition = new RekognitionClient(clientOptions);
-    this.s3 = new S3Client(clientOptions);
+    this.rekognition = new RekognitionClient(awsClientOptions(region));
+    this.s3 = new S3Client(s3ClientOptions(region));
   }
 
   async processImage(
@@ -126,18 +151,16 @@ export class ImageProcessingService {
     try {
       const result = await this.rekognition.send(command);
 
-      const inappropriateLabels = [
-        'Explicit Nudity',
-        'Violence',
-        'Hate Symbols',
-        'Drugs',
-        'Gambling',
-      ];
-
-      const foundLabels =
-        result.ModerationLabels?.map((label) => label.Name) || [];
-      const isAppropriate = !foundLabels.some(
-        (label) => label !== undefined && inappropriateLabels.includes(label),
+      const labels = result.ModerationLabels ?? [];
+      const foundLabels = labels
+        .map((label) => label.Name)
+        .filter((label): label is string => label !== undefined);
+      const isAppropriate = !labels.some((label) =>
+        [label.Name, label.ParentName].some(
+          (name) =>
+            name !== undefined &&
+            BLOCKED_MODERATION_NAMES.has(name.toLowerCase()),
+        ),
       );
 
       return {
@@ -151,13 +174,7 @@ export class ImageProcessingService {
       this.logger.error(
         `Content moderation check failed: ${error instanceof Error ? error.message : String(error)}`,
       );
-      // Default to false for security - if we can't verify content is safe, reject it...
-
-      return {
-        isAppropriate: false,
-        labels: ['ModerationCheckFailed'],
-        confidence: 0,
-      };
+      throw error;
     }
   }
 
@@ -206,7 +223,7 @@ export class ImageProcessingService {
       this.logger.error(
         `Face detection failed: ${error instanceof Error ? error.message : String(error)}`,
       );
-      return { faceDetected: false };
+      throw error;
     }
   }
 
@@ -223,8 +240,20 @@ export class ImageProcessingService {
     try {
       // Download image from S3...
 
-      const command = new GetObjectCommand({ Bucket: bucket, Key: key });
-      const s3Object = await this.s3.send(command);
+      const head = await this.s3.send(
+        new HeadObjectCommand({ Bucket: bucket, Key: key }),
+      );
+      if (
+        head.ContentLength !== undefined &&
+        head.ContentLength > MAX_IMAGE_BYTES
+      ) {
+        throw new Error(
+          `Image is ${head.ContentLength} bytes; the limit is ${MAX_IMAGE_BYTES}`,
+        );
+      }
+      const s3Object = await this.s3.send(
+        new GetObjectCommand({ Bucket: bucket, Key: key }),
+      );
       const imageBuffer = Buffer.from(
         await s3Object.Body!.transformToByteArray(),
       );

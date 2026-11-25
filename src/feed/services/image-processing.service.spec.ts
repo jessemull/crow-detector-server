@@ -111,6 +111,7 @@ describe('ImageProcessingService', () => {
           .fn()
           .mockResolvedValue(new Uint8Array(Buffer.from('mock-image-data'))),
       };
+      mockS3Send.mockResolvedValueOnce({ ContentLength: 16 });
       mockS3Send.mockResolvedValueOnce({
         Body: mockBody,
       });
@@ -200,16 +201,9 @@ describe('ImageProcessingService', () => {
     it('should handle processing errors', async () => {
       mockRekognitionSend.mockRejectedValueOnce(new Error('AWS error'));
 
-      mockRekognitionSend.mockResolvedValueOnce({
-        ModerationLabels: [],
-      });
-
-      mockRekognitionSend.mockRejectedValueOnce(
-        new Error('Face detection error'),
+      await expect(service.processImage(bucket, key)).rejects.toThrow(
+        'AWS error',
       );
-
-      const result = await service.processImage(bucket, key);
-      expect(result.faceDetection.faceDetected).toBe(false);
     });
 
     it('should throw error from main catch block when checkContentModeration throws unhandled error', async () => {
@@ -279,25 +273,17 @@ describe('ImageProcessingService', () => {
     it('should handle content moderation API errors', async () => {
       mockRekognitionSend.mockRejectedValue(new Error('Rekognition error'));
 
-      const result = await (service as any).checkContentModeration(bucket, key);
-
-      expect(result).toEqual({
-        isAppropriate: false,
-        labels: ['ModerationCheckFailed'],
-        confidence: 0,
-      });
+      await expect(
+        (service as any).checkContentModeration(bucket, key),
+      ).rejects.toThrow('Rekognition error');
     });
 
     it('should handle content moderation API string errors', async () => {
       mockRekognitionSend.mockRejectedValue('String Rekognition error');
 
-      const result = await (service as any).checkContentModeration(bucket, key);
-
-      expect(result).toEqual({
-        isAppropriate: false,
-        labels: ['ModerationCheckFailed'],
-        confidence: 0,
-      });
+      await expect(
+        (service as any).checkContentModeration(bucket, key),
+      ).rejects.toBe('String Rekognition error');
     });
 
     it('should filter out undefined labels', async () => {
@@ -381,21 +367,17 @@ describe('ImageProcessingService', () => {
     it('should handle face detection API errors', async () => {
       mockRekognitionSend.mockRejectedValue(new Error('Face detection error'));
 
-      const result = await (service as any).detectFaces(bucket, key);
-
-      expect(result).toEqual({
-        faceDetected: false,
-      });
+      await expect((service as any).detectFaces(bucket, key)).rejects.toThrow(
+        'Face detection error',
+      );
     });
 
     it('should handle face detection API string errors', async () => {
       mockRekognitionSend.mockRejectedValue('String face detection error');
 
-      const result = await (service as any).detectFaces(bucket, key);
-
-      expect(result).toEqual({
-        faceDetected: false,
-      });
+      await expect((service as any).detectFaces(bucket, key)).rejects.toBe(
+        'String face detection error',
+      );
     });
   });
 

@@ -146,10 +146,12 @@ function main() {
     logger.info('\n=== Full cURL Example ===');
 
     const bodyArg =
-      Object.keys(body).length > 0 ? `-d '${JSON.stringify(body)}'` : '';
+      Object.keys(body).length > 0
+        ? `-d ${shellSingleQuote(JSON.stringify(body))}`
+        : '';
 
     logger.info(
-      `curl -X ${method} https://api-dev.crittercanteen.com${path} ${bodyArg} \\`,
+      `curl -X ${shellSingleQuote(method)} ${shellSingleQuote(`https://api-dev.crittercanteen.com${path}`)} ${bodyArg} \\`,
     );
     logger.info(`  -H "Content-Type: application/json" \\`);
     logger.info(`  -H "x-device-id: ${auth.headers['x-device-id']}" \\`);
@@ -162,6 +164,10 @@ function main() {
     );
     process.exit(1);
   }
+}
+
+function shellSingleQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
 if (require.main === module) {
