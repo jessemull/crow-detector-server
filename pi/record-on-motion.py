@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-Porch recorder — approach A (continuous segments + retain on motion).
+Porch recorder — continuous segments, one file per visit.
 
 Always remux short RTSP segments to disk. Decode a cheap gray view of the
-same stream for motion. On motion, retain overlapping segments, join, upload.
+same stream. A visit opens when a compact patch keeps changing, stays open
+while new motion arrives inside the quiet gap, then joins once and uploads.
 """
 
 from __future__ import annotations
@@ -27,24 +28,27 @@ if str(_PI_DIR) not in sys.path:
 
 from record_on_motion_lib import (  # noqa: E402
     ContinuousRetainPipeline,
-    activity_still_present,
+    concat_segments,
     drop_incomplete_newest_segment,
     env_float,
+    follow_visit,
     load_env_file,
+    motion_tracker_from_env,
     prune_segments_older_than,
     rtsp_substream_url,
+    segments_covering,
     select_segments_overlapping_window,
+    visit_keep_after_epoch,
+    visit_limits_from_env,
     wait_for_motion,
-    write_concat_list,
 )
 
-# Event window retained around motion (seconds).
+# Seconds of segments kept around the first and last confirmed motion.
 PRE_ROLL_SECONDS = 4
 POST_ROLL_SECONDS = 20
 SEGMENT_TIME_SECONDS = 2
-# Keep a little more than one visit on disk for overlap/debug.
-LOCAL_RETENTION_SECONDS = 180
-VISIT_CAP_SECONDS = 120
+# Idle cleanup. An open visit keeps its own segments back to the pre-roll.
+LOCAL_RETENTION_SECONDS = 900
 OUTPUT_DIR = Path.home() / "clips"
 SEGMENT_DIR = OUTPUT_DIR / "segments"
 DEVICE_ID = "pi-porch"
@@ -52,9 +56,6 @@ PORCH_ENV_PATH = Path.home() / "porch.env"
 SAMPLE_WIDTH = 160
 SAMPLE_HEIGHT = 90
 DETECT_FPS = 5.0
-DEFAULT_MOTION_THRESHOLD = 0.035
-DEFAULT_IDLE_SECONDS = 3.0
-DEFAULT_VISIT_COOLDOWN_SECONDS = 30.0
 
 
 def load_porch_env(path: Path = PORCH_ENV_PATH) -> None:
@@ -72,11 +73,7 @@ PRIVATE_KEY_PATH = Path(
         str(Path.home() / "keys" / "pi-porch-private.pem"),
     )
 )
-MOTION_THRESHOLD = env_float("PORCH_MOTION_THRESHOLD", DEFAULT_MOTION_THRESHOLD)
-IDLE_SECONDS = env_float("PORCH_IDLE_SECONDS", DEFAULT_IDLE_SECONDS)
-VISIT_COOLDOWN_SECONDS = env_float(
-    "PORCH_VISIT_COOLDOWN_SECONDS", DEFAULT_VISIT_COOLDOWN_SECONDS
-)
+VISIT_GAP, VISIT_CAP = visit_limits_from_env("PORCH")
 PRE_ROLL = int(env_float("PORCH_PRE_ROLL_SECONDS", float(PRE_ROLL_SECONDS)))
 POST_ROLL = int(env_float("PORCH_POST_ROLL_SECONDS", float(POST_ROLL_SECONDS)))
 SEGMENT_TIME = int(
@@ -111,48 +108,6 @@ def pipeline_rtsp_url() -> str:
 
 def redacted_rtsp_host(url: str) -> str:
     return url.rsplit("@", 1)[-1] if "@" in url else "(rtsp)"
-
-
-def concat_segments(
-    segment_paths: list[Path],
-    output_path: Path,
-    ffmpeg_bin: str,
-) -> None:
-    if not segment_paths:
-        raise RuntimeError("no retained segments to build a clip")
-    list_path = output_path.with_suffix(".concat.txt")
-    write_concat_list(segment_paths, list_path)
-    try:
-        # Re-encode: copy-concat across reset segment timestamps is unreliable.
-        subprocess.run(
-            [
-                ffmpeg_bin,
-                "-hide_banner",
-                "-loglevel",
-                "error",
-                "-f",
-                "concat",
-                "-safe",
-                "0",
-                "-i",
-                str(list_path),
-                "-c:v",
-                "libx264",
-                "-preset",
-                "veryfast",
-                "-pix_fmt",
-                "yuv420p",
-                "-an",
-                "-movflags",
-                "+faststart",
-                "-y",
-                str(output_path),
-            ],
-            check=True,
-            timeout=180,
-        )
-    finally:
-        list_path.unlink(missing_ok=True)
 
 
 def prune_old_clips(keep_after_epoch: float, directory: Path = OUTPUT_DIR) -> None:
@@ -340,6 +295,34 @@ def run_once() -> None:
         upload_and_remove(clip_path)
 
 
+def retain_window_clip(
+    pipeline: ContinuousRetainPipeline,
+    *,
+    ffmpeg_bin: str,
+    window_start: float,
+    window_end: float,
+) -> Path:
+    """Join the segments that cover one visit and return the clip path."""
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    path = OUTPUT_DIR / f"clip-{stamp}.mp4"
+    print(f"retaining {path.name} ({window_end - window_start:.0f}s)")
+    retained = segments_covering(
+        pipeline,
+        window_start,
+        window_end,
+        float(SEGMENT_TIME),
+    )
+    print(f"retained {len(retained)} segments")
+    concat_segments(retained, path, ffmpeg_bin)
+    print(f"saved {path}")
+    prune_local_segments(
+        pipeline,
+        keep_after_epoch=time.time() - float(LOCAL_RETENTION),
+    )
+    return path
+
+
 def run_loop() -> None:
     if not API_BASE_URL:
         raise SystemExit(
@@ -347,11 +330,30 @@ def run_loop() -> None:
         )
     ffmpeg_bin = require_ffmpeg()
     url = pipeline_rtsp_url()
-    print(
-        "approach A: continuous segments + retain on motion "
-        f"(stream={redacted_rtsp_host(url)}, segment={SEGMENT_TIME}s, "
-        f"pre={PRE_ROLL}s, post={POST_ROLL}s, threshold={MOTION_THRESHOLD})"
+    tracker = motion_tracker_from_env(
+        "PORCH",
+        width=SAMPLE_WIDTH,
+        height=SAMPLE_HEIGHT,
     )
+    print(
+        "continuous segments, one file per visit "
+        f"(stream={redacted_rtsp_host(url)}, segment={SEGMENT_TIME}s, "
+        f"gap={VISIT_GAP:.0f}s, cap={VISIT_CAP:.0f}s)"
+    )
+    visit_start: dict[str, float | None] = {"epoch": None}
+
+    def prune_for_state() -> None:
+        start = visit_start["epoch"]
+        if start is None:
+            keep_after = time.time() - float(LOCAL_RETENTION)
+        else:
+            keep_after = visit_keep_after_epoch(
+                start,
+                pre_roll_seconds=float(PRE_ROLL),
+                segment_seconds=float(SEGMENT_TIME),
+            )
+        prune_local_segments(pipeline, keep_after_epoch=keep_after)
+
     try:
         with ContinuousRetainPipeline(
             url,
@@ -365,51 +367,42 @@ def run_loop() -> None:
             pipeline.drain_for(float(SEGMENT_TIME + 1))
             while True:
                 try:
-                    wait_for_motion(
+                    visit_start["epoch"] = None
+                    sample = wait_for_motion(
                         pipeline,
-                        threshold=MOTION_THRESHOLD,
-                        on_motion=lambda score: print(
-                            f"motion score={score:.4f}"
-                        ),
-                        on_tick=lambda: prune_local_segments(
-                            pipeline,
-                            keep_after_epoch=time.time()
-                            - float(LOCAL_RETENTION),
-                        ),
+                        tracker,
+                        on_tick=prune_for_state,
                     )
-                    visit_started = time.monotonic()
-                    motion_epoch = time.time()
-                    print("visit started")
-                    while time.monotonic() - visit_started < VISIT_CAP_SECONDS:
-                        clip_path = retain_event_clip(
-                            pipeline,
-                            ffmpeg_bin=ffmpeg_bin,
-                            motion_epoch=motion_epoch,
-                            pre_roll_seconds=PRE_ROLL,
-                            post_roll_seconds=POST_ROLL,
-                        )
-                        upload_and_remove(clip_path)
-                        if not activity_still_present(
-                            pipeline,
-                            threshold=MOTION_THRESHOLD,
-                            window_seconds=IDLE_SECONDS,
-                        ):
-                            break
-                        motion_epoch = time.time()
-                    else:
-                        print("visit cap reached")
-                    print("visit ended")
-                    if VISIT_COOLDOWN_SECONDS > 0:
-                        print(f"cooldown {VISIT_COOLDOWN_SECONDS}s")
-                        pipeline.drain_for(VISIT_COOLDOWN_SECONDS)
-                        prune_local_segments(
-                            pipeline,
-                            keep_after_epoch=time.time()
-                            - float(LOCAL_RETENTION),
-                        )
+                    print(
+                        "visit started "
+                        f"changed={sample.changed_ratio:.3f} fill={sample.blob_fill:.2f}"
+                    )
+
+                    def remember_start(start_epoch: float) -> None:
+                        visit_start["epoch"] = start_epoch
+
+                    window_start, window_end, reason = follow_visit(
+                        pipeline,
+                        tracker,
+                        gap_seconds=VISIT_GAP,
+                        cap_seconds=VISIT_CAP,
+                        pre_roll_seconds=float(PRE_ROLL),
+                        post_roll_seconds=float(POST_ROLL),
+                        segment_seconds=float(SEGMENT_TIME),
+                        on_open=remember_start,
+                        on_tick=prune_for_state,
+                    )
+                    print(f"visit ended ({reason})")
+                    clip_path = retain_window_clip(
+                        pipeline,
+                        ffmpeg_bin=ffmpeg_bin,
+                        window_start=window_start,
+                        window_end=window_end,
+                    )
+                    upload_and_remove(clip_path)
                 except (RuntimeError, OSError, subprocess.SubprocessError) as error:
                     # Empty/failed harvest or transient ffmpeg — stay alive.
-                    print(f"retain/upload error (continuing): {error}")
+                    print(f"retain/upload error (continuing): {type(error).__name__}")
                     time.sleep(2.0)
     except KeyboardInterrupt:
         print("\nstopped")

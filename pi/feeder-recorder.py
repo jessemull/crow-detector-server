@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """Feeder host recorder.
 
-The default loop only claims dispense proofs. Animal visits are a separate
-run: ``python3 pi/feeder-recorder.py --visit-once``.
+The default loop only claims dispense proofs. Animal visits use the same
+motion detector as the shelter camera:
+
+``python3 pi/feeder-recorder.py --visits`` watches continuously.
+``python3 pi/feeder-recorder.py --visit-once`` records the next visit and exits.
 
 Reads ~/feeder.env. Does not use the porch camera URL or porch systemd unit.
 """
@@ -13,6 +16,7 @@ import argparse
 import base64
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -24,13 +28,28 @@ _PI_DIR = Path(__file__).resolve().parent
 if str(_PI_DIR) not in sys.path:
     sys.path.insert(0, str(_PI_DIR))
 
-from record_on_motion_lib import load_env_file  # noqa: E402
+from record_on_motion_lib import (  # noqa: E402
+    ContinuousRetainPipeline,
+    classify_sample_offsets,
+    concat_segments,
+    env_float,
+    follow_visit,
+    load_env_file,
+    motion_tracker_from_env,
+    rtsp_substream_url,
+    segments_covering,
+    visit_limits_from_env,
+    wait_for_motion,
+)
 
 STAGING_DIR = Path.home() / "feeder-staging"
 ENV_PATH = Path.home() / "feeder.env"
 DEVICE_ID = "pi-feeder"
 PROOF_SECONDS = 12
 STAGING_TTL_SECONDS = 45 * 60
+SAMPLE_WIDTH = 160
+SAMPLE_HEIGHT = 90
+DETECT_FPS = 5.0
 
 
 def load_feeder_env(path: Path = ENV_PATH) -> None:
@@ -125,13 +144,13 @@ def record_clip(destination: Path, seconds: int) -> None:
     )
 
 
-def extract_jpeg(video: Path, jpeg: Path) -> None:
+def extract_jpeg(video: Path, jpeg: Path, offset_seconds: float = 1.0) -> None:
     subprocess.run(
         [
             "ffmpeg",
             "-y",
             "-ss",
-            "1",
+            f"{offset_seconds:.3f}",
             "-i",
             str(video),
             "-frames:v",
@@ -141,6 +160,101 @@ def extract_jpeg(video: Path, jpeg: Path) -> None:
         check=True,
         capture_output=True,
     )
+
+
+def record_motion_visit(destination: Path) -> float:
+    """Wait for one compact visit on the feeder camera and write that file.
+
+    Returns the visit length in seconds. A light change across the whole
+    frame does not open a visit. Motion that returns inside the gap stays
+    in this same file.
+    """
+    if not RTSP_URL:
+        raise RuntimeError("FEEDER_RTSP_URL is not set")
+    ffmpeg_bin = shutil.which("ffmpeg")
+    if not ffmpeg_bin:
+        raise RuntimeError("ffmpeg not found")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    tracker = motion_tracker_from_env(
+        "FEEDER",
+        width=SAMPLE_WIDTH,
+        height=SAMPLE_HEIGHT,
+    )
+    gap, cap = visit_limits_from_env("FEEDER")
+    pre_roll = int(env_float("FEEDER_PRE_ROLL_SECONDS", 4))
+    post_roll = int(env_float("FEEDER_POST_ROLL_SECONDS", 20))
+    segment_time = int(env_float("FEEDER_SEGMENT_TIME_SECONDS", 2))
+    with ContinuousRetainPipeline(
+        rtsp_substream_url(RTSP_URL),
+        segment_dir=STAGING_DIR / "segments",
+        width=SAMPLE_WIDTH,
+        height=SAMPLE_HEIGHT,
+        ffmpeg_bin=ffmpeg_bin,
+        fps=DETECT_FPS,
+        segment_time=segment_time,
+    ) as pipeline:
+        pipeline.drain_for(float(segment_time + 1))
+        sample = wait_for_motion(pipeline, tracker)
+        print(
+            "feeder visit started "
+            f"changed={sample.changed_ratio:.3f} fill={sample.blob_fill:.2f}"
+        )
+        window_start, window_end, reason = follow_visit(
+            pipeline,
+            tracker,
+            gap_seconds=gap,
+            cap_seconds=cap,
+            pre_roll_seconds=float(pre_roll),
+            post_roll_seconds=float(post_roll),
+            segment_seconds=float(segment_time),
+        )
+        print(f"feeder visit ended ({reason})")
+        retained = segments_covering(
+            pipeline,
+            window_start,
+            window_end,
+            float(segment_time),
+        )
+        concat_segments(retained, destination, ffmpeg_bin)
+    return max(0.0, window_end - window_start)
+
+
+def classify_clip(clip: Path, duration: float) -> dict | None:
+    """Strongest animal sample, or None when samples agree the frame is empty.
+
+    A failed request is ignored when another sample succeeds. If every sample
+    request fails, raise so the clip is kept and not published.
+    """
+    best: dict | None = None
+    successes = 0
+    errors = 0
+    for offset in classify_sample_offsets(duration):
+        jpeg = clip.with_name(f"{clip.stem}-{int(offset * 10)}.jpg")
+        try:
+            extract_jpeg(clip, jpeg, offset)
+            encoded = base64.b64encode(jpeg.read_bytes()).decode("ascii")
+            analysis = api_json(
+                "POST",
+                "/feeder/classify",
+                {"imageBase64": encoded, "mediaType": "image/jpeg"},
+            )
+        except Exception:
+            errors += 1
+            continue
+        finally:
+            jpeg.unlink(missing_ok=True)
+        successes += 1
+        if not isinstance(analysis, dict) or not analysis.get("hasAnimals"):
+            continue
+        count = int(analysis.get("animalCount") or 0)
+        best_count = int(best.get("animalCount") or 0) if best else -1
+        if best is None or count >= best_count:
+            best = analysis
+    if best is not None:
+        return best
+    if successes == 0 and errors:
+        raise RuntimeError("classify failed")
+    return None
 
 
 def upload_mp4(path: Path) -> str:
@@ -200,21 +314,14 @@ def handle_dispense(request_id: str) -> None:
 
 
 def handle_visit_once(dispense_request_id: str | None = None) -> None:
-    """Record a separate visit file, classify one frame, upload only if an animal is present."""
+    """Record one motion visit, classify several frames, upload only if an animal is present."""
     stamp = int(time.time())
     clip = STAGING_DIR / f"visit-{stamp}.mp4"
-    jpeg = STAGING_DIR / f"visit-{stamp}.jpg"
     finished = False
     try:
-        record_clip(clip, PROOF_SECONDS)
-        extract_jpeg(clip, jpeg)
-        encoded = base64.b64encode(jpeg.read_bytes()).decode("ascii")
-        analysis = api_json(
-            "POST",
-            "/feeder/classify",
-            {"imageBase64": encoded, "mediaType": "image/jpeg"},
-        )
-        if not analysis.get("hasAnimals"):
+        duration = record_motion_visit(clip)
+        analysis = classify_clip(clip, duration)
+        if not analysis:
             print("visit dropped: no animal")
             finished = True
             return
@@ -235,7 +342,6 @@ def handle_visit_once(dispense_request_id: str | None = None) -> None:
     finally:
         if finished:
             clip.unlink(missing_ok=True)
-            jpeg.unlink(missing_ok=True)
 
 
 def poll_once() -> bool:
@@ -258,7 +364,12 @@ def main() -> None:
     parser.add_argument(
         "--visit-once",
         action="store_true",
-        help="Record one visit clip, classify, upload only if an animal is present",
+        help="Record the next motion visit, classify, upload only if an animal is present",
+    )
+    parser.add_argument(
+        "--visits",
+        action="store_true",
+        help="Watch the feeder camera and publish each motion visit that contains an animal",
     )
     parser.add_argument(
         "--dispense-id",
@@ -274,10 +385,14 @@ def main() -> None:
     if args.visit_once:
         handle_visit_once(args.dispense_id or None)
         return
+    if args.visits:
+        # Proofs stay on the default loop so a button press cannot publish a gallery clip.
+        while True:
+            handle_visit_once()
+            time.sleep(2)
     if args.once:
         poll_once()
         return
-    # Proofs only. Visits stay on --visit-once so a button press cannot publish a gallery clip.
     while True:
         try:
             worked = poll_once()

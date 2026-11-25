@@ -49,6 +49,7 @@ class FailureTests(unittest.TestCase):
     def setUp(self) -> None:
         self.originals = {
             "record_clip": feeder.record_clip,
+            "record_motion_visit": feeder.record_motion_visit,
             "extract_jpeg": feeder.extract_jpeg,
             "upload_mp4": feeder.upload_mp4,
             "api_json": feeder.api_json,
@@ -57,6 +58,7 @@ class FailureTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         feeder.record_clip = self.originals["record_clip"]
+        feeder.record_motion_visit = self.originals["record_motion_visit"]
         feeder.extract_jpeg = self.originals["extract_jpeg"]
         feeder.upload_mp4 = self.originals["upload_mp4"]
         feeder.api_json = self.originals["api_json"]
@@ -65,10 +67,10 @@ class FailureTests(unittest.TestCase):
     def test_visit_failure_does_not_print_the_camera_url(self) -> None:
         feeder.RTSP_URL = "rtsp://user:s3cret@10.0.0.5/stream1"
 
-        def boom(destination: Path, seconds: int) -> None:
+        def boom(destination: Path) -> float:
             raise subprocess.CalledProcessError(1, ["ffmpeg", feeder.RTSP_URL])
 
-        feeder.record_clip = boom
+        feeder.record_motion_visit = boom
         buffer = io.StringIO()
         with tempfile.TemporaryDirectory() as tmp:
             feeder.STAGING_DIR = Path(tmp)
@@ -99,10 +101,11 @@ class FailureTests(unittest.TestCase):
     def test_visit_sends_the_dispense_id_when_one_is_given(self) -> None:
         bodies: list[tuple[str, dict | None]] = []
 
-        def write_clip(destination: Path, seconds: int) -> None:
+        def write_clip(destination: Path) -> float:
             destination.write_bytes(b"mp4")
+            return 30.0
 
-        def write_jpeg(video: Path, jpeg: Path) -> None:
+        def write_jpeg(video: Path, jpeg: Path, offset_seconds: float = 1.0) -> None:
             jpeg.write_bytes(b"jpg")
 
         def api(method: str, path: str, body: dict | None = None) -> dict:
@@ -116,7 +119,7 @@ class FailureTests(unittest.TestCase):
                 }
             return {"id": "visit-1"}
 
-        feeder.record_clip = write_clip
+        feeder.record_motion_visit = write_clip
         feeder.extract_jpeg = write_jpeg
         feeder.upload_mp4 = lambda path: "feeder/visit.mp4"
         feeder.api_json = api

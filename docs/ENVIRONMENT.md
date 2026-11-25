@@ -65,13 +65,19 @@ Porch LAN recorder (host laptop/server, not Nest) — see `docs/DEVICES.md` and 
 | `PORCH_RTSP_URL`              | Full RTSP URL including Camera Account user/pass | Yes      | - |
 | `PORCH_RTSP_SAMPLE_URL`       | Override warm pipeline URL (defaults to `stream2` derived from `PORCH_RTSP_URL`) | No | derived `stream2` |
 | `PI_PORCH_PRIVATE_KEY_PATH`   | Path to porch private key on the host            | No       | `~/keys/pi-porch-private.pem` |
-| `PORCH_MOTION_THRESHOLD`      | Frame-diff score (0–1) that counts as motion     | No       | `0.035` |
-| `PORCH_IDLE_SECONDS`          | Quiet window before ending a visit               | No       | `3` |
-| `PORCH_VISIT_COOLDOWN_SECONDS`| Pause after a visit before arming again          | No       | `30` |
-| `PORCH_PRE_ROLL_SECONDS`      | Seconds before motion retained from continuous segments | No | `4` |
-| `PORCH_POST_ROLL_SECONDS`     | Seconds after motion retained from continuous segments | No | `20` |
+| `PORCH_PIXEL_DELTA`           | Brightness change (0–255) that counts as a changed pixel | No | `30` |
+| `PORCH_MIN_CHANGED_RATIO`     | Smallest share of the frame that can be an animal | No     | `0.004` |
+| `PORCH_MAX_CHANGED_RATIO`     | Largest share of the frame that can be an animal. Above this is a light change | No | `0.45` |
+| `PORCH_LIGHT_DISARM_RATIO`    | A change this large disarms detection until the picture is quiet again | No | `0.80` |
+| `PORCH_MIN_BLOB_FILL`         | Changed pixels must fill this much of their box | No       | `0.25` |
+| `PORCH_MOTION_FRAMES`         | Compact frames in a row required to open or extend a visit | No | `3` |
+| `PORCH_REFERENCE_ALPHA`       | How fast the background reference absorbs change | No      | `0.02` |
+| `PORCH_VISIT_GAP_SECONDS`     | Quiet time that still belongs to the same visit | No       | `120` |
+| `PORCH_VISIT_CAP_SECONDS`     | Hard maximum length of one visit                | No       | `600` |
+| `PORCH_PRE_ROLL_SECONDS`      | Seconds before the first motion kept in the file | No      | `4` |
+| `PORCH_POST_ROLL_SECONDS`     | Seconds after the last motion kept in the file  | No       | `20` |
 | `PORCH_SEGMENT_TIME_SECONDS`  | Continuous remux segment length                  | No       | `2` |
-| `PORCH_LOCAL_RETENTION_SECONDS` | Max age of local segment files before prune    | No       | `180` |
+| `PORCH_LOCAL_RETENTION_SECONDS` | Max age of local files once no visit is open  | No       | `900` |
 
 Host secrets live in `~/porch.env` (`chmod 600`) and are never committed. Prefer systemd (`scripts/porch-recorder.service`) on the LAN host; deploy code with `./scripts/deploy-porch-host.sh`.
 
@@ -95,8 +101,20 @@ Feeder LAN recorder (host laptop/server, not Nest) — see `docs/DEVICES.md` and
 | `FEEDER_API_BASE_URL`       | API base for feeder dispense, classify, and upload | Yes   | - (bring-up: `https://api-dev.crittercanteen.com`) |
 | `FEEDER_RTSP_URL`           | Full RTSP URL for the feeder camera             | Yes      | - |
 | `PI_FEEDER_PRIVATE_KEY_PATH`| Path to the feeder private key on the host      | No       | `~/keys/pi-feeder-private.pem` |
+| `FEEDER_PIXEL_DELTA`        | Same motion test as `PORCH_PIXEL_DELTA`         | No       | `30` |
+| `FEEDER_MIN_CHANGED_RATIO`  | Same motion test as the porch minimum           | No       | `0.004` |
+| `FEEDER_MAX_CHANGED_RATIO`  | Same light rejection as the porch maximum       | No       | `0.45` |
+| `FEEDER_LIGHT_DISARM_RATIO` | A change this large disarms detection until quiet | No     | `0.80` |
+| `FEEDER_MIN_BLOB_FILL`      | Same compact-patch test as the porch            | No       | `0.25` |
+| `FEEDER_MOTION_FRAMES`      | Compact frames in a row required                | No       | `3` |
+| `FEEDER_REFERENCE_ALPHA`    | Background reference blend                      | No       | `0.02` |
+| `FEEDER_VISIT_GAP_SECONDS`  | Quiet time that still belongs to the same visit | No       | `120` |
+| `FEEDER_VISIT_CAP_SECONDS`  | Hard maximum length of one visit                | No       | `600` |
+| `FEEDER_PRE_ROLL_SECONDS`   | Seconds before the first motion kept in the file | No      | `4` |
+| `FEEDER_POST_ROLL_SECONDS`  | Seconds after the last motion kept in the file  | No       | `20` |
+| `FEEDER_SEGMENT_TIME_SECONDS` | Continuous remux segment length               | No       | `2` |
 
-Host secrets live in `~/feeder.env` (`chmod 600`) and are never committed. Apply `scripts/db-seed/feeder-video.sql` before the routes are used. The default recorder loop claims dispense proofs only. `python3 pi/feeder-recorder.py --visit-once` records an animal visit, and `--dispense-id` links that visit to a proof.
+Host secrets live in `~/feeder.env` (`chmod 600`) and are never committed. Apply `scripts/db-seed/feeder-video.sql` before the routes are used. The default recorder loop claims dispense proofs only (a fixed 12-second clip from the button). `python3 pi/feeder-recorder.py --visits` watches the feeder camera with the same motion detector as the shelter and publishes a visit only when classification finds an animal. `--visit-once` records the next visit, and `--dispense-id` links that visit to a proof.
 
 Legacy Pi helpers still exist: `npm run pi:sync` / `pi:start` / `pi:stop` (hardcoded old `critter-cam.local` paths). The outdoor porch path is **LAN host + RTSP**, not Pi CSI/PIR.
 
