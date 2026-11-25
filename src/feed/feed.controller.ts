@@ -15,6 +15,7 @@ import { FeedEventService } from './services/feed-event.service';
 import { FeedResponse } from 'src/common/types';
 import { PatchFeedDTO } from './dto/patch-feed.dto';
 import { UpdateFeedStatusDto } from './dto/update-feed-status.dto';
+import { ListEventsQueryDto } from 'src/common/dto/list-events-query.dto';
 import { EcdsaAuthGuard } from '../auth/middleware/ecdsa-auth.guard';
 
 @Controller('feed')
@@ -39,15 +40,15 @@ export class FeedController {
   }
 
   @Get('events')
+  @UseGuards(EcdsaAuthGuard)
   async getFeedEvents(
-    @Query('limit') limit: number,
-    @Query('from') from: string,
-    @Query('to') to: string,
+    @Query() query: ListEventsQueryDto,
   ): Promise<FeedEvent[]> {
-    return this.feedEventService.find(limit, from, to);
+    return this.feedEventService.find(query);
   }
 
   @Get(':id')
+  @UseGuards(EcdsaAuthGuard)
   async getFeedEventById(@Param('id') id: string): Promise<FeedEvent> {
     return this.feedEventService.findById(id);
   }

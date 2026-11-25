@@ -6,6 +6,15 @@ import { FeedEvent } from '../../src/feed/entity/feed-event.entity';
 import { config } from 'dotenv';
 import { createLogger } from '../../src/common/logger/logger.config';
 
+function postgresSsl(): { rejectUnauthorized: boolean } {
+  const isProdLike =
+    process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'prod';
+  return {
+    rejectUnauthorized:
+      isProdLike || process.env.SSL_REJECT_UNAUTHORIZED !== 'false',
+  };
+}
+
 config();
 
 async function testConnection() {
@@ -21,9 +30,7 @@ async function testConnection() {
     entities: [FeedEvent, DetectionEvent],
     synchronize: false,
     logging: true,
-    ssl: {
-      rejectUnauthorized: process.env.SSL_REJECT_UNAUTHORIZED === 'true',
-    },
+    ssl: postgresSsl(),
   });
 
   try {

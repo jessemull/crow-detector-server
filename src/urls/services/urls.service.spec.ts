@@ -73,9 +73,9 @@ describe('UrlsService', () => {
 
   describe('constructor', () => {
     it('should create S3 client with correct region', () => {
-      expect(mockS3Client).toHaveBeenCalledWith({
-        region: 'us-west-2',
-      });
+      expect(mockS3Client).toHaveBeenCalledWith(
+        expect.objectContaining({ region: 'us-west-2' }),
+      );
     });
 
     it('should use default region when AWS_REGION is not set', () => {
@@ -91,9 +91,9 @@ describe('UrlsService', () => {
 
       new UrlsService(mockConfigService as any, mockFeedEventRepository as any);
 
-      expect(mockS3Client).toHaveBeenCalledWith({
-        region: 'us-west-2',
-      });
+      expect(mockS3Client).toHaveBeenCalledWith(
+        expect.objectContaining({ region: 'us-west-2' }),
+      );
     });
 
     it('should throw error when S3_BUCKET_NAME is not set', () => {

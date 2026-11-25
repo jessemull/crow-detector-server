@@ -7,12 +7,15 @@ Parameters:
     Default: 'dev'
     AllowedValues: ['dev', 'prod']
     Description: 'Environment name'
-    
+
   DatabaseInstanceClass:
     Type: String
     Default: 'db.t3.micro'
     AllowedValues: ['db.t3.micro', 'db.t3.small', 'db.t3.medium', 'db.r5.large']
     Description: 'Database instance class'
+
+Conditions:
+  IsProd: !Equals [!Ref Environment, 'prod']
 
 Resources:
   DatabaseInstance:
@@ -36,6 +39,7 @@ Resources:
       BackupRetentionPeriod: 7
       MultiAZ: false
       PubliclyAccessible: false
+      DeletionProtection: !If [IsProd, true, false]
       Tags:
         - Key: Name
           Value: !Sub 'crow-detector-db-${Environment}'
@@ -50,13 +54,13 @@ Outputs:
     Value: !GetAtt DatabaseInstance.Endpoint.Address
     Export:
       Name: !Sub 'crow-detector-db-${Environment}-endpoint'
-  
+
   DatabasePort:
     Description: 'Database port'
     Value: !GetAtt DatabaseInstance.Endpoint.Port
     Export:
       Name: !Sub 'crow-detector-db-${Environment}-port'
-  
+
   DatabaseName:
     Description: 'Database name'
     Value: !Sub 'crow_detector_db_${Environment}'

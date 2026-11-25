@@ -43,9 +43,9 @@ describe('S3MetadataService', () => {
 
   describe('constructor', () => {
     it('should initialize S3 service with correct configuration', () => {
-      expect(S3Client).toHaveBeenCalledWith({
-        region: 'us-west-2',
-      });
+      expect(S3Client).toHaveBeenCalledWith(
+        expect.objectContaining({ region: 'us-west-2' }),
+      );
       expect(configService.get).toHaveBeenCalledWith('awsRegion');
     });
   });
@@ -91,6 +91,13 @@ describe('S3MetadataService', () => {
       );
       expect(result.type).toBe('detection');
       expect(result.timestamp).toBe(9876543210000);
+    });
+
+    it('keeps a millisecond key prefix instead of scaling it again', async () => {
+      const url =
+        'https://test-bucket.s3.us-west-2.amazonaws.com/feed/1755884038592-test-image.jpg';
+      const result = await service.extractMetadataFromUrl(url);
+      expect(result.timestamp).toBe(1755884038592);
     });
 
     it('should default to BUTTON source when metadata is missing', async () => {
@@ -237,30 +244,30 @@ describe('S3MetadataService', () => {
       expect(result).toBe(5432);
     });
 
-    it('should return 0 when ContentLength is undefined', async () => {
+    it('rejects when ContentLength is undefined', async () => {
       mockS3Send.mockResolvedValue({
         ContentLength: undefined,
       });
 
-      const result = await service.getObjectSize(bucket, key);
-
-      expect(result).toBe(0);
+      await expect(service.getObjectSize(bucket, key)).rejects.toThrow(
+        'no content length',
+      );
     });
 
-    it('should return 0 and log error when S3 call fails', async () => {
+    it('rejects when the S3 call fails', async () => {
       mockS3Send.mockRejectedValue(new Error('Network error'));
 
-      const result = await service.getObjectSize(bucket, key);
-
-      expect(result).toBe(0);
+      await expect(service.getObjectSize(bucket, key)).rejects.toThrow(
+        'Network error',
+      );
     });
 
-    it('should return 0 and log error when S3 call fails with string error', async () => {
+    it('rejects when the S3 call fails with a string error', async () => {
       mockS3Send.mockRejectedValue('String network error');
 
-      const result = await service.getObjectSize(bucket, key);
-
-      expect(result).toBe(0);
+      await expect(service.getObjectSize(bucket, key)).rejects.toBe(
+        'String network error',
+      );
     });
   });
 

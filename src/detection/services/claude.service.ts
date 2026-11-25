@@ -183,9 +183,8 @@ Rules:
   }
 
   private isCrowName(name: string): boolean {
-    const normalized = name.toLowerCase();
-    return ['crow', 'raven', 'blackbird', 'corvid'].some((term) =>
-      normalized.includes(term),
+    return /(?:^|[^a-z])(crows?|ravens?|blackbirds?|corvids?)(?:[^a-z]|$)/i.test(
+      name,
     );
   }
 }

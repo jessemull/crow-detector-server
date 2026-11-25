@@ -14,8 +14,12 @@ export async function callAPI(s3Info: S3ObjectInfo): Promise<void> {
   const imageType = getImageType(s3Info.key);
   const endpoint = imageType === 'feed' ? FEED_ENDPOINT : DETECTION_ENDPOINT;
 
+  const encodedKey = s3Info.key
+    .split('/')
+    .map((segment) => encodeURIComponent(segment))
+    .join('/');
   const payload = {
-    imageUrl: `https://${s3Info.bucket}.s3.amazonaws.com/${s3Info.key}`,
+    imageUrl: `https://${s3Info.bucket}.s3.amazonaws.com/${encodedKey}`,
   };
 
   const controller = new AbortController();
@@ -35,6 +39,14 @@ export async function callAPI(s3Info: S3ObjectInfo): Promise<void> {
     });
 
     clearTimeout(timeoutId);
+
+    if (response.status === 409) {
+      lambdaLogger.info('API reported a duplicate; acknowledging', {
+        imageType,
+        status: response.status,
+      });
+      return;
+    }
 
     if (!response.ok) {
       throw new Error(`API call failed with status: ${response.status}`);

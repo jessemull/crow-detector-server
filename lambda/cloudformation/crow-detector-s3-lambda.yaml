@@ -28,7 +28,7 @@ Resources:
         S3Bucket:
           Fn::ImportValue: !Sub 'CrowDetectorLambdaBucketName-${Environment}'
         S3Key: !Ref S3Key
-      Timeout: 30
+      Timeout: 120
       MemorySize: 256
       Environment:
         Variables:

@@ -20,9 +20,20 @@ from record_on_motion_lib import (
     prune_segments_older_than,
     rtsp_substream_url,
     select_segments_overlapping_window,
+    signed_payload,
     wait_for_motion,
     write_concat_list,
 )
+
+
+class SignedPayloadTests(unittest.TestCase):
+    def test_porch_upload_matches_api_guard(self) -> None:
+        body = {"fileName": "clip-1", "contentLength": 1200}
+        payload = signed_payload("POST", "/urls/porch", body, "1700000000000")
+        self.assertEqual(
+            payload,
+            'POST/urls/porch{"fileName":"clip-1","contentLength":1200}1700000000000',
+        )
 
 
 class ParseEnvLineTests(unittest.TestCase):

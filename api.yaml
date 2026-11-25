@@ -15,42 +15,37 @@ paths:
   /health:
     get:
       summary: Health check
-      description: Check the health status of the API and database
+      description: Liveness check. Does not ping the database. ECS and Docker probe this path. Use GET /health/database for the database ping.
       tags:
         - Health
       responses:
         '200':
-          description: API and database are healthy
+          description: Process is up
           content:
             application/json:
               schema:
                 type: object
+                required:
+                  - status
+                  - timestamp
                 properties:
                   status:
                     type: string
-                    example: "ok"
-                  info:
-                    type: object
-                    properties:
-                      database:
-                        type: object
-                        properties:
-                          status:
-                            type: string
-                            example: "up"
+                    example: 'ok'
+                  timestamp:
+                    type: string
+                    format: date-time
+  /health/database:
+    get:
+      summary: Database health check
+      description: Pings PostgreSQL. This is not the task liveness probe.
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Database is reachable
         '503':
-          description: Service unavailable
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: "error"
-                  error:
-                    type: string
-                    example: "Database connection failed"
+          description: Database is unreachable
 
   /detection:
     post:
@@ -147,7 +142,15 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DetectionEvent'
+                type: object
+                required:
+                  - data
+                  - message
+                properties:
+                  data:
+                    $ref: '#/components/schemas/DetectionEvent'
+                  message:
+                    type: string
         '404':
           description: Detection event not found
         '401':
@@ -217,9 +220,12 @@ paths:
           description: Bad request - invalid input data
         '401':
           description: Unauthorized - invalid authentication
+        '409':
+          description: Feed cooldown is still active
         '500':
           description: Internal server error
 
+  /feed/events:
     get:
       summary: Get feed events
       description: Retrieve feed events with optional filtering
@@ -370,13 +376,14 @@ paths:
         - Feed
       responses:
         '200':
-          description: Latest feed event status retrieved successfully
+          description: Latest status, or data null when no feed events exist
           content:
             application/json:
               schema:
                 type: object
                 properties:
                   data:
+                    nullable: true
                     type: object
                     properties:
                       id:
@@ -385,7 +392,14 @@ paths:
                         description: Feed event ID
                       status:
                         type: string
-                        enum: [PENDING, FEEDING, FEEDING_COMPLETE, PHOTO_TAKEN, COMPLETE]
+                        enum:
+                          [
+                            PENDING,
+                            FEEDING,
+                            FEEDING_COMPLETE,
+                            PHOTO_TAKEN,
+                            COMPLETE,
+                          ]
                         description: Current feeder status
                       createdAt:
                         type: string
@@ -394,8 +408,6 @@ paths:
                   message:
                     type: string
                     description: Response message
-        '404':
-          description: No feed events found
         '500':
           description: Internal server error
 
@@ -577,7 +589,7 @@ components:
       description: |
         ECDSA signature for request authentication.
         Required headers:
-        - x-device-id: Device identifier (pi-user, pi-motion, pi-feeder, pi-porch)
+        - x-device-id: Device identifier (pi-user, pi-motion, pi-feeder, pi-porch, lambda-s3)
         - x-signature: Base64-encoded ECDSA signature
         - x-timestamp: Request timestamp in milliseconds
 
@@ -591,7 +603,7 @@ components:
           type: string
           format: uri
           description: URL of the detection image
-          example: "https://example.com/images/detection.jpg"
+          example: 'https://example.com/images/detection.jpg'
 
     PatchDetectionDTO:
       type: object
@@ -617,21 +629,21 @@ components:
           type: string
           enum: [PENDING, PROCESSING, COMPLETED, FAILED]
           description: Current processing status of the image
-          example: "COMPLETED"
+          example: 'COMPLETED'
         processingError:
           type: string
           description: Error message if processing failed
-          example: "Image processing timeout"
+          example: 'Image processing timeout'
         detectedAnimals:
           type: array
           description: Array of detected animals with confidence scores and counts
           items:
             $ref: '#/components/schemas/DetectedAnimal'
           example:
-            - name: "Crow"
+            - name: 'Crow'
               confidence: 99.1
               count: 2
-            - name: "Squirrel"
+            - name: 'Squirrel'
               confidence: 87.5
               count: 1
         originalImageSize:
@@ -647,15 +659,13 @@ components:
       type: object
       required:
         - imageUrl
-        - source
       properties:
         imageUrl:
           type: string
           format: uri
+          maxLength: 2048
           description: URL of the feed event image
-          example: "https://example.com/images/feed.jpg"
-        source:
-          $ref: '#/components/schemas/Source'
+          example: 'https://example.com/images/feed.jpg'
 
     PatchFeedDTO:
       type: object
@@ -671,7 +681,7 @@ components:
           type: string
           format: uri
           description: URL of the cropped feed image
-          example: "https://example.com/images/feed-cropped.jpg"
+          example: 'https://example.com/images/feed-cropped.jpg'
         status:
           $ref: '#/components/schemas/Status'
 
@@ -684,12 +694,12 @@ components:
           type: string
           enum: [PENDING, FEEDING, FEEDING_COMPLETE, PHOTO_TAKEN, COMPLETE]
           description: New feeder status for the feed event
-          example: "FEEDING"
+          example: 'FEEDING'
         photoUrl:
           type: string
           format: uri
           description: URL of the verification photo (optional, used with PHOTO_TAKEN status)
-          example: "https://example.com/images/verification.jpg"
+          example: 'https://example.com/images/verification.jpg'
         isAppropriate:
           type: boolean
           description: Whether the feed image is appropriate
@@ -700,11 +710,11 @@ components:
           type: string
           enum: [PENDING, PROCESSING, COMPLETED, FAILED]
           description: Current processing status of the image
-          example: "COMPLETED"
+          example: 'COMPLETED'
         processingError:
           type: string
           description: Error message if processing failed
-          example: "Image processing timeout"
+          example: 'Image processing timeout'
         moderationLabels:
           type: string
           description: JSON string of content moderation labels
@@ -736,52 +746,61 @@ components:
         - fileName
         - format
         - source
+        - contentLength
       properties:
         fileName:
           type: string
-          description: Name of the file to upload
-          example: "feed-event-2024-01-15.jpg"
+          maxLength: 120
+          description: Basename without a path or extension
+          example: 'feed-event'
         format:
           $ref: '#/components/schemas/ImageFormat'
         source:
           type: string
           description: Source identifier for the image
-          example: "pi-feeder-01"
-        contentType:
-          type: string
-          description: MIME type of the image (optional)
-          example: "image/jpeg"
+          example: 'pi-feeder-01'
+        contentLength:
+          type: integer
+          minimum: 1
+          maximum: 15728640
+          description: Exact PUT body size in bytes. The signed URL rejects any other length.
 
     CreateDetectionImageUrlDTO:
       type: object
       required:
         - fileName
         - format
+        - contentLength
       properties:
         fileName:
           type: string
-          description: Name of the file to upload
-          example: "detection-2024-01-15.jpg"
+          maxLength: 120
+          description: Basename without a path or extension
+          example: 'detection'
         format:
           $ref: '#/components/schemas/ImageFormat'
-        contentType:
-          type: string
-          description: MIME type of the image (optional)
-          example: "image/jpeg"
+        contentLength:
+          type: integer
+          minimum: 1
+          maximum: 15728640
+          description: Exact PUT body size in bytes. The signed URL rejects any other length.
 
     CreatePorchClipUrlDTO:
       type: object
       required:
         - fileName
+        - contentLength
       properties:
         fileName:
           type: string
+          maxLength: 120
           description: Clip file name without path
-          example: "clip-20261114-210000"
-        contentType:
-          type: string
-          description: MIME type of the clip (optional)
-          example: "video/mp4"
+          example: 'clip-20261114-210000'
+        contentLength:
+          type: integer
+          minimum: 1
+          maximum: 104857600
+          description: Exact PUT body size in bytes. Content type is video/mp4.
 
     PorchClip:
       type: object
@@ -794,7 +813,7 @@ components:
         name:
           type: string
           description: Clip file name under porch/
-          example: "1731628800000-clip-20261114-210000.mp4"
+          example: '1731628800000-clip-20261114-210000.mp4'
         recordedAt:
           type: string
           format: date-time
@@ -813,7 +832,7 @@ components:
           type: string
           format: uuid
           description: Unique identifier for the detection event
-          example: "123e4567-e89b-12d3-a456-426614174000"
+          example: '123e4567-e89b-12d3-a456-426614174000'
         confidence:
           type: number
           format: float
@@ -835,26 +854,26 @@ components:
           type: string
           format: uri
           description: URL of the detection image
-          example: "https://example.com/images/detection.jpg"
+          example: 'https://example.com/images/detection.jpg'
         processingStatus:
           type: string
           enum: [PENDING, PROCESSING, COMPLETED, FAILED]
           description: Current processing status of the image
-          example: "COMPLETED"
+          example: 'COMPLETED'
         processingError:
           type: string
           description: Error message if processing failed
-          example: "Image processing timeout"
+          example: 'Image processing timeout'
         detectedAnimals:
           type: array
           description: Array of detected animals with confidence scores and counts
           items:
             $ref: '#/components/schemas/DetectedAnimal'
           example:
-            - name: "Crow"
+            - name: 'Crow'
               confidence: 99.1
               count: 2
-            - name: "Pig"
+            - name: 'Pig'
               confidence: 99.2
               count: 1
         originalImageSize:
@@ -869,12 +888,12 @@ components:
           type: string
           format: date-time
           description: When the detection event was created
-          example: "2024-01-15T10:30:00Z"
+          example: '2024-01-15T10:30:00Z'
         updatedAt:
           type: string
           format: date-time
           description: When the detection event was last updated
-          example: "2024-01-15T10:35:00Z"
+          example: '2024-01-15T10:35:00Z'
         feedEvent:
           $ref: '#/components/schemas/FeedEvent'
 
@@ -885,7 +904,7 @@ components:
           type: string
           format: uuid
           description: Unique identifier for the feed event
-          example: "123e4567-e89b-12d3-a456-426614174000"
+          example: '123e4567-e89b-12d3-a456-426614174000'
         confidence:
           type: number
           format: float
@@ -897,12 +916,12 @@ components:
           type: string
           format: uri
           description: URL of the feed event image
-          example: "https://example.com/images/feed.jpg"
+          example: 'https://example.com/images/feed.jpg'
         croppedImageUrl:
           type: string
           format: uri
           description: URL of the cropped feed image (stored in processed/ directory)
-          example: "https://example.com/images/processed/feed-cropped.jpg"
+          example: 'https://example.com/images/processed/feed-cropped.jpg'
         isAppropriate:
           type: boolean
           description: Whether the feed image is appropriate
@@ -915,11 +934,11 @@ components:
           type: string
           enum: [PENDING, PROCESSING, COMPLETED, FAILED]
           description: Current processing status of the image
-          example: "COMPLETED"
+          example: 'COMPLETED'
         processingError:
           type: string
           description: Error message if processing failed
-          example: "Image processing timeout"
+          example: 'Image processing timeout'
         moderationLabels:
           type: string
           description: JSON string of content moderation labels
@@ -948,12 +967,12 @@ components:
           type: string
           format: date-time
           description: When the feed event was created
-          example: "2024-01-15T10:30:00Z"
+          example: '2024-01-15T10:30:00Z'
         updatedAt:
           type: string
           format: date-time
           description: When the feed event was last updated
-          example: "2024-01-15T10:35:00Z"
+          example: '2024-01-15T10:35:00Z'
         detectionEvents:
           type: array
           items:
@@ -963,27 +982,27 @@ components:
           type: string
           enum: [PENDING, FEEDING, FEEDING_COMPLETE, PHOTO_TAKEN, COMPLETE]
           description: Current feeder status for the feed event
-          example: "PENDING"
+          example: 'PENDING'
         feederTriggeredAt:
           type: string
           format: date-time
           description: When the feeder was triggered
-          example: "2024-01-15T10:32:00Z"
+          example: '2024-01-15T10:32:00Z'
         feedingCompletedAt:
           type: string
           format: date-time
           description: When the feeding was completed
-          example: "2024-01-15T10:33:00Z"
+          example: '2024-01-15T10:33:00Z'
         photoTakenAt:
           type: string
           format: date-time
           description: When the verification photo was taken
-          example: "2024-01-15T10:34:00Z"
+          example: '2024-01-15T10:34:00Z'
         photoUrl:
           type: string
           format: uri
           description: URL of the verification photo
-          example: "https://example.com/images/verification.jpg"
+          example: 'https://example.com/images/verification.jpg'
 
     DetectedAnimal:
       type: object
@@ -991,7 +1010,7 @@ components:
         name:
           type: string
           description: Name of the detected animal species
-          example: "Crow"
+          example: 'Crow'
         confidence:
           type: number
           format: float
@@ -1022,7 +1041,7 @@ components:
         message:
           type: string
           description: Response message
-          example: "Detection event created successfully!"
+          example: 'Detection event created successfully!'
 
     FeedResponse:
       type: object
@@ -1036,7 +1055,7 @@ components:
         message:
           type: string
           description: Response message
-          example: "Feeder event created successfully!"
+          example: 'Feeder event created successfully!'
 
     Source:
       type: string
@@ -1046,7 +1065,7 @@ components:
         - SCRIPT
         - TEST
       description: Source of the feed event
-      example: "BUTTON"
+      example: 'BUTTON'
 
     Status:
       type: string
@@ -1054,7 +1073,7 @@ components:
         - ACCEPTED
         - REJECTED
       description: Status of the feed event
-      example: "ACCEPTED"
+      example: 'ACCEPTED'
 
     ImageFormat:
       type: string
@@ -1062,8 +1081,11 @@ components:
         - jpg
         - jpeg
         - png
+        - gif
+        - bmp
+        - webp
       description: Supported image formats
-      example: "jpg"
+      example: 'jpg'
 
 tags:
   - name: Health

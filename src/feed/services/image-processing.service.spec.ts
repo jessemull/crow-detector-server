@@ -74,12 +74,12 @@ describe('ImageProcessingService', () => {
 
   describe('constructor', () => {
     it('should initialize AWS services with correct configuration', () => {
-      expect(RekognitionClient).toHaveBeenCalledWith({
-        region: 'us-west-2',
-      });
-      expect(S3Client).toHaveBeenCalledWith({
-        region: 'us-west-2',
-      });
+      expect(RekognitionClient).toHaveBeenCalledWith(
+        expect.objectContaining({ region: 'us-west-2' }),
+      );
+      expect(S3Client).toHaveBeenCalledWith(
+        expect.objectContaining({ region: 'us-west-2' }),
+      );
       expect(configService.get).toHaveBeenCalledWith('awsRegion');
     });
   });
@@ -437,7 +437,9 @@ describe('ImageProcessingService', () => {
 
       expect(result).toEqual(Buffer.from('cropped-image'));
       expect(mockS3Send).toHaveBeenCalledWith(expect.any(GetObjectCommand));
-      expect(sharp).toHaveBeenCalledWith(Buffer.from('mock-image-data'));
+      expect(sharp).toHaveBeenCalledWith(Buffer.from('mock-image-data'), {
+        limitInputPixels: 20_000_000,
+      });
       expect(mockSharpInstance.metadata).toHaveBeenCalled();
       expect(mockSharpInstance.extract).toHaveBeenCalledWith({
         left: 140,
@@ -543,9 +545,7 @@ describe('ImageProcessingService', () => {
         imageBuffer,
       );
 
-      expect(result).toBe(
-        'https://test-bucket.s3.us-west-2.amazonaws.com/processed/test-key_cropped.jpg',
-      );
+      expect(result).toBe('processed/test-key_cropped.jpg');
       expect(mockS3Send).toHaveBeenCalledWith(expect.any(PutObjectCommand));
     });
 

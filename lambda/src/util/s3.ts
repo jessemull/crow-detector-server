@@ -1,5 +1,6 @@
 import { S3ObjectInfo, S3EventFromSQS } from '../types';
 import { SQSRecord } from 'aws-lambda';
+import { lambdaLogger } from './logger';
 
 export function extractS3Info(record: SQSRecord): S3ObjectInfo {
   try {
@@ -26,7 +27,9 @@ export function extractS3Info(record: SQSRecord): S3ObjectInfo {
 
     return result;
   } catch (error) {
-    console.error('Error in extractS3Info:', error);
+    lambdaLogger.error('Error in extractS3Info', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     throw error;
   }
 }

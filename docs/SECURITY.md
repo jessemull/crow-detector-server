@@ -45,7 +45,7 @@ When **both** are true:
 
 …the ECDSA guard skips signature verification for local development.
 
-**MUST NOT** activate in production. ECS prod tasks set `NODE_ENV=production`. Do not set `x-dev-mode` equivalents in prod clients.
+**MUST NOT** activate unless `NODE_ENV` is exactly `development`. An unset value does not count. ECS tasks set `NODE_ENV` to `dev` or `prod`, never `development`, so the bypass stays off in both deployed environments. Do not set `x-dev-mode` on deployed clients.
 
 ---
 
@@ -68,7 +68,7 @@ In `production` / `prod`, CA verification is always on. Outside those environmen
 
 ### SHOULD (follow-up)
 
-- Prefer **OIDC** for GitHub Actions → AWS authentication instead of long-lived access keys when ready (non-blocking for governance modernization).
+- GitHub Actions assumes `AWS_ROLE_ARN` via OIDC. The role and provider are `cloudformation/github-actions-oidc.yaml`. Deploy that stack and set the secret before the next deploy. Workflows do not fall back to long-lived access keys.
 
 ---
 

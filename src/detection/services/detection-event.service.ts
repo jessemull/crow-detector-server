@@ -5,6 +5,7 @@ import { DetectionImageProcessingService } from './detection-image-processing.se
 import { FeedEvent } from 'src/feed/entity/feed-event.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { ListEventsQueryDto } from 'src/common/dto/list-events-query.dto';
 import { PatchDetectionDTO } from '../dto/patch-detection.dto';
 import { S3MetadataService } from 'src/feed/services/s3-metadata.service';
 import { createLogger } from 'src/common/logger/logger.config';
@@ -28,41 +29,53 @@ export class DetectionEventService {
   ): Promise<DetectionEvent> {
     const { imageUrl } = createDetectionDTO;
 
+    const existing = await this.detectionEventRepository.findOne({
+      where: { imageUrl },
+      relations: ['feedEvent'],
+    });
+    if (existing) {
+      return existing;
+    }
+
+    const metadata =
+      await this.s3MetadataService.extractMetadataFromUrl(imageUrl);
+    const feedEvent = metadata.feedEventId
+      ? await this.feedEventRepository.findOne({
+          where: { id: metadata.feedEventId },
+        })
+      : null;
+
     const event = this.detectionEventRepository.create({
       imageUrl,
       processingStatus: ProcessingStatus.PENDING,
+      ...(feedEvent ? { feedEvent } : {}),
     });
 
     const savedEvent = await this.detectionEventRepository.save(event);
 
-    // Start async image processing...
-
-    this.processImageAsync(savedEvent.id, imageUrl).catch((error) => {
-      this.logger.error(
-        `Image processing failed for detection event ${savedEvent.id}:`,
-        error,
-      );
-    });
+    this.processImageAsync(savedEvent.id, metadata.bucket, metadata.key).catch(
+      (error: unknown) => {
+        this.logger.error(
+          `Image processing failed for detection event ${savedEvent.id}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      },
+    );
 
     return savedEvent;
   }
 
-  async find(
-    limit?: number,
-    from?: string,
-    to?: string,
-  ): Promise<DetectionEvent[]> {
+  async find(query: ListEventsQueryDto): Promise<DetectionEvent[]> {
     const where: FindOptionsWhere<DetectionEvent> = {};
 
-    if (from && to) {
-      where.createdAt = Between(new Date(from), new Date(to));
-    } else if (from) {
-      where.createdAt = Between(new Date(from), new Date());
+    if (query.from && query.to) {
+      where.createdAt = Between(new Date(query.from), new Date(query.to));
+    } else if (query.from) {
+      where.createdAt = Between(new Date(query.from), new Date());
     }
 
     return this.detectionEventRepository.find({
       order: { createdAt: 'DESC' },
-      take: limit,
+      take: query.limit,
       where,
       relations: ['feedEvent'],
     });
@@ -93,27 +106,35 @@ export class DetectionEventService {
       throw new NotFoundException(`Detection event with id ${id} not found!`);
     }
 
-    await this.detectionEventRepository.update(id, patchDetectionDTO);
+    const result = await this.detectionEventRepository.update(
+      { id, processingStatus: detectionEvent.processingStatus },
+      patchDetectionDTO,
+    );
+    if (!result.affected) {
+      throw new NotFoundException(
+        `Detection event ${id} changed before the update was applied`,
+      );
+    }
 
     return this.findById(id);
   }
 
   private async processImageAsync(
     eventId: string,
-    imageUrl: string,
+    bucket: string,
+    key: string,
   ): Promise<void> {
     try {
-      // Update status to processing...
-
-      await this.detectionEventRepository.update(eventId, {
-        processingStatus: ProcessingStatus.PROCESSING,
-      });
-
-      // Extract S3 bucket and key from URL...
-
-      const metadata =
-        await this.s3MetadataService.extractMetadataFromUrl(imageUrl);
-      const { bucket, key } = metadata;
+      const claimed = await this.detectionEventRepository.update(
+        { id: eventId, processingStatus: ProcessingStatus.PENDING },
+        { processingStatus: ProcessingStatus.PROCESSING },
+      );
+      if (!claimed.affected) {
+        this.logger.info(
+          `Detection event ${eventId} is no longer pending; skipping`,
+        );
+        return;
+      }
 
       // Process the image for animal detection...
 
@@ -146,7 +167,10 @@ export class DetectionEventService {
       } else {
         // If no animals detected, delete the detection event...
 
-        await this.detectionEventRepository.delete(eventId);
+        await this.detectionEventRepository.delete({
+          id: eventId,
+          processingStatus: ProcessingStatus.PROCESSING,
+        });
         this.logger.info(
           `No animals detected, deleted detection event ${eventId}`,
         );
@@ -155,13 +179,20 @@ export class DetectionEventService {
 
       // Update the detection event...
 
-      await this.detectionEventRepository.update(eventId, updateData);
+      await this.detectionEventRepository.update(
+        { id: eventId, processingStatus: ProcessingStatus.PROCESSING },
+        updateData,
+      );
       this.logger.info(`Animal detection completed for event ${eventId}`);
     } catch (error: unknown) {
-      await this.detectionEventRepository.update(eventId, {
-        processingStatus: ProcessingStatus.FAILED,
-        processingError: error instanceof Error ? error.message : String(error),
-      });
+      await this.detectionEventRepository.update(
+        { id: eventId, processingStatus: ProcessingStatus.PROCESSING },
+        {
+          processingStatus: ProcessingStatus.FAILED,
+          processingError:
+            error instanceof Error ? error.message : String(error),
+        },
+      );
       throw error;
     }
   }

@@ -55,7 +55,7 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     claudeModel: env.CLAUDE_MODEL || 'claude-haiku-5-5',
     feedCooldownHours: parseInt(env.FEED_COOLDOWN_HOURS || '4', 10),
     logLevel: env.LOG_LEVEL || 'info',
-    nodeEnv: env.NODE_ENV || 'development',
+    nodeEnv: env.NODE_ENV || '',
     port: parseInt(env.PORT || '3000', 10) || 3000,
     rds: {
       database: env.RDS_DATABASE,
@@ -105,13 +105,16 @@ function parseCorsOrigins(env: NodeJS.ProcessEnv): string[] {
 }
 
 /**
- * Fail fast on missing required secrets outside development/test.
+ * Fail fast on missing required secrets unless the process is an explicit
+ * local or ECS-dev environment. An unset NODE_ENV must not look like development.
  */
 export function validateAppConfig(config: AppConfig): void {
-  const isProdLike =
-    config.nodeEnv === 'production' || config.nodeEnv === 'prod';
+  const skipFailFast =
+    config.nodeEnv === 'development' ||
+    config.nodeEnv === 'test' ||
+    config.nodeEnv === 'dev';
 
-  if (!isProdLike) {
+  if (skipFailFast) {
     return;
   }
 
@@ -132,7 +135,7 @@ export function validateAppConfig(config: AppConfig): void {
   const missing = required.filter(([, value]) => !value).map(([name]) => name);
 
   if (missing.length > 0) {
-    const message = `Missing required environment variables for production: ${missing.join(', ')}`;
+    const message = `Missing required environment variables for ${config.nodeEnv || 'unset NODE_ENV'}: ${missing.join(', ')}`;
     logger.error(message);
     throw new Error(message);
   }

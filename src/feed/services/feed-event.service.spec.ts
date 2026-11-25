@@ -39,7 +39,16 @@ describe('FeedEventService', () => {
     find: jest.fn(),
     findOne: jest.fn(),
     save: jest.fn(),
-    update: jest.fn(),
+    update: jest.fn().mockResolvedValue({ affected: 1 }),
+    manager: {
+      transaction: jest.fn(
+        async (
+          work: (manager: {
+            getRepository: () => typeof mockRepository;
+          }) => Promise<unknown>,
+        ) => work({ getRepository: () => mockRepository }),
+      ),
+    },
   };
 
   beforeEach(async () => {
@@ -82,6 +91,9 @@ describe('FeedEventService', () => {
       ],
     }).compile();
 
+    mockRepository.find.mockResolvedValue([]);
+    mockRepository.findOne.mockResolvedValue(null);
+    mockRepository.update.mockResolvedValue({ affected: 1 });
     service = module.get<FeedEventService>(FeedEventService);
     repository = module.get<Repository<FeedEvent>>(
       getRepositoryToken(FeedEvent),
@@ -217,7 +229,7 @@ describe('FeedEventService', () => {
       const mockEvents = [mockFeedEvent];
       mockRepository.find.mockResolvedValue(mockEvents);
 
-      const result = await service.find();
+      const result = await service.find({ limit: undefined } as never);
 
       expect(repository.find).toHaveBeenCalledWith({
         order: { createdAt: 'DESC' },
@@ -232,7 +244,7 @@ describe('FeedEventService', () => {
       const limit = 10;
       mockRepository.find.mockResolvedValue(mockEvents);
 
-      const result = await service.find(limit);
+      const result = await service.find({ limit });
 
       expect(repository.find).toHaveBeenCalledWith({
         order: { createdAt: 'DESC' },
@@ -249,7 +261,7 @@ describe('FeedEventService', () => {
       const now = new Date();
       mockRepository.find.mockResolvedValue(mockEvents);
 
-      const result = await service.find(undefined, from);
+      const result = await service.find({ limit: undefined, from } as never);
 
       expect(repository.find).toHaveBeenCalledWith({
         order: { createdAt: 'DESC' },
@@ -267,7 +279,11 @@ describe('FeedEventService', () => {
       const toDate = new Date(to);
       mockRepository.find.mockResolvedValue(mockEvents);
 
-      const result = await service.find(undefined, from, to);
+      const result = await service.find({
+        limit: undefined,
+        from,
+        to,
+      } as never);
 
       expect(repository.find).toHaveBeenCalledWith({
         order: { createdAt: 'DESC' },
@@ -282,7 +298,11 @@ describe('FeedEventService', () => {
       mockRepository.find.mockRejectedValue(error);
 
       await expect(
-        service.find(10, '2024-01-01', '2024-12-31'),
+        service.find({
+          limit: 10,
+          from: '2024-01-01',
+          to: '2024-12-31',
+        }),
       ).rejects.toThrow('Repository error');
     });
   });
@@ -423,9 +443,10 @@ describe('FeedEventService', () => {
 
       await (service as any).processImageAsync(eventId, bucket, key);
 
-      expect(repository.update).toHaveBeenCalledWith(eventId, {
-        processingStatus: ProcessingStatus.PROCESSING,
-      });
+      expect(repository.update).toHaveBeenCalledWith(
+        { id: eventId, processingStatus: ProcessingStatus.PENDING },
+        { processingStatus: ProcessingStatus.PROCESSING },
+      );
 
       expect(imageProcessingService.processImage).toHaveBeenCalledWith(
         bucket,
@@ -444,7 +465,7 @@ describe('FeedEventService', () => {
       );
 
       expect(repository.update).toHaveBeenCalledWith(
-        eventId,
+        { id: eventId, processingStatus: ProcessingStatus.PROCESSING },
         expect.objectContaining({
           processingStatus: ProcessingStatus.COMPLETED,
           isAppropriate: true,
@@ -481,7 +502,7 @@ describe('FeedEventService', () => {
       ).not.toHaveBeenCalled();
 
       expect(repository.update).toHaveBeenCalledWith(
-        eventId,
+        { id: eventId, processingStatus: ProcessingStatus.PROCESSING },
         expect.objectContaining({
           processingStatus: ProcessingStatus.COMPLETED,
           isAppropriate: true,
@@ -516,7 +537,7 @@ describe('FeedEventService', () => {
       ).not.toHaveBeenCalled();
 
       expect(repository.update).toHaveBeenCalledWith(
-        eventId,
+        { id: eventId, processingStatus: ProcessingStatus.PROCESSING },
         expect.objectContaining({
           processingStatus: ProcessingStatus.COMPLETED,
           isAppropriate: false,
@@ -537,14 +558,18 @@ describe('FeedEventService', () => {
 
       await (service as any).processImageAsync(eventId, bucket, key);
 
-      expect(repository.update).toHaveBeenCalledWith(eventId, {
-        processingStatus: ProcessingStatus.PROCESSING,
-      });
+      expect(repository.update).toHaveBeenCalledWith(
+        { id: eventId, processingStatus: ProcessingStatus.PENDING },
+        { processingStatus: ProcessingStatus.PROCESSING },
+      );
 
-      expect(repository.update).toHaveBeenCalledWith(eventId, {
-        processingStatus: ProcessingStatus.FAILED,
-        processingError: 'Image processing failed',
-      });
+      expect(repository.update).toHaveBeenCalledWith(
+        { id: eventId, processingStatus: ProcessingStatus.PROCESSING },
+        {
+          processingStatus: ProcessingStatus.FAILED,
+          processingError: 'Image processing failed',
+        },
+      );
     });
 
     it('should handle image processing string errors and mark as failed', async () => {
@@ -557,14 +582,18 @@ describe('FeedEventService', () => {
 
       await (service as any).processImageAsync(eventId, bucket, key);
 
-      expect(repository.update).toHaveBeenCalledWith(eventId, {
-        processingStatus: ProcessingStatus.PROCESSING,
-      });
+      expect(repository.update).toHaveBeenCalledWith(
+        { id: eventId, processingStatus: ProcessingStatus.PENDING },
+        { processingStatus: ProcessingStatus.PROCESSING },
+      );
 
-      expect(repository.update).toHaveBeenCalledWith(eventId, {
-        processingStatus: ProcessingStatus.FAILED,
-        processingError: 'String image processing failed',
-      });
+      expect(repository.update).toHaveBeenCalledWith(
+        { id: eventId, processingStatus: ProcessingStatus.PROCESSING },
+        {
+          processingStatus: ProcessingStatus.FAILED,
+          processingError: 'String image processing failed',
+        },
+      );
     });
   });
 
@@ -599,10 +628,13 @@ describe('FeedEventService', () => {
         mockFeedEvent.imageUrl,
       );
 
-      expect(repository.update).toHaveBeenCalledWith(eventId, {
-        processingStatus: ProcessingStatus.PENDING,
-        processingError: undefined,
-      });
+      expect(repository.update).toHaveBeenCalledWith(
+        { id: eventId, processingStatus: ProcessingStatus.FAILED },
+        {
+          processingStatus: ProcessingStatus.PENDING,
+          processingError: undefined,
+        },
+      );
     });
 
     it('should handle errors when event not found', async () => {

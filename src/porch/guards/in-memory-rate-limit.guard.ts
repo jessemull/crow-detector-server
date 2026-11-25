@@ -11,6 +11,7 @@ import { FastifyRequest } from 'fastify';
 @Injectable()
 export class InMemoryRateLimitGuard implements CanActivate {
   private readonly hitsByClient = new Map<string, number[]>();
+  private readonly maxTrackedClients = 1_000;
   private maxRequests = 30;
   private windowMs = 60_000;
 
@@ -32,6 +33,16 @@ export class InMemoryRateLimitGuard implements CanActivate {
     const windowStart = now - this.windowMs;
 
     this.prune(windowStart);
+
+    if (
+      !this.hitsByClient.has(clientKey) &&
+      this.hitsByClient.size >= this.maxTrackedClients
+    ) {
+      throw new HttpException(
+        'Too many clip list requests. Try again in a minute.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
 
     const recent = this.hitsByClient.get(clientKey) || [];
 

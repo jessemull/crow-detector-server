@@ -4,14 +4,22 @@ import { FeedEvent } from '../entity/feed-event.entity';
 import { ImageProcessingService } from './image-processing.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
+  ConflictException,
   Injectable,
   NotFoundException,
-  BadRequestException,
 } from '@nestjs/common';
+import { ListEventsQueryDto } from 'src/common/dto/list-events-query.dto';
 import { ProcessingStatus, FeedEventStatus } from 'src/common/types';
 import { S3MetadataService } from './s3-metadata.service';
 import { createLogger } from 'src/common/logger/logger.config';
 import { ConfigService } from '@nestjs/config';
+
+const FEED_STATUS_FROM: Partial<Record<FeedEventStatus, FeedEventStatus>> = {
+  [FeedEventStatus.FEEDING]: FeedEventStatus.PENDING,
+  [FeedEventStatus.FEEDING_COMPLETE]: FeedEventStatus.FEEDING,
+  [FeedEventStatus.PHOTO_TAKEN]: FeedEventStatus.FEEDING_COMPLETE,
+  [FeedEventStatus.COMPLETE]: FeedEventStatus.PHOTO_TAKEN,
+};
 
 @Injectable()
 export class FeedEventService {
@@ -32,44 +40,50 @@ export class FeedEventService {
     const { imageUrl } = createFeedDTO;
 
     try {
-      // Check cooldown period if not skipped...
-
-      if (!skipCooldown) {
-        await this.checkCooldownPeriod();
-      }
-
-      // Extract metadata from S3 URL...
-
       const s3Metadata =
         await this.s3MetadataService.extractMetadataFromUrl(imageUrl);
-
-      // Get object size...
-
       const originalImageSize = await this.s3MetadataService.getObjectSize(
         s3Metadata.bucket,
         s3Metadata.key,
       );
 
-      // Create feed event with extracted metadata...
+      let created = false;
+      const savedEvent = await this.feedEventRepository.manager.transaction(
+        async (manager) => {
+          const repo = manager.getRepository(FeedEvent);
+          const existing = await repo.findOne({ where: { imageUrl } });
+          if (existing) {
+            return existing;
+          }
 
-      const event = this.feedEventRepository.create({
-        imageUrl,
-        source: s3Metadata.source, // Use extracted source from S3
-        processingStatus: ProcessingStatus.PENDING,
-        feedEventStatus: FeedEventStatus.PENDING, // Initial feeder status
-        originalImageSize,
-        createdAt: new Date(s3Metadata.timestamp), // Use S3 timestamp
-      });
+          if (!skipCooldown) {
+            await this.checkCooldownPeriod(repo);
+          }
 
-      const savedEvent = await this.feedEventRepository.save(event);
-
-      // Start async image processing...
-
-      void this.processImageAsync(
-        savedEvent.id,
-        s3Metadata.bucket,
-        s3Metadata.key,
+          created = true;
+          const event = repo.create({
+            imageUrl,
+            source: s3Metadata.source,
+            processingStatus: ProcessingStatus.PENDING,
+            feedEventStatus: FeedEventStatus.PENDING,
+            originalImageSize,
+            createdAt: new Date(s3Metadata.timestamp),
+          });
+          return repo.save(event);
+        },
       );
+
+      if (created) {
+        void this.processImageAsync(
+          savedEvent.id,
+          s3Metadata.bucket,
+          s3Metadata.key,
+        ).catch((error: unknown) => {
+          this.logger.error(
+            `Async image processing rejected for ${savedEvent.id}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        });
+      }
 
       return savedEvent;
     } catch (error) {
@@ -81,53 +95,31 @@ export class FeedEventService {
     }
   }
 
-  private async checkCooldownPeriod(): Promise<void> {
-    try {
-      // Get the most recent feed event...
+  private async checkCooldownPeriod(
+    repo: Repository<FeedEvent>,
+  ): Promise<void> {
+    const lastFeedEvents = await repo.find({
+      order: { createdAt: 'DESC' },
+      take: 1,
+      lock: { mode: 'pessimistic_write' },
+    });
+    const lastFeedEvent = lastFeedEvents[0];
+    if (!lastFeedEvent) {
+      return;
+    }
 
-      const lastFeedEvents = await this.feedEventRepository.find({
-        order: { createdAt: 'DESC' },
-        take: 1,
-      });
+    const cooldownHours =
+      this.configService.get<number>('feedCooldownHours') || 4;
+    const cooldownMs = cooldownHours * 60 * 60 * 1000;
+    const timeSinceLastFeed = Date.now() - lastFeedEvent.createdAt.getTime();
 
-      const lastFeedEvent = lastFeedEvents[0];
-
-      if (!lastFeedEvent) {
-        // No previous feed events, cooldown not applicable...
-
-        return;
-      }
-
-      // Get cooldown period from configuration (default 4 hours)...
-
-      const cooldownHours =
-        this.configService.get<number>('feedCooldownHours') || 4;
-      const cooldownMs = cooldownHours * 60 * 60 * 1000;
-
-      // Calculate time since last feed...
-
-      const timeSinceLastFeed = Date.now() - lastFeedEvent.createdAt.getTime();
-
-      if (timeSinceLastFeed < cooldownMs) {
-        const remainingHours = Math.ceil(
-          (cooldownMs - timeSinceLastFeed) / (60 * 60 * 1000),
-        );
-        throw new BadRequestException(
-          `Feed cooldown active. Please wait ${remainingHours} hour(s) before feeding again.`,
-        );
-      }
-    } catch (error) {
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
-      this.logger.error(
-        `Error checking cooldown period: ${error instanceof Error ? error.message : String(error)}`,
-        error instanceof Error ? error.stack : undefined,
+    if (timeSinceLastFeed < cooldownMs) {
+      const remainingHours = Math.ceil(
+        (cooldownMs - timeSinceLastFeed) / (60 * 60 * 1000),
       );
-
-      // If there's an error checking cooldown, allow the feed to proceed...
-
-      this.logger.warn('Cooldown check failed, allowing feed to proceed');
+      throw new ConflictException(
+        `Feed cooldown active. Please wait ${remainingHours} hour(s) before feeding again.`,
+      );
     }
   }
 
@@ -141,9 +133,16 @@ export class FeedEventService {
 
       // Update status to processing...
 
-      await this.feedEventRepository.update(eventId, {
-        processingStatus: ProcessingStatus.PROCESSING,
-      });
+      const claimed = await this.feedEventRepository.update(
+        { id: eventId, processingStatus: ProcessingStatus.PENDING },
+        { processingStatus: ProcessingStatus.PROCESSING },
+      );
+      if (!claimed.affected) {
+        this.logger.info(
+          `Feed event ${eventId} is no longer pending; skipping image processing`,
+        );
+        return;
+      }
 
       // Process image...
 
@@ -194,7 +193,10 @@ export class FeedEventService {
 
       // Update the feed event...
 
-      await this.feedEventRepository.update(eventId, updateData);
+      await this.feedEventRepository.update(
+        { id: eventId, processingStatus: ProcessingStatus.PROCESSING },
+        updateData,
+      );
 
       this.logger.info(`Image processing completed for event ${eventId}`);
     } catch (error) {
@@ -205,27 +207,32 @@ export class FeedEventService {
 
       // Update status to failed...
 
-      await this.feedEventRepository.update(eventId, {
-        processingStatus: ProcessingStatus.FAILED,
-        processingError: error instanceof Error ? error.message : String(error),
-      });
+      await this.feedEventRepository.update(
+        { id: eventId, processingStatus: ProcessingStatus.PROCESSING },
+        {
+          processingStatus: ProcessingStatus.FAILED,
+          processingError:
+            error instanceof Error ? error.message : String(error),
+        },
+      );
     }
   }
 
-  async find(limit?: number, from?: string, to?: string): Promise<FeedEvent[]> {
+  async find(query: ListEventsQueryDto): Promise<FeedEvent[]> {
     const where: FindOptionsWhere<FeedEvent> = {};
 
-    if (from && to) {
-      where.createdAt = Between(new Date(from), new Date(to));
-    } else if (from) {
-      where.createdAt = Between(new Date(from), new Date());
+    if (query.from && query.to) {
+      where.createdAt = Between(new Date(query.from), new Date(query.to));
+    } else if (query.from) {
+      where.createdAt = Between(new Date(query.from), new Date());
     }
 
-    return this.feedEventRepository.find({
+    const events = await this.feedEventRepository.find({
       order: { createdAt: 'DESC' },
-      take: limit,
+      take: query.limit,
       where,
     });
+    return Promise.all(events.map((event) => this.withReadableCrop(event)));
   }
 
   async findById(id: string): Promise<FeedEvent> {
@@ -238,7 +245,17 @@ export class FeedEventService {
       throw new NotFoundException(`Feed event with id ${id} not found!`);
     }
 
-    return feedEvent;
+    return this.withReadableCrop(feedEvent);
+  }
+
+  private async withReadableCrop(event: FeedEvent): Promise<FeedEvent> {
+    if (!event.croppedImageUrl || event.croppedImageUrl.includes('://')) {
+      return event;
+    }
+    event.croppedImageUrl = await this.s3MetadataService.presignGet(
+      event.croppedImageUrl,
+    );
+    return event;
   }
 
   async update(
@@ -271,14 +288,28 @@ export class FeedEventService {
 
     // Reset processing status and start over...
 
-    await this.feedEventRepository.update(eventId, {
-      processingStatus: ProcessingStatus.PENDING,
-      processingError: undefined,
+    const reset = await this.feedEventRepository.update(
+      { id: eventId, processingStatus: ProcessingStatus.FAILED },
+      {
+        processingStatus: ProcessingStatus.PENDING,
+        processingError: undefined,
+      },
+    );
+    if (!reset.affected) {
+      throw new ConflictException(
+        `Feed event ${eventId} is not failed, so it cannot be reprocessed`,
+      );
+    }
+
+    void this.processImageAsync(
+      eventId,
+      s3Metadata.bucket,
+      s3Metadata.key,
+    ).catch((error: unknown) => {
+      this.logger.error(
+        `Async reprocess rejected for ${eventId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
     });
-
-    // Start async processing again...
-
-    void this.processImageAsync(eventId, s3Metadata.bucket, s3Metadata.key);
   }
 
   async getLatestFeedEventStatus(): Promise<{
@@ -336,7 +367,20 @@ export class FeedEventService {
         break;
     }
 
-    await this.feedEventRepository.update(id, updateData);
+    const nextStatus = status as FeedEventStatus;
+    const fromStatus = FEED_STATUS_FROM[nextStatus];
+    const result = await this.feedEventRepository.update(
+      {
+        id,
+        ...(fromStatus ? { feedEventStatus: fromStatus } : {}),
+      },
+      updateData,
+    );
+    if (!result.affected) {
+      throw new ConflictException(
+        `Feed event ${id} cannot move to ${status} from its current status`,
+      );
+    }
 
     return this.findById(id);
   }

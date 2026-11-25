@@ -8,7 +8,7 @@ Parameters:
     AllowedValues:
       - dev
       - prod
-  
+
   ContainerImage:
     Type: String
     Description: The URI of the container image to deploy
@@ -17,20 +17,20 @@ Mappings:
   EnvConfig:
     dev:
       Subnets:
-        - !ImportValue 'aws-infra-private-subnet-1-id'  # us-west-2a
-        - !ImportValue 'aws-infra-private-subnet-2-id'  # us-west-2b
-        - !ImportValue 'aws-infra-private-subnet-3-id'  # us-west-2c
-        - !ImportValue 'aws-infra-private-subnet-4-id'  # us-west-2d
+        - !ImportValue 'aws-infra-private-subnet-1-id' # us-west-2a
+        - !ImportValue 'aws-infra-private-subnet-2-id' # us-west-2b
+        - !ImportValue 'aws-infra-private-subnet-3-id' # us-west-2c
+        - !ImportValue 'aws-infra-private-subnet-4-id' # us-west-2d
       SecurityGroupExport: aws-infra-ecs-sg-id
       LogLevel: 'info'
       Cpu: 256
       Memory: 512
     prod:
       Subnets:
-        - !ImportValue 'aws-infra-private-subnet-1-id'  # us-west-2a
-        - !ImportValue 'aws-infra-private-subnet-2-id'  # us-west-2b
-        - !ImportValue 'aws-infra-private-subnet-3-id'  # us-west-2c
-        - !ImportValue 'aws-infra-private-subnet-4-id'  # us-west-2d
+        - !ImportValue 'aws-infra-private-subnet-1-id' # us-west-2a
+        - !ImportValue 'aws-infra-private-subnet-2-id' # us-west-2b
+        - !ImportValue 'aws-infra-private-subnet-3-id' # us-west-2c
+        - !ImportValue 'aws-infra-private-subnet-4-id' # us-west-2d
       SecurityGroupExport: aws-infra-ecs-sg-id
       LogLevel: 'warn'
       Cpu: 512
@@ -49,11 +49,11 @@ Resources:
         - FARGATE
       Cpu: !FindInMap [EnvConfig, !Ref Environment, Cpu]
       Memory: !FindInMap [EnvConfig, !Ref Environment, Memory]
-      ExecutionRoleArn: !If 
+      ExecutionRoleArn: !If
         - IsDev
         - !ImportValue crow-detector-iam-roles-dev-TaskExecutionRoleArn
         - !ImportValue crow-detector-iam-roles-prod-TaskExecutionRoleArn
-      TaskRoleArn: !If 
+      TaskRoleArn: !If
         - IsDev
         - !ImportValue crow-detector-iam-roles-dev-TaskRoleArn
         - !ImportValue crow-detector-iam-roles-prod-TaskRoleArn
@@ -121,9 +121,14 @@ Resources:
       Cluster: !Sub 'crow-detector-${Environment}'
       TaskDefinition: !Ref TaskDefinition
       DesiredCount: 1
+      HealthCheckGracePeriodSeconds: 120
+      DeploymentConfiguration:
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
       LaunchType: FARGATE
       LoadBalancers:
-        - TargetGroupArn: !If 
+        - TargetGroupArn: !If
             - IsDev
             - !ImportValue crow-detector-tg-dev-Arn
             - !ImportValue crow-detector-tg-prod-Arn
@@ -135,10 +140,10 @@ Resources:
           SecurityGroups:
             - !ImportValue 'aws-infra-ecs-sg-id'
           Subnets:
-            - !ImportValue 'aws-infra-private-subnet-1-id'  # us-west-2a
-            - !ImportValue 'aws-infra-private-subnet-2-id'  # us-west-2b
-            - !ImportValue 'aws-infra-private-subnet-3-id'  # us-west-2c
-            - !ImportValue 'aws-infra-private-subnet-4-id'  # us-west-2d
+            - !ImportValue 'aws-infra-private-subnet-1-id' # us-west-2a
+            - !ImportValue 'aws-infra-private-subnet-2-id' # us-west-2b
+            - !ImportValue 'aws-infra-private-subnet-3-id' # us-west-2c
+            - !ImportValue 'aws-infra-private-subnet-4-id' # us-west-2d
 
 Outputs:
   TaskDefinitionArn:
@@ -151,4 +156,4 @@ Outputs:
     Description: The name of the ECS service
     Value: !Ref ECSService
     Export:
-      Name: !Sub '${AWS::StackName}-ServiceName' 
+      Name: !Sub '${AWS::StackName}-ServiceName'

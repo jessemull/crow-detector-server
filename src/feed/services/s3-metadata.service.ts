@@ -1,6 +1,12 @@
 import { ConfigService } from '@nestjs/config';
 import { Injectable } from '@nestjs/common';
-import { S3Client, HeadObjectCommand } from '@aws-sdk/client-s3';
+import {
+  GetObjectCommand,
+  HeadObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { awsClientOptions } from 'src/common/aws/client-options';
 import { Source, S3Metadata } from 'src/common/types';
 import { createLogger } from 'src/common/logger/logger.config';
 
@@ -10,9 +16,8 @@ export class S3MetadataService {
   private readonly s3: S3Client;
 
   constructor(private readonly configService: ConfigService) {
-    this.s3 = new S3Client({
-      region: this.configService.get<string>('awsRegion') || 'us-west-2',
-    });
+    const region = this.configService.get<string>('awsRegion') || 'us-west-2';
+    this.s3 = new S3Client(awsClientOptions(region));
   }
 
   async extractMetadataFromUrl(imageUrl: string): Promise<S3Metadata> {
@@ -111,10 +116,12 @@ export class S3MetadataService {
       throw new Error('Could not extract timestamp from filename');
     }
 
-    const timestampSeconds = parseInt(timestampMatch[1], 10);
-    const timestamp = timestampSeconds * 1000; // Convert seconds to milliseconds
+    const rawTimestamp = parseInt(timestampMatch[1], 10);
+    // New keys use Date.now() (13 digits). Older keys used epoch seconds.
+    const timestamp =
+      rawTimestamp >= 1_000_000_000_000 ? rawTimestamp : rawTimestamp * 1000;
     this.logger.info(
-      `Extracted timestamp: ${timestampSeconds} seconds = ${timestamp} milliseconds`,
+      `Extracted timestamp: ${rawTimestamp} (stored as ${timestamp} ms)`,
     );
 
     // Extract source from S3 metadata (uploaded with the image)...
@@ -139,6 +146,7 @@ export class S3MetadataService {
       source,
       timestamp,
       type,
+      ...(feedEventId ? { feedEventId } : {}),
     };
   }
 
@@ -162,14 +170,23 @@ export class S3MetadataService {
   }
 
   async getObjectSize(bucket: string, key: string): Promise<number> {
-    try {
-      const metadata = await this.getObjectMetadata(bucket, key);
-      return metadata.ContentLength || 0;
-    } catch (error) {
-      this.logger.error(
-        `Failed to get object size: ${error instanceof Error ? error.message : String(error)}`,
-      );
-      return 0;
+    const metadata = await this.getObjectMetadata(bucket, key);
+    if (metadata.ContentLength === undefined) {
+      throw new Error(`S3 object ${key} has no content length`);
     }
+    return metadata.ContentLength;
+  }
+
+  /** Short-lived read URL. Callers store the object key, not this URL. */
+  async presignGet(key: string, expiresInSeconds = 900): Promise<string> {
+    const bucket = this.configService.get<string>('s3BucketName');
+    if (!bucket) {
+      throw new Error('s3BucketName (S3_BUCKET_NAME) is required');
+    }
+    return getSignedUrl(
+      this.s3,
+      new GetObjectCommand({ Bucket: bucket, Key: key }),
+      { expiresIn: expiresInSeconds },
+    );
   }
 }

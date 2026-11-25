@@ -1,4 +1,3 @@
-const webpack = require("webpack");
 const path = require("path");
 const dotenv = require("dotenv");
 const TerserPlugin = require("terser-webpack-plugin");
@@ -59,15 +58,5 @@ module.exports = {
       }),
     ],
   },
-  plugins: [
-    new webpack.DefinePlugin({
-      "process.env.API_BASE_URL": JSON.stringify(
-        process.env.API_BASE_URL || "https://api-dev.crittercanteen.com"
-      ),
-      "process.env.API_ENDPOINT": JSON.stringify(
-        process.env.API_ENDPOINT || "/detection/crow-detected-event"
-      ),
-      "process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV || "development"),
-    }),
-  ],
+  plugins: [],
 };

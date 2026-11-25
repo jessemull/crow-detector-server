@@ -1,18 +1,72 @@
-import request from 'supertest';
-import { AppModule } from './../src/app.module';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
-import { Source, Status } from '../src/common/types';
 import { Test, TestingModule } from '@nestjs/testing';
+import {
+  FastifyAdapter,
+  NestFastifyApplication,
+} from '@nestjs/platform-fastify';
+import { HealthCheckService, TypeOrmHealthIndicator } from '@nestjs/terminus';
+import request from 'supertest';
+import { DetectionController } from '../src/detection/detection.controller';
+import { DetectionEventService } from '../src/detection/services/detection-event.service';
+import { FeedController } from '../src/feed/feed.controller';
+import { FeedEventService } from '../src/feed/services/feed-event.service';
+import { HealthController } from '../src/health/health.controller';
+import { ProcessingStatus, Source, Status } from '../src/common/types';
 
-describe('AppController (e2e)', () => {
+describe('HTTP contract (e2e)', () => {
   let app: INestApplication;
 
+  const feedEvent = {
+    id: 'feed-1',
+    imageUrl: 'https://example.com/crow-image.jpg',
+    source: Source.API,
+    status: Status.ACCEPTED,
+    processingStatus: ProcessingStatus.PENDING,
+    createdAt: new Date().toISOString(),
+  };
+
+  const detectionEvent = {
+    id: 'detection-1',
+    imageUrl: 'https://example.com/animal.jpg',
+    processingStatus: ProcessingStatus.PENDING,
+  };
+
   beforeEach(async () => {
+    process.env.NODE_ENV = 'development';
     const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
+      controllers: [HealthController, FeedController, DetectionController],
+      providers: [
+        {
+          provide: FeedEventService,
+          useValue: {
+            create: jest.fn().mockResolvedValue(feedEvent),
+            find: jest.fn().mockResolvedValue([feedEvent]),
+            findById: jest.fn().mockResolvedValue(feedEvent),
+            getLatestFeedEventStatus: jest.fn().mockResolvedValue(null),
+          },
+        },
+        {
+          provide: HealthCheckService,
+          useValue: { check: jest.fn() },
+        },
+        {
+          provide: TypeOrmHealthIndicator,
+          useValue: { pingCheck: jest.fn() },
+        },
+        {
+          provide: DetectionEventService,
+          useValue: {
+            create: jest.fn().mockResolvedValue(detectionEvent),
+            find: jest.fn().mockResolvedValue([detectionEvent]),
+            findById: jest.fn().mockResolvedValue(detectionEvent),
+          },
+        },
+      ],
     }).compile();
 
-    app = moduleFixture.createNestApplication();
+    app = moduleFixture.createNestApplication<NestFastifyApplication>(
+      new FastifyAdapter(),
+    );
     app.useGlobalPipes(
       new ValidationPipe({
         transform: true,
@@ -21,218 +75,82 @@ describe('AppController (e2e)', () => {
       }),
     );
     await app.init();
+    await app.getHttpAdapter().getInstance().ready();
   });
 
   afterEach(async () => {
     await app.close();
   });
 
-  describe('Health Check', () => {
-    it('/health (GET)', () => {
-      return request(app.getHttpServer())
-        .get('/health')
-        .expect(200)
-        .expect((res) => {
-          expect(res.body).toHaveProperty('status');
-          expect(res.body).toHaveProperty('details');
-        });
-    });
+  it('GET /health returns the liveness body', () => {
+    return request(app.getHttpServer())
+      .get('/health')
+      .expect(200)
+      .expect((res) => {
+        expect(res.body.status).toBe('ok');
+        expect(res.body.timestamp).toEqual(expect.any(String));
+        expect(res.body.details).toBeUndefined();
+      });
   });
 
-  describe('Feed Endpoints', () => {
-    let feedEventId: string;
-
-    it('/feed (POST) - should create a feed event', () => {
-      const createFeedDTO = {
-        imageUrl: 'https://example.com/crow-image.jpg',
-        source: Source.API,
-      };
-
-      return request(app.getHttpServer())
-        .post('/feed')
-        .send(createFeedDTO)
-        .expect(201)
-        .expect((res) => {
-          expect(res.body).toHaveProperty('data');
-          expect(res.body).toHaveProperty('message');
-          expect(res.body.data).toHaveProperty('id');
-          expect(res.body.data.imageUrl).toBe(createFeedDTO.imageUrl);
-          expect(res.body.data.source).toBe(createFeedDTO.source);
-          feedEventId = res.body.data.id;
-        });
-    });
-
-    it('/feed/events (GET) - should return feed events', () => {
-      return request(app.getHttpServer())
-        .get('/feed/events')
-        .expect(200)
-        .expect((res) => {
-          expect(Array.isArray(res.body)).toBe(true);
-          if (res.body.length > 0) {
-            expect(res.body[0]).toHaveProperty('id');
-            expect(res.body[0]).toHaveProperty('imageUrl');
-            expect(res.body[0]).toHaveProperty('source');
-          }
-        });
-    });
-
-    it('/feed/events (GET) - should return feed events with limit', () => {
-      return request(app.getHttpServer())
-        .get('/feed/events?limit=5')
-        .expect(200)
-        .expect((res) => {
-          expect(Array.isArray(res.body)).toBe(true);
-          expect(res.body.length).toBeLessThanOrEqual(5);
-        });
-    });
-
-    it('/feed (PATCH) - should update a feed event', () => {
-      if (!feedEventId) {
-        throw new Error('Feed event ID not available from previous test');
-      }
-
-      const patchFeedDTO = {
-        id: feedEventId,
-        confidence: 0.95,
-        croppedImageUrl: 'https://example.com/cropped.jpg',
-        status: Status.ACCEPTED,
-      };
-
-      return request(app.getHttpServer())
-        .patch('/feed')
-        .send(patchFeedDTO)
-        .expect(200)
-        .expect((res) => {
-          expect(res.body).toHaveProperty('data');
-          expect(res.body).toHaveProperty('message');
-          expect(res.body.data.id).toBe(feedEventId);
-          expect(res.body.data.confidence).toBe(patchFeedDTO.confidence);
-          expect(res.body.data.status).toBe(patchFeedDTO.status);
-        });
-    });
+  it('GET /feed/status/latest returns data null when empty', () => {
+    return request(app.getHttpServer())
+      .get('/feed/status/latest')
+      .expect(200)
+      .expect((res) => {
+        expect(res.body.data).toBeNull();
+      });
   });
 
-  describe('Detection Endpoints', () => {
-    let detectionEventId: string;
-    let feedEventId: string;
-
-    beforeEach(async () => {
-      // Create a feed event first for detection tests
-      const createFeedDTO = {
-        imageUrl: 'https://example.com/feed-for-detection.jpg',
-        source: Source.API,
-      };
-
-      const response = await request(app.getHttpServer())
-        .post('/feed')
-        .send(createFeedDTO);
-
-      feedEventId = response.body.data.id;
-    });
-
-    it('/detection (POST) - should create a detection event', async () => {
-      const createDetectionDTO = {
-        feedEvent: feedEventId,
-        imageUrl: 'https://example.com/detection-image.jpg',
-      };
-
-      const response = await request(app.getHttpServer())
-        .post('/detection')
-        .send(createDetectionDTO)
-        .expect(201);
-
-      expect(response.body).toHaveProperty('data');
-      expect(response.body).toHaveProperty('message');
-      expect(response.body.data).toHaveProperty('id');
-      expect(response.body.data.imageUrl).toBe(createDetectionDTO.imageUrl);
-      expect(response.body.data.feedEvent.id).toBe(feedEventId);
-      detectionEventId = response.body.data.id;
-    });
-
-    it('/detection (GET) - should return detection events', () => {
-      return request(app.getHttpServer())
-        .get('/detection')
-        .expect(200)
-        .expect((res) => {
-          expect(Array.isArray(res.body)).toBe(true);
-          if (res.body.length > 0) {
-            expect(res.body[0]).toHaveProperty('id');
-            expect(res.body[0]).toHaveProperty('imageUrl');
-            expect(res.body[0]).toHaveProperty('feedEvent');
-          }
-        });
-    });
-
-    it('/detection (GET) - should return detection events with limit', () => {
-      return request(app.getHttpServer())
-        .get('/detection?limit=3')
-        .expect(200)
-        .expect((res) => {
-          expect(Array.isArray(res.body)).toBe(true);
-          expect(res.body.length).toBeLessThanOrEqual(3);
-        });
-    });
-
-    it('/detection (PATCH) - should update a detection event', () => {
-      if (!detectionEventId) {
-        throw new Error('Detection event ID not available from previous test');
-      }
-
-      const patchDetectionDTO = {
-        id: detectionEventId,
-        confidence: 0.98,
-        crowCount: 8,
-      };
-
-      return request(app.getHttpServer())
-        .patch('/detection')
-        .send(patchDetectionDTO)
-        .expect(200)
-        .expect((res) => {
-          expect(res.body).toHaveProperty('data');
-          expect(res.body).toHaveProperty('message');
-          expect(res.body.data.id).toBe(detectionEventId);
-          expect(res.body.data.confidence).toBe(patchDetectionDTO.confidence);
-          expect(res.body.data.crowCount).toBe(patchDetectionDTO.crowCount);
-        });
-    });
+  it('POST /feed accepts imageUrl only', () => {
+    return request(app.getHttpServer())
+      .post('/feed')
+      .set('x-dev-mode', 'true')
+      .send({ imageUrl: feedEvent.imageUrl })
+      .expect(201)
+      .expect((res) => {
+        expect(res.body.data.imageUrl).toBe(feedEvent.imageUrl);
+      });
   });
 
-  describe('Validation Tests', () => {
-    it('/feed (POST) - should reject invalid image URL', () => {
-      const invalidFeedDTO = {
-        imageUrl: 'not-a-valid-url',
-        source: Source.API,
-      };
+  it('POST /feed rejects a source field', () => {
+    return request(app.getHttpServer())
+      .post('/feed')
+      .set('x-dev-mode', 'true')
+      .send({ imageUrl: feedEvent.imageUrl, source: Source.API })
+      .expect(400);
+  });
 
-      return request(app.getHttpServer())
-        .post('/feed')
-        .send(invalidFeedDTO)
-        .expect(400);
-    });
+  it('GET /feed/events requires the dev bypass and returns the list', () => {
+    return request(app.getHttpServer())
+      .get('/feed/events')
+      .set('x-dev-mode', 'true')
+      .expect(200)
+      .expect((res) => {
+        expect(res.body[0].id).toBe(feedEvent.id);
+      });
+  });
 
-    it('/feed (POST) - should reject invalid source', () => {
-      const invalidFeedDTO = {
-        imageUrl: 'https://example.com/image.jpg',
-        source: 'INVALID_SOURCE',
-      };
+  it('POST /detection accepts imageUrl only', () => {
+    return request(app.getHttpServer())
+      .post('/detection')
+      .set('x-dev-mode', 'true')
+      .send({ imageUrl: detectionEvent.imageUrl })
+      .expect(201)
+      .expect((res) => {
+        expect(res.body.data.id).toBe(detectionEvent.id);
+        expect(res.body.message).toEqual(expect.any(String));
+      });
+  });
 
-      return request(app.getHttpServer())
-        .post('/feed')
-        .send(invalidFeedDTO)
-        .expect(400);
-    });
-
-    it('/detection (POST) - should reject invalid UUID', () => {
-      const invalidDetectionDTO = {
-        feedEvent: 'not-a-valid-uuid',
-        imageUrl: 'https://example.com/image.jpg',
-      };
-
-      return request(app.getHttpServer())
-        .post('/detection')
-        .send(invalidDetectionDTO)
-        .expect(400);
-    });
+  it('GET /detection/:id returns data and message', () => {
+    return request(app.getHttpServer())
+      .get('/detection/detection-1')
+      .set('x-dev-mode', 'true')
+      .expect(200)
+      .expect((res) => {
+        expect(res.body.data.id).toBe(detectionEvent.id);
+        expect(res.body.message).toEqual(expect.any(String));
+      });
   });
 });

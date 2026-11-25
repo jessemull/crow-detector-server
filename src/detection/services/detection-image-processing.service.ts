@@ -6,6 +6,7 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { Injectable } from '@nestjs/common';
+import { awsClientOptions } from 'src/common/aws/client-options';
 import { createLogger } from 'src/common/logger/logger.config';
 import { AnimalDetectionResult } from 'src/common/types';
 import { AnimalPhotoMediaType, ClaudeService } from './claude.service';
@@ -23,9 +24,7 @@ export class DetectionImageProcessingService {
   ) {
     const region = this.configService.get<string>('awsRegion') || 'us-west-2';
 
-    this.s3 = new S3Client({
-      region,
-    });
+    this.s3 = new S3Client(awsClientOptions(region));
   }
 
   async processImage(

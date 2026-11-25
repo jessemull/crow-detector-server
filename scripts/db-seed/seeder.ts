@@ -4,6 +4,15 @@ import { FeedEvent } from '../../src/feed/entity/feed-event.entity';
 import { FeedEventSeeder, DetectionEventSeeder } from './seeders';
 import { createLogger } from '../../src/common/logger/logger.config';
 
+function postgresSsl(): { rejectUnauthorized: boolean } {
+  const isProdLike =
+    process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'prod';
+  return {
+    rejectUnauthorized:
+      isProdLike || process.env.SSL_REJECT_UNAUTHORIZED !== 'false',
+  };
+}
+
 export class DatabaseSeeder {
   private dataSource: DataSource;
   private logger = createLogger('DatabaseSeeder');
@@ -19,9 +28,7 @@ export class DatabaseSeeder {
       entities: [FeedEvent, DetectionEvent],
       synchronize: false,
       logging: process.env.NODE_ENV === 'development',
-      ssl: {
-        rejectUnauthorized: process.env.SSL_REJECT_UNAUTHORIZED === 'true',
-      },
+      ssl: postgresSsl(),
     });
   }
 
@@ -77,6 +84,13 @@ export class DatabaseSeeder {
   }
 
   async synchronize(): Promise<void> {
+    const nodeEnv = process.env.NODE_ENV;
+    if (nodeEnv === 'production' || nodeEnv === 'prod') {
+      throw new Error(
+        'Refusing to drop tables when NODE_ENV is production or prod',
+      );
+    }
+
     try {
       this.logger.info('Starting database synchronization...');
 
@@ -88,9 +102,9 @@ export class DatabaseSeeder {
 
       this.logger.info('Tables dropped successfully');
       this.logger.info(
-        'Now restart your NestJS app to recreate tables with new schema',
+        'Nest will not recreate them: TypeORM synchronize is false.',
       );
-      this.logger.info('Then run: npm run db:seed');
+      this.logger.info('Apply the schema yourself, then run: npm run db:seed');
     } catch (error) {
       this.logger.error({ error }, 'Synchronization failed');
       throw error;

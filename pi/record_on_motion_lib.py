@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import queue
 import select
@@ -11,6 +12,11 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import IO, Any
+
+
+def signed_payload(method: str, path: str, body: dict, timestamp: str) -> str:
+    """Bytes the API guard verifies: method + path + compact JSON + timestamp."""
+    return f"{method}{path}{json.dumps(body, separators=(',', ':'))}{timestamp}"
 
 
 def parse_env_line(line: str) -> tuple[str, str] | None:

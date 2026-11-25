@@ -79,7 +79,7 @@ These constraints are **absolute** — no exceptions without human approval.
 
 ## Type Safety
 
-- [ ] TypeScript strict mode always enabled
+- [ ] TypeScript checks stay on: strictNullChecks, noImplicitAny, strictBindCallApply, strictPropertyInitialization, noFallthroughCasesInSwitch. `"strict": true` is not enabled.
 - [ ] no `any` in production code without justification
 - [ ] named exports preferred; follow existing patterns
 

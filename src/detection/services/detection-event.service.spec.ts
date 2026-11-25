@@ -107,6 +107,14 @@ describe('DetectionEventService', () => {
         processingStatus: ProcessingStatus.PENDING,
         feedEvent: undefined,
       };
+      mockRepository.findOne.mockResolvedValue(null);
+      mockS3MetadataService.extractMetadataFromUrl.mockResolvedValue({
+        bucket: 'test-bucket',
+        key: 'test-key',
+        source: Source.API,
+        timestamp: Date.now(),
+        type: 'detection' as const,
+      });
       mockRepository.create.mockReturnValue(createdEvent);
       mockRepository.save.mockResolvedValue(createdEvent);
 
@@ -126,6 +134,14 @@ describe('DetectionEventService', () => {
       };
 
       const error = new Error('Repository error');
+      mockRepository.findOne.mockResolvedValue(null);
+      mockS3MetadataService.extractMetadataFromUrl.mockResolvedValue({
+        bucket: 'test-bucket',
+        key: 'test-key',
+        source: Source.API,
+        timestamp: Date.now(),
+        type: 'detection' as const,
+      });
       mockRepository.create.mockReturnValue({});
       mockRepository.save.mockRejectedValue(error);
 
@@ -140,7 +156,7 @@ describe('DetectionEventService', () => {
       const mockEvents = [mockDetectionEvent];
       mockRepository.find.mockResolvedValue(mockEvents);
 
-      const result = await service.find();
+      const result = await service.find({ limit: undefined } as never);
 
       expect(repository.find).toHaveBeenCalledWith({
         order: { createdAt: 'DESC' },
@@ -156,7 +172,7 @@ describe('DetectionEventService', () => {
       const limit = 10;
       mockRepository.find.mockResolvedValue(mockEvents);
 
-      const result = await service.find(limit);
+      const result = await service.find({ limit });
 
       expect(repository.find).toHaveBeenCalledWith({
         order: { createdAt: 'DESC' },
@@ -174,7 +190,7 @@ describe('DetectionEventService', () => {
       const now = new Date();
       mockRepository.find.mockResolvedValue(mockEvents);
 
-      const result = await service.find(undefined, from);
+      const result = await service.find({ limit: undefined, from } as never);
 
       expect(repository.find).toHaveBeenCalledWith({
         order: { createdAt: 'DESC' },
@@ -193,7 +209,11 @@ describe('DetectionEventService', () => {
       const toDate = new Date(to);
       mockRepository.find.mockResolvedValue(mockEvents);
 
-      const result = await service.find(undefined, from, to);
+      const result = await service.find({
+        limit: undefined,
+        from,
+        to,
+      } as never);
 
       expect(repository.find).toHaveBeenCalledWith({
         order: { createdAt: 'DESC' },
@@ -209,7 +229,11 @@ describe('DetectionEventService', () => {
       mockRepository.find.mockRejectedValue(error);
 
       await expect(
-        service.find(10, '2024-01-01', '2024-12-31'),
+        service.find({
+          limit: 10,
+          from: '2024-01-01',
+          to: '2024-12-31',
+        }),
       ).rejects.toThrow('Repository error');
     });
   });
@@ -266,7 +290,10 @@ describe('DetectionEventService', () => {
       expect(repository.findOne).toHaveBeenCalledWith({
         where: { id },
       });
-      expect(repository.update).toHaveBeenCalledWith(id, patchDetectionDTO);
+      expect(repository.update).toHaveBeenCalledWith(
+        { id, processingStatus: mockDetectionEvent.processingStatus },
+        patchDetectionDTO,
+      );
       expect(result).toBeDefined();
     });
 
@@ -310,7 +337,6 @@ describe('DetectionEventService', () => {
 
     it('should process image successfully when animals are detected', async () => {
       const eventId = 'test-uuid';
-      const imageUrl = 'https://example.com/image.jpg';
 
       mockS3MetadataService.extractMetadataFromUrl.mockResolvedValue({
         bucket: 'test-bucket',
@@ -336,33 +362,40 @@ describe('DetectionEventService', () => {
 
       mockRepository.update.mockResolvedValue({ affected: 1 });
 
-      await (service as any).processImageAsync(eventId, imageUrl);
+      await (service as any).processImageAsync(
+        eventId,
+        'test-bucket',
+        'test-key',
+      );
 
-      expect(mockRepository.update).toHaveBeenCalledWith(eventId, {
-        processingStatus: ProcessingStatus.PROCESSING,
-      });
+      expect(mockRepository.update).toHaveBeenCalledWith(
+        { id: eventId, processingStatus: ProcessingStatus.PENDING },
+        { processingStatus: ProcessingStatus.PROCESSING },
+      );
 
       expect(
         mockDetectionImageProcessingService.processImage,
       ).toHaveBeenCalledWith('test-bucket', 'test-key');
 
-      expect(mockRepository.update).toHaveBeenCalledWith(eventId, {
-        processingStatus: ProcessingStatus.COMPLETED,
-        processingDuration: 1500,
-        originalImageSize: 1024,
-        detectedAnimals: [
-          { name: 'Crow', confidence: 95.5, count: 1 },
-          { name: 'Bird', confidence: 92.1, count: 1 },
-          { name: 'Squirrel', confidence: 88.7, count: 1 },
-        ],
-        crowCount: 2,
-        animalCount: 3,
-      });
+      expect(mockRepository.update).toHaveBeenCalledWith(
+        { id: eventId, processingStatus: ProcessingStatus.PROCESSING },
+        {
+          processingStatus: ProcessingStatus.COMPLETED,
+          processingDuration: 1500,
+          originalImageSize: 1024,
+          detectedAnimals: [
+            { name: 'Crow', confidence: 95.5, count: 1 },
+            { name: 'Bird', confidence: 92.1, count: 1 },
+            { name: 'Squirrel', confidence: 88.7, count: 1 },
+          ],
+          crowCount: 2,
+          animalCount: 3,
+        },
+      );
     });
 
     it('should delete detection event when no animals are detected', async () => {
       const eventId = 'test-uuid';
-      const imageUrl = 'https://example.com/image.jpg';
 
       mockS3MetadataService.extractMetadataFromUrl.mockResolvedValue({
         bucket: 'test-bucket',
@@ -383,18 +416,25 @@ describe('DetectionEventService', () => {
       mockRepository.update.mockResolvedValue({ affected: 1 });
       mockRepository.delete.mockResolvedValue({ affected: 1 });
 
-      await (service as any).processImageAsync(eventId, imageUrl);
+      await (service as any).processImageAsync(
+        eventId,
+        'test-bucket',
+        'test-key',
+      );
 
-      expect(mockRepository.update).toHaveBeenCalledWith(eventId, {
+      expect(mockRepository.update).toHaveBeenCalledWith(
+        { id: eventId, processingStatus: ProcessingStatus.PENDING },
+        { processingStatus: ProcessingStatus.PROCESSING },
+      );
+
+      expect(mockRepository.delete).toHaveBeenCalledWith({
+        id: eventId,
         processingStatus: ProcessingStatus.PROCESSING,
       });
-
-      expect(mockRepository.delete).toHaveBeenCalledWith(eventId);
     });
 
     it('should handle image processing errors and mark as failed', async () => {
       const eventId = 'test-uuid';
-      const imageUrl = 'https://example.com/image.jpg';
 
       mockS3MetadataService.extractMetadataFromUrl.mockResolvedValue({
         bucket: 'test-bucket',
@@ -411,38 +451,31 @@ describe('DetectionEventService', () => {
       mockRepository.update.mockResolvedValue({ affected: 1 });
 
       await expect(
-        (service as any).processImageAsync(eventId, imageUrl),
+        (service as any).processImageAsync(eventId, 'test-bucket', 'test-key'),
       ).rejects.toThrow('AWS service unavailable');
 
-      expect(mockRepository.update).toHaveBeenCalledWith(eventId, {
-        processingStatus: ProcessingStatus.FAILED,
-        processingError: 'AWS service unavailable',
-      });
+      expect(mockRepository.update).toHaveBeenCalledWith(
+        { id: eventId, processingStatus: ProcessingStatus.PROCESSING },
+        {
+          processingStatus: ProcessingStatus.FAILED,
+          processingError: 'AWS service unavailable',
+        },
+      );
     });
 
     it('should handle S3 metadata extraction errors', async () => {
-      const eventId = 'test-uuid';
-      const imageUrl = 'https://example.com/image.jpg';
-
+      mockRepository.findOne.mockResolvedValue(null);
       mockS3MetadataService.extractMetadataFromUrl.mockRejectedValue(
         new Error('Invalid S3 URL format'),
       );
 
-      mockRepository.update.mockResolvedValue({ affected: 1 });
-
       await expect(
-        (service as any).processImageAsync(eventId, imageUrl),
+        service.create({ imageUrl: 'https://example.com/image.jpg' }),
       ).rejects.toThrow('Invalid S3 URL format');
-
-      expect(mockRepository.update).toHaveBeenCalledWith(eventId, {
-        processingStatus: ProcessingStatus.FAILED,
-        processingError: 'Invalid S3 URL format',
-      });
     });
 
     it('should handle S3 object size retrieval errors', async () => {
       const eventId = 'test-uuid';
-      const imageUrl = 'https://example.com/image.jpg';
 
       mockS3MetadataService.extractMetadataFromUrl.mockResolvedValue({
         bucket: 'test-bucket',
@@ -467,13 +500,16 @@ describe('DetectionEventService', () => {
       mockRepository.update.mockResolvedValue({ affected: 1 });
 
       await expect(
-        (service as any).processImageAsync(eventId, imageUrl),
+        (service as any).processImageAsync(eventId, 'test-bucket', 'test-key'),
       ).rejects.toThrow('S3 object not found');
 
-      expect(mockRepository.update).toHaveBeenCalledWith(eventId, {
-        processingStatus: ProcessingStatus.FAILED,
-        processingError: 'S3 object not found',
-      });
+      expect(mockRepository.update).toHaveBeenCalledWith(
+        { id: eventId, processingStatus: ProcessingStatus.PROCESSING },
+        {
+          processingStatus: ProcessingStatus.FAILED,
+          processingError: 'S3 object not found',
+        },
+      );
     });
   });
 });

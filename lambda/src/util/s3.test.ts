@@ -116,10 +116,6 @@ describe('S3 Utility', () => {
       mockRecord.body = 'invalid json';
 
       expect(() => extractS3Info(mockRecord)).toThrow();
-      expect(mockConsoleError).toHaveBeenCalledWith(
-        'Error in extractS3Info:',
-        expect.any(Error),
-      );
     });
 
     it('should re-throw errors after logging them', () => {
@@ -132,7 +128,6 @@ describe('S3 Utility', () => {
       mockRecord.body = 'invalid json';
 
       expect(() => extractS3Info(mockRecord)).toThrow();
-      expect(mockConsoleError).toHaveBeenCalled();
     });
   });
 });

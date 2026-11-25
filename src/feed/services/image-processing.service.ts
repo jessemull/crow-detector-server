@@ -16,7 +16,11 @@ import {
   ContentModerationResult,
   ImageProcessingResult,
 } from 'src/common/types';
+import { awsClientOptions } from 'src/common/aws/client-options';
 import { createLogger } from 'src/common/logger/logger.config';
+
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_INPUT_PIXELS = 20_000_000;
 
 @Injectable()
 export class ImageProcessingService {
@@ -27,13 +31,9 @@ export class ImageProcessingService {
   constructor(private readonly configService: ConfigService) {
     const region = this.configService.get<string>('awsRegion') || 'us-west-2';
 
-    this.rekognition = new RekognitionClient({
-      region,
-    });
-
-    this.s3 = new S3Client({
-      region,
-    });
+    const clientOptions = awsClientOptions(region);
+    this.rekognition = new RekognitionClient(clientOptions);
+    this.s3 = new S3Client(clientOptions);
   }
 
   async processImage(
@@ -228,10 +228,14 @@ export class ImageProcessingService {
       const imageBuffer = Buffer.from(
         await s3Object.Body!.transformToByteArray(),
       );
+      if (imageBuffer.length > MAX_IMAGE_BYTES) {
+        throw new Error(
+          `Image is ${imageBuffer.length} bytes; the limit is ${MAX_IMAGE_BYTES}`,
+        );
+      }
 
-      // Get image metadata...
-
-      const metadata = await sharp(imageBuffer).metadata();
+      const sharpOptions = { limitInputPixels: MAX_INPUT_PIXELS };
+      const metadata = await sharp(imageBuffer, sharpOptions).metadata();
       const { width: imageWidth, height: imageHeight } = metadata;
 
       if (!imageWidth || !imageHeight) {
@@ -257,7 +261,9 @@ export class ImageProcessingService {
 
       // Crop and resize image...
 
-      const croppedBuffer = await sharp(imageBuffer)
+      const croppedBuffer = await sharp(imageBuffer, {
+        limitInputPixels: MAX_INPUT_PIXELS,
+      })
         .extract({
           left: cropLeft,
           top: cropTop,
@@ -305,11 +311,8 @@ export class ImageProcessingService {
       });
       await this.s3.send(command);
 
-      const region = this.configService.get<string>('awsRegion') || 'us-west-2';
-      const processedUrl = `https://${bucket}.s3.${region}.amazonaws.com/${processedKey}`;
-      this.logger.info(`Processed image uploaded: ${processedUrl}`);
-
-      return processedUrl;
+      this.logger.info(`Processed image uploaded: ${processedKey}`);
+      return processedKey;
     } catch (error) {
       this.logger.error(
         `Failed to upload processed image: ${error instanceof Error ? error.message : String(error)}`,
