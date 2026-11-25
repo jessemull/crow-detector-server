@@ -689,11 +689,6 @@ components:
           minimum: 0
           description: Total number of animals detected in the image
           example: 5
-        processingStatus:
-          type: string
-          enum: [PENDING, PROCESSING, COMPLETED, FAILED]
-          description: Current processing status of the image
-          example: 'COMPLETED'
         processingError:
           type: string
           description: Error message if processing failed
@@ -750,9 +745,6 @@ components:
           $ref: '#/components/schemas/Source'
         status:
           $ref: '#/components/schemas/Status'
-        processingStatus:
-          type: string
-          enum: [PENDING, PROCESSING, COMPLETED, FAILED]
         processingError:
           type: string
         moderationLabels:
@@ -780,8 +772,11 @@ components:
           example: 'FEEDING'
         photoUrl:
           type: string
-          description: Optional verification photo URL stored with PHOTO_TAKEN
-          example: 'https://example.com/images/verification.jpg'
+          format: uri
+          maxLength: 2048
+          pattern: '^https://[^/?#]+/feed/[^?#]+$'
+          description: Optional HTTPS verification photo whose object key is under feed/. PHOTO_TAKEN stores it. Keys containing .., ://, or a backslash are rejected.
+          example: 'https://bucket.s3.amazonaws.com/feed/verification.jpg'
 
     CreateFeedImageUrlDTO:
       type: object
@@ -805,8 +800,8 @@ components:
         contentLength:
           type: integer
           minimum: 1
-          maximum: 15728640
-          description: Exact PUT body size in bytes. The signed URL rejects any other length.
+          maximum: 5242880
+          description: Exact PUT body size in bytes. The signed URL rejects any other length. Images above 5 MiB are rejected before Rekognition.
 
     CreateDetectionImageUrlDTO:
       type: object
@@ -825,8 +820,8 @@ components:
         contentLength:
           type: integer
           minimum: 1
-          maximum: 15728640
-          description: Exact PUT body size in bytes. The signed URL rejects any other length.
+          maximum: 5242880
+          description: Exact PUT body size in bytes. The signed URL rejects any other length. Images above 5 MiB are rejected before analysis.
 
     CreatePorchClipUrlDTO:
       type: object

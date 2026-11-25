@@ -1,5 +1,5 @@
 import { SQSRecord } from 'aws-lambda';
-import { extractS3Info } from './s3';
+import { extractS3Info, extractS3Records } from './s3';
 
 describe('S3 Utility', () => {
   describe('extractS3Info', () => {
@@ -55,6 +55,44 @@ describe('S3 Utility', () => {
       );
 
       expect(extractS3Info(mockRecord).key).toBe('feed/photo 1.jpg');
+    });
+
+    it('returns every S3 record in the notification', () => {
+      const mockRecord = createMockSQSRecord(
+        'test-bucket',
+        'feed/first.jpg',
+        'ObjectCreated:Put',
+        10,
+      );
+      const body = JSON.parse(mockRecord.body) as {
+        Records: Array<Record<string, unknown>>;
+      };
+      body.Records.push({
+        ...body.Records[0],
+        s3: {
+          ...(body.Records[0].s3 as object),
+          object: {
+            key: 'detection/second.jpg',
+            size: 20,
+          },
+        },
+      });
+      mockRecord.body = JSON.stringify(body);
+
+      expect(extractS3Records(mockRecord)).toEqual([
+        {
+          bucket: 'test-bucket',
+          key: 'feed/first.jpg',
+          size: 10,
+          eventName: 'ObjectCreated:Put',
+        },
+        {
+          bucket: 'test-bucket',
+          key: 'detection/second.jpg',
+          size: 20,
+          eventName: 'ObjectCreated:Put',
+        },
+      ]);
     });
 
     it('should handle missing size and default to 0', () => {

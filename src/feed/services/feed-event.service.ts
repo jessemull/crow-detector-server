@@ -30,6 +30,11 @@ const FEED_STATUS_FROM: Partial<Record<FeedEventStatus, FeedEventStatus>> = {
 export class FeedEventService {
   private readonly logger = createLogger(FeedEventService.name);
   private inFlight = 0;
+  private readonly waiting: Array<{
+    eventId: string;
+    bucket: string;
+    key: string;
+  }> = [];
 
   constructor(
     @InjectRepository(FeedEvent)
@@ -103,7 +108,6 @@ export class FeedEventService {
     } catch (error) {
       this.logger.error(
         `Failed to create feed event: ${error instanceof Error ? error.message : String(error)}`,
-        error instanceof Error ? error.stack : undefined,
       );
       throw error;
     }
@@ -226,7 +230,6 @@ export class FeedEventService {
     } catch (error) {
       this.logger.error(
         `Image processing failed for event ${eventId}: ${error instanceof Error ? error.message : String(error)}`,
-        error instanceof Error ? error.stack : undefined,
       );
 
       // Update status to failed...
@@ -274,6 +277,9 @@ export class FeedEventService {
     const key = objectKey(event.imageUrl);
     if (key && isAllowedObjectKey(key, 'feed/')) {
       event.imageUrl = await this.s3MetadataService.presignGet(key, 'feed/');
+    } else {
+      this.logger.warn(`Ignoring image URL outside feed/ for ${event.id}`);
+      event.imageUrl = '';
     }
     if (event.photoUrl) {
       const photoKey = objectKey(event.photoUrl);
@@ -474,12 +480,33 @@ export class FeedEventService {
   }
 
   private startProcessing(eventId: string, bucket: string, key: string): void {
-    if (this.inFlight >= MAX_IN_FLIGHT) {
-      this.logger.warn(
-        `Feed event ${eventId} stays pending because ${MAX_IN_FLIGHT} image jobs are already running`,
-      );
+    const alreadyWaiting = this.waiting.some((job) => job.eventId === eventId);
+    if (this.inFlight >= MAX_IN_FLIGHT || this.waiting.length > 0) {
+      if (!alreadyWaiting) {
+        this.waiting.push({ eventId, bucket, key });
+        if (this.inFlight >= MAX_IN_FLIGHT) {
+          this.logger.warn(
+            `Feed event ${eventId} waits because ${MAX_IN_FLIGHT} image jobs are already running`,
+          );
+        }
+      }
+      this.drainProcessing();
       return;
     }
+    this.launchProcessing(eventId, bucket, key);
+  }
+
+  private drainProcessing(): void {
+    while (this.inFlight < MAX_IN_FLIGHT && this.waiting.length > 0) {
+      const next = this.waiting.shift();
+      if (!next) {
+        return;
+      }
+      this.launchProcessing(next.eventId, next.bucket, next.key);
+    }
+  }
+
+  private launchProcessing(eventId: string, bucket: string, key: string): void {
     this.inFlight += 1;
     void this.processImageAsync(eventId, bucket, key)
       .catch((error: unknown) => {
@@ -489,6 +516,7 @@ export class FeedEventService {
       })
       .finally(() => {
         this.inFlight -= 1;
+        this.drainProcessing();
       });
   }
 }

@@ -10,8 +10,8 @@ import {
   Min,
 } from 'class-validator';
 
-/** Signed PUT bodies cannot exceed this. Rekognition and sharp use the same cap. */
-export const IMAGE_UPLOAD_MAX_BYTES = 15 * 1024 * 1024;
+/** Signed image PUTs cannot exceed the cap enforced before Rekognition and sharp. */
+export const IMAGE_UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
 
 const SAFE_FILE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/;
 

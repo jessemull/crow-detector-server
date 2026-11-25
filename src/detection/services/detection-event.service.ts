@@ -26,6 +26,11 @@ const MAX_IN_FLIGHT = 4;
 export class DetectionEventService {
   private readonly logger = createLogger(DetectionEventService.name);
   private inFlight = 0;
+  private readonly waiting: Array<{
+    eventId: string;
+    bucket: string;
+    key: string;
+  }> = [];
 
   constructor(
     @InjectRepository(DetectionEvent)
@@ -144,6 +149,12 @@ export class DetectionEventService {
       throw new NotFoundException(`Detection event with id ${id} not found!`);
     }
 
+    if (patchDetectionDTO.processingStatus !== undefined) {
+      throw new BadRequestException(
+        'processingStatus is updated by image processing',
+      );
+    }
+
     const result = await this.detectionEventRepository.update(
       { id, processingStatus: detectionEvent.processingStatus },
       patchDetectionDTO,
@@ -186,6 +197,10 @@ export class DetectionEventService {
       );
 
       if (!result.hasAnimals) {
+        await this.detectionImageProcessingService.deleteStoredImage(
+          bucket,
+          key,
+        );
         const removed = await this.detectionEventRepository.delete({
           id: eventId,
           processingStatus: ProcessingStatus.PROCESSING,
@@ -196,10 +211,6 @@ export class DetectionEventService {
           );
           return;
         }
-        await this.detectionImageProcessingService.deleteStoredImage(
-          bucket,
-          key,
-        );
         this.logger.info(
           `No animals detected, deleted detection event ${eventId}`,
         );
@@ -288,6 +299,9 @@ export class DetectionEventService {
         key,
         'detection/',
       );
+    } else {
+      this.logger.warn(`Ignoring image URL outside detection/ for ${event.id}`);
+      event.imageUrl = '';
     }
     if (event.feedEvent) {
       const feedKey = objectKey(event.feedEvent.imageUrl);
@@ -296,6 +310,11 @@ export class DetectionEventService {
           feedKey,
           'feed/',
         );
+      } else {
+        this.logger.warn(
+          `Ignoring image URL outside feed/ for ${event.feedEvent.id}`,
+        );
+        event.feedEvent.imageUrl = '';
       }
       if (
         event.feedEvent.croppedImageUrl &&
@@ -306,18 +325,44 @@ export class DetectionEventService {
             event.feedEvent.croppedImageUrl,
             'processed/',
           );
+      } else if (event.feedEvent.croppedImageUrl) {
+        this.logger.warn(
+          `Ignoring cropped image outside processed/ for ${event.feedEvent.id}`,
+        );
+        event.feedEvent.croppedImageUrl = undefined;
       }
     }
     return event;
   }
 
   private startProcessing(eventId: string, bucket: string, key: string): void {
-    if (this.inFlight >= MAX_IN_FLIGHT) {
-      this.logger.warn(
-        `Detection event ${eventId} stays pending because ${MAX_IN_FLIGHT} image jobs are already running`,
-      );
+    const alreadyWaiting = this.waiting.some((job) => job.eventId === eventId);
+    if (this.inFlight >= MAX_IN_FLIGHT || this.waiting.length > 0) {
+      if (!alreadyWaiting) {
+        this.waiting.push({ eventId, bucket, key });
+        if (this.inFlight >= MAX_IN_FLIGHT) {
+          this.logger.warn(
+            `Detection event ${eventId} waits because ${MAX_IN_FLIGHT} image jobs are already running`,
+          );
+        }
+      }
+      this.drainProcessing();
       return;
     }
+    this.launchProcessing(eventId, bucket, key);
+  }
+
+  private drainProcessing(): void {
+    while (this.inFlight < MAX_IN_FLIGHT && this.waiting.length > 0) {
+      const next = this.waiting.shift();
+      if (!next) {
+        return;
+      }
+      this.launchProcessing(next.eventId, next.bucket, next.key);
+    }
+  }
+
+  private launchProcessing(eventId: string, bucket: string, key: string): void {
     this.inFlight += 1;
     this.processImageAsync(eventId, bucket, key)
       .catch((error: unknown) => {
@@ -327,6 +372,7 @@ export class DetectionEventService {
       })
       .finally(() => {
         this.inFlight -= 1;
+        this.drainProcessing();
       });
   }
 }

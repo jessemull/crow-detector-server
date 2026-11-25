@@ -39,7 +39,7 @@ describe('ImageProcessingService', () => {
 
   beforeEach(async () => {
     mockRekognitionSend = jest.fn();
-    mockS3Send = jest.fn();
+    mockS3Send = jest.fn().mockResolvedValue({ ContentLength: 16 });
 
     (RekognitionClient as jest.Mock).mockImplementation(() => ({
       send: mockRekognitionSend,
@@ -112,6 +112,7 @@ describe('ImageProcessingService', () => {
           .mockResolvedValue(new Uint8Array(Buffer.from('mock-image-data'))),
       };
       mockS3Send.mockResolvedValueOnce({ ContentLength: 16 });
+      mockS3Send.mockResolvedValueOnce({ ContentLength: 16 });
       mockS3Send.mockResolvedValueOnce({
         Body: mockBody,
       });
@@ -153,6 +154,17 @@ describe('ImageProcessingService', () => {
       expect(mockRekognitionSend).toHaveBeenCalledWith(
         expect.any(DetectFacesCommand),
       );
+    });
+
+    it('rejects an oversized object before Rekognition', async () => {
+      mockS3Send.mockResolvedValueOnce({
+        ContentLength: 5 * 1024 * 1024 + 1,
+      });
+
+      await expect(service.processImage(bucket, key)).rejects.toThrow(
+        'the limit is',
+      );
+      expect(mockRekognitionSend).not.toHaveBeenCalled();
     });
 
     it('should return early when content is inappropriate', async () => {
