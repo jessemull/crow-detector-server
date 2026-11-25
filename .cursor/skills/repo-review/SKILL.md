@@ -79,4 +79,4 @@ Then add a **Remediation backlog**: group findings into proposed fix PRs, each w
 
 ## Measuring this skill
 
-After a run, score it against `evals/review/repo-recall.md`. Do not read that file before or during the review. Missed items mean a criterion or a pass needs strengthening; see `evals/review/README.md`.
+There is no checked-in repo recall set. When a review misses a real defect, record it so the next recall set can be rebuilt. See `evals/review/README.md`.

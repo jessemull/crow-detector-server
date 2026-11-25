@@ -1,5 +1,10 @@
-export const API_BASE_URL =
-  process.env.API_BASE_URL || 'https://api-dev.crittercanteen.com';
+export function requireApiBaseUrl(): string {
+  const value = process.env.API_BASE_URL;
+  if (!value) {
+    throw new Error('API_BASE_URL is required');
+  }
+  return value;
+}
 
 export const DETECTION_ENDPOINT =
   process.env.DETECTION_ENDPOINT || '/detection';

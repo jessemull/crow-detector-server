@@ -1,12 +1,7 @@
 import { SQSEvent, SQSRecord, Context } from 'aws-lambda';
 
 process.env.LAMBDA_S3_PRIVATE_KEY = Buffer.from(
-  `-----BEGIN EC PRIVATE KEY-----
-MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgR3AvaHdwoFmc/ZPp
-OM1i6/Mi8hIOhEsdWXm8iFHYAQhabVoAoGCCqGSM49AwEHoUQDQgAE8OmBTWgAbW
-BgKdDZ7TihYwGHxEdOQsjr/tP6Npnrrmr04+ANVy43H57PBfjPSG90Tb8VOVV6c5
-Pq8qB9wBHipQ==
------END EC PRIVATE KEY-----`,
+  'test-key-not-a-secret',
 ).toString('base64');
 
 import { handler } from './index';
@@ -65,14 +60,9 @@ describe('S3 Event Lambda Handler', () => {
 
       const result = await handler(mockEvent, mockContext);
 
-      expect(result).toEqual({
-        statusCode: 200,
-        body: expect.stringContaining(
-          'All SQS events processed successfully',
-        ) as string,
-      });
+      expect(result).toEqual({ batchItemFailures: [] });
       expect(mockedFetch).toHaveBeenCalledWith(
-        'https://api-dev.crittercanteen.com/detection',
+        'https://test-api.com/detection',
         expect.objectContaining({
           method: 'POST',
           headers: expect.objectContaining({
@@ -99,7 +89,9 @@ describe('S3 Event Lambda Handler', () => {
         throw new Error('Forced handler-level error');
       });
 
-      await expect(handler(mockEvent, mockContext)).rejects.toThrow();
+      await expect(handler(mockEvent, mockContext)).resolves.toEqual({
+        batchItemFailures: [{ itemIdentifier: 'test-message-id' }],
+      });
     });
 
     it('should hit handler-level catch block with non-string error', async () => {
@@ -118,7 +110,9 @@ describe('S3 Event Lambda Handler', () => {
         throw 'string error';
       });
 
-      await expect(handler(mockEvent, mockContext)).rejects.toThrow();
+      await expect(handler(mockEvent, mockContext)).resolves.toEqual({
+        batchItemFailures: [{ itemIdentifier: 'test-message-id' }],
+      });
     });
 
     it('should handle mixed success/failure results', async () => {
@@ -146,9 +140,9 @@ describe('S3 Event Lambda Handler', () => {
         } as Response)
         .mockRejectedValueOnce(new Error('API call failed'));
 
-      await expect(handler(mockEvent, mockContext)).rejects.toThrow(
-        /Some SQS events failed to process|./,
-      );
+      await expect(handler(mockEvent, mockContext)).resolves.toEqual({
+        batchItemFailures: [{ itemIdentifier: 'test-message-id' }],
+      });
     });
 
     it('should handle handler-level errors', async () => {
@@ -173,9 +167,9 @@ describe('S3 Event Lambda Handler', () => {
         ],
       };
 
-      await expect(handler(mockEvent, mockContext)).rejects.toThrow(
-        /Some SQS events failed to process|./,
-      );
+      await expect(handler(mockEvent, mockContext)).resolves.toEqual({
+        batchItemFailures: [{ itemIdentifier: 'test-message-id' }],
+      });
     });
 
     it('should skip non-image files', async () => {
@@ -191,12 +185,7 @@ describe('S3 Event Lambda Handler', () => {
 
       const result = await handler(mockEvent, mockContext);
 
-      expect(result).toEqual({
-        statusCode: 200,
-        body: expect.stringContaining(
-          'All SQS events processed successfully',
-        ) as string,
-      });
+      expect(result).toEqual({ batchItemFailures: [] });
       expect(mockedFetch).not.toHaveBeenCalled();
     });
 
@@ -220,7 +209,7 @@ describe('S3 Event Lambda Handler', () => {
       const result = await handler(mockEvent, mockContext);
 
       expect(mockedFetch).toHaveBeenCalledWith(
-        'https://api-dev.crittercanteen.com/feed',
+        'https://test-api.com/feed',
         expect.objectContaining({
           method: 'POST',
           headers: expect.objectContaining({
@@ -244,12 +233,7 @@ describe('S3 Event Lambda Handler', () => {
 
       const result = await handler(mockEvent, mockContext);
 
-      expect(result).toEqual({
-        statusCode: 200,
-        body: expect.stringContaining(
-          'All SQS events processed successfully',
-        ) as string,
-      });
+      expect(result).toEqual({ batchItemFailures: [] });
       expect(mockedFetch).not.toHaveBeenCalled();
     });
 
@@ -284,12 +268,7 @@ describe('S3 Event Lambda Handler', () => {
       const result = await handler(mockEvent, mockContext);
 
       expect(mockedFetch).toHaveBeenCalledTimes(2);
-      expect(result).toEqual({
-        statusCode: 200,
-        body: expect.stringContaining(
-          'All SQS events processed successfully',
-        ) as string,
-      });
+      expect(result).toEqual({ batchItemFailures: [] });
     });
 
     it('should handle API call failures', async () => {
@@ -305,9 +284,9 @@ describe('S3 Event Lambda Handler', () => {
 
       mockedFetch.mockRejectedValueOnce(new Error('API call failed'));
 
-      await expect(handler(mockEvent, mockContext)).rejects.toThrow(
-        /Some SQS events failed to process|./,
-      );
+      await expect(handler(mockEvent, mockContext)).resolves.toEqual({
+        batchItemFailures: [{ itemIdentifier: 'test-message-id' }],
+      });
     });
 
     it('should handle general errors', async () => {
@@ -325,12 +304,12 @@ describe('S3 Event Lambda Handler', () => {
         throw new Error('Unexpected error');
       });
 
-      await expect(handler(mockEvent, mockContext)).rejects.toThrow(
-        /Some SQS events failed to process|./,
-      );
+      await expect(handler(mockEvent, mockContext)).resolves.toEqual({
+        batchItemFailures: [{ itemIdentifier: 'test-message-id' }],
+      });
     });
 
-    it('should use default API URL when environment variable is not set', async () => {
+    it('fails the message when API_BASE_URL is unset', async () => {
       delete process.env.API_BASE_URL;
 
       const mockEvent: SQSEvent = {
@@ -343,18 +322,10 @@ describe('S3 Event Lambda Handler', () => {
         ],
       };
 
-      mockedFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve({ success: true }),
-      } as Response);
-
-      const result = await handler(mockEvent, mockContext);
-
-      expect(mockedFetch).toHaveBeenCalledWith(
-        'https://api-dev.crittercanteen.com/detection',
-        expect.any(Object),
-      );
+      await expect(handler(mockEvent, mockContext)).resolves.toEqual({
+        batchItemFailures: [{ itemIdentifier: 'test-message-id' }],
+      });
+      expect(mockedFetch).not.toHaveBeenCalled();
     });
   });
 
@@ -506,9 +477,9 @@ describe('S3 Event Lambda Handler', () => {
         ],
       };
 
-      await expect(handler(mockEvent, mockContext)).rejects.toThrow(
-        /Some SQS events failed to process|./,
-      );
+      await expect(handler(mockEvent, mockContext)).resolves.toEqual({
+        batchItemFailures: [{ itemIdentifier: 'test-message-id' }],
+      });
     });
 
     it('should handle API call with non-ok response', async () => {
@@ -528,9 +499,9 @@ describe('S3 Event Lambda Handler', () => {
         json: () => Promise.resolve({ error: 'Internal server error' }),
       } as Response);
 
-      await expect(handler(mockEvent, mockContext)).rejects.toThrow(
-        /Some SQS events failed to process|./,
-      );
+      await expect(handler(mockEvent, mockContext)).resolves.toEqual({
+        batchItemFailures: [{ itemIdentifier: 'test-message-id' }],
+      });
     });
 
     it('should handle API call timeout', async () => {
@@ -549,9 +520,9 @@ describe('S3 Event Lambda Handler', () => {
       abortError.name = 'AbortError';
       mockedFetch.mockRejectedValueOnce(abortError);
 
-      await expect(handler(mockEvent, mockContext)).rejects.toThrow(
-        /Some SQS events failed to process|./,
-      );
+      await expect(handler(mockEvent, mockContext)).resolves.toEqual({
+        batchItemFailures: [{ itemIdentifier: 'test-message-id' }],
+      });
     });
 
     it('should handle fetch error during API call', async () => {
@@ -567,9 +538,9 @@ describe('S3 Event Lambda Handler', () => {
 
       mockedFetch.mockRejectedValueOnce(new Error('Network error'));
 
-      await expect(handler(mockEvent, mockContext)).rejects.toThrow(
-        /Some SQS events failed to process|./,
-      );
+      await expect(handler(mockEvent, mockContext)).resolves.toEqual({
+        batchItemFailures: [{ itemIdentifier: 'test-message-id' }],
+      });
     });
 
     it('should handle non-test environment logging', async () => {
@@ -627,9 +598,9 @@ describe('S3 Event Lambda Handler', () => {
         ],
       };
 
-      await expect(handler(mockEvent, mockContext)).rejects.toThrow(
-        /Some SQS events failed to process|./,
-      );
+      await expect(handler(mockEvent, mockContext)).resolves.toEqual({
+        batchItemFailures: [{ itemIdentifier: 'test-message-id' }],
+      });
     });
   });
 });

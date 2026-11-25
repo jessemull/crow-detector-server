@@ -37,14 +37,17 @@ describe('InMemoryRateLimitGuard', () => {
     );
   });
 
-  it('uses the first x-forwarded-for address when present', () => {
+  it('keys on request.ip and ignores a caller-supplied x-forwarded-for', () => {
     const guard = new InMemoryRateLimitGuard().configure(1, 60_000);
-    expect(guard.canActivate(makeContext('9.9.9.9', '3.3.3.3, 4.4.4.4'))).toBe(
+    expect(guard.canActivate(makeContext('3.3.3.3', '9.9.9.9, 3.3.3.3'))).toBe(
       true,
     );
-    expect(() =>
-      guard.canActivate(makeContext('9.9.9.9', '3.3.3.3, 4.4.4.4')),
-    ).toThrow(HttpException);
+    expect(guard.canActivate(makeContext('8.8.8.8', '9.9.9.9, 3.3.3.3'))).toBe(
+      true,
+    );
+    expect(() => guard.canActivate(makeContext('3.3.3.3', '1.1.1.1'))).toThrow(
+      HttpException,
+    );
   });
 
   it('prunes stale client entries from the hit map', () => {

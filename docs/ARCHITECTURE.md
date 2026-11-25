@@ -41,23 +41,23 @@ Shared networking (VPC, subnets, security groups) comes from the **`aws-infra-*`
 
 1. Devices/clients request presigned URLs from Nest (`urls` module).
 2. Objects land in S3; bucket notifications enqueue SQS messages.
-3. Lambda signs ECDSA requests and POSTs/PATCHes Nest feed/detection endpoints.
+3. Lambda signs ECDSA requests and POSTs `/feed` or `/detection`. It does not PATCH.
 4. Nest processes images (Haiku for animal photos, Rekognition and Sharp for the feed), updates event status, stores metadata.
 
 ---
 
 ## Nest module layout
 
-| Module       | Responsibility                                              |
-| ------------ | ----------------------------------------------------------- |
-| `auth`       | ECDSA guard                                                 |
-| `feed`       | Feed events, face/crop pipeline, S3 metadata helpers        |
-| `detection`  | Detection events, Claude Haiku animal counts                 |
-| `porch`      | Public porch clip list with short-lived playback URLs       |
-| `urls`       | Presigned S3 URL creation (feed, detection, porch upload)   |
-| `health`     | Health endpoints                                            |
-| `common`     | Logger, shared types                                        |
-| `config`     | Typed environment configuration                             |
+| Module      | Responsibility                                            |
+| ----------- | --------------------------------------------------------- |
+| `auth`      | ECDSA guard                                               |
+| `feed`      | Feed events, face/crop pipeline, S3 metadata helpers      |
+| `detection` | Detection events, Claude Haiku animal counts              |
+| `porch`     | Public porch clip list with short-lived playback URLs     |
+| `urls`      | Presigned S3 URL creation (feed, detection, porch upload) |
+| `health`    | Health endpoints                                          |
+| `common`    | Logger, shared types                                      |
+| `config`    | Typed environment configuration                           |
 
 Porch videos live under the `porch/` prefix. They never enter the animal photo pipeline (S3 notifications and the Lambda only handle image suffixes under `feed/` and `detection/`). Capture hardware and the LAN uploader plan are in **`docs/DEVICES.md`** (sealed outdoor cams + always-on host; not outdoor CSI/PIR kits). The reference recorder is `pi/record-on-motion.py` (ffmpeg RTSP + software motion → ECDSA upload). Production path: systemd on the LAN host + `scripts/deploy-porch-host.sh`. Legacy `npm run pi:sync` / `pi:start` / `pi:stop` remain for SSH copy/restart helpers.
 
@@ -75,13 +75,13 @@ Merge-to-main deploys the **ECS task** stack only. The 30-day `porch/` lifecycle
 
 ## Lambda package
 
-| Concern     | Detail                                                      |
-| ----------- | ----------------------------------------------------------- |
-| Location    | `lambda/` nested npm package                                |
-| Runtime     | Node.js **24** (AWS Lambda max managed runtime; Node 26 not available yet) |
-| Build       | webpack → single bundle → zip                               |
-| Role        | Parse S3/SQS events, ECDSA sign, call Nest API              |
-| Isolation   | No imports from `../src` Nest tree                          |
+| Concern   | Detail                                                                     |
+| --------- | -------------------------------------------------------------------------- |
+| Location  | `lambda/` nested npm package                                               |
+| Runtime   | Node.js **24** (AWS Lambda max managed runtime; Node 26 not available yet) |
+| Build     | webpack → single bundle → zip                                              |
+| Role      | Parse S3/SQS events, ECDSA sign, call Nest API                             |
+| Isolation | No imports from `../src` Nest tree                                         |
 
 ---
 
@@ -96,13 +96,13 @@ Merge-to-main deploys the **ECS task** stack only. The 30-day `porch/` lifecycle
 
 ## Local development
 
-| Mechanism        | Path / command                                      |
-| ---------------- | --------------------------------------------------- |
-| Nest watch       | `npm run start:dev` (tunnel + watch)                |
-| SSH tunnel       | `scripts/tunnel.js` via `RDS_HOST` / bastion env    |
-| DB seed          | `scripts/db-seed/`                                  |
-| Auth token helper| `npm run auth:token`                                |
-| Lambda unit tests| `cd lambda && npm test`                             |
+| Mechanism         | Path / command                                   |
+| ----------------- | ------------------------------------------------ |
+| Nest watch        | `npm run start:dev` (tunnel + watch)             |
+| SSH tunnel        | `scripts/tunnel.js` via `RDS_HOST` / bastion env |
+| DB seed           | `scripts/db-seed/`                               |
+| Auth token helper | `npm run auth:token`                             |
+| Lambda unit tests | `cd lambda && npm test`                          |
 
 ---
 

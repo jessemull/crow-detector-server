@@ -32,19 +32,19 @@ The **Crow Detector Server** manages the core backend logic for the **Crow Detec
 
 AI agents and contributors **must** start with the governance chain:
 
-| Doc | Purpose |
-| --- | ------- |
-| [`CONTEXT.md`](./CONTEXT.md) | Primary entry — loading order, precedence, quality gates |
-| [`AGENTS.md`](./AGENTS.md) | Full development rules for Nest + Lambda |
-| [`CLAUDE.md`](./CLAUDE.md) / [`GEMINI.md`](./GEMINI.md) | Thin redirects to CONTEXT/AGENTS |
-| [`docs/GOVERNANCE.md`](./docs/GOVERNANCE.md) | Authority, escalation, enforcement |
-| [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) | Nest modules, Lambda, CloudFormation |
-| [`docs/TESTING.md`](./docs/TESTING.md) | Jest strategy and 80% coverage |
-| [`docs/SECURITY.md`](./docs/SECURITY.md) | ECDSA, secrets, IAM, logging |
-| [`docs/ENVIRONMENT.md`](./docs/ENVIRONMENT.md) | Environment variable reference |
-| [`docs/CONTRIBUTING.md`](./docs/CONTRIBUTING.md) | Branch / commit / PR workflow |
-| [`docs/REVIEW.md`](./docs/REVIEW.md) | Review severity (MUST/SHOULD) |
-| [`docs/COMMENTS.md`](./docs/COMMENTS.md) | Comment policy |
+| Doc                                                     | Purpose                                                  |
+| ------------------------------------------------------- | -------------------------------------------------------- |
+| [`CONTEXT.md`](./CONTEXT.md)                            | Primary entry — loading order, precedence, quality gates |
+| [`AGENTS.md`](./AGENTS.md)                              | Full development rules for Nest + Lambda                 |
+| [`CLAUDE.md`](./CLAUDE.md) / [`GEMINI.md`](./GEMINI.md) | Thin redirects to CONTEXT/AGENTS                         |
+| [`docs/GOVERNANCE.md`](./docs/GOVERNANCE.md)            | Authority, escalation, enforcement                       |
+| [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)        | Nest modules, Lambda, CloudFormation                     |
+| [`docs/TESTING.md`](./docs/TESTING.md)                  | Jest strategy and 80% coverage                           |
+| [`docs/SECURITY.md`](./docs/SECURITY.md)                | ECDSA, secrets, IAM, logging                             |
+| [`docs/ENVIRONMENT.md`](./docs/ENVIRONMENT.md)          | Environment variable reference                           |
+| [`docs/CONTRIBUTING.md`](./docs/CONTRIBUTING.md)        | Branch / commit / PR workflow                            |
+| [`docs/REVIEW.md`](./docs/REVIEW.md)                    | Review severity (MUST/SHOULD)                            |
+| [`docs/COMMENTS.md`](./docs/COMMENTS.md)                | Comment policy                                           |
 
 Quality gates: `make preflight` (also run by Husky on `git push`). Conventional Commits via Commitizen + commitlint.
 
@@ -61,12 +61,8 @@ The **Crow Detector** is an interactive system that allows users to feed crows t
 - **Feeder Pi Device**: Raspberry Pi connected to automated feeder with relay control:
   - Dispenses crow feed when triggered.
   - Monitors feeding activity.
-- **Motion Pi Device**: Raspberry Pi with PIR motion sensor and night vision camera:
-  - Detects motion and captures images of feeding animals.
-  - Uploads detection images to S3.
-- **Porch Pi Device**: Raspberry Pi with PIR sensor and porch camera:
-  - Records 20–30s mp4 clips during a visit (about 2 minutes max).
-  - Uploads clips to the private `porch/` prefix (no animal naming).
+- **Motion camera**: Sealed outdoor IP camera. A LAN host pulls RTSP and uploads detection images to S3.
+- **Porch camera**: Sealed outdoor IP camera (for example a Tapo). A LAN host pulls RTSP, cuts the visit, and uploads mp4 clips to the private `porch/` prefix. See `docs/DEVICES.md`.
 
 ### Web Interface
 
@@ -147,7 +143,7 @@ The **Crow Detector Server** is built using modern technologies to ensure reliab
 - **AWS ECS**: Container orchestration for server deployment.
 - **AWS CloudFormation**: Infrastructure as Code for resource management.
 - **AWS IAM**: Identity and access management for secure resource access.
-- **AWS Rekognition**: AI-powered image analysis and animal detection.
+- **AWS Rekognition**: Content moderation and face detection for feed photos. Animal identification uses Claude.
 
 ### Development Tools
 
@@ -165,9 +161,8 @@ The **Crow Detector Server** is built using modern technologies to ensure reliab
 
 ### AI & Machine Learning
 
-- **Claude AI**: Anthropic's Claude for advanced animal species classification.
-- **Fallback Processing**: Local detection algorithms when AI services are unavailable.
-- **Confidence Scoring**: Multi-level confidence assessment for detection accuracy.
+- **Claude AI**: Anthropic's Claude counts the living animals in a detection photo.
+- **Confidence Scoring**: The model returns a confidence from 0 to 100 for each kind.
 
 ## Setup Instructions
 
@@ -196,11 +191,11 @@ To clone the repository, install dependencies, and run the project locally follo
 
    ```
    # Database Configuration
-   DB_HOST=localhost
-   DB_PORT=5432
-   DB_USERNAME=your_username
-   DB_PASSWORD=your_password
-   DB_DATABASE=crow_detector_dev
+   RDS_HOST=localhost
+   RDS_PORT=5432
+   RDS_USERNAME=your_username
+   RDS_PASSWORD=your_password
+   RDS_DATABASE=crow_detector_dev
 
    # AWS Configuration
    AWS_REGION=us-west-2
@@ -282,10 +277,10 @@ Use the included authentication token generator:
 
 ```bash
 # Generate token for feed URL endpoint
-npm run auth:token POST /urls/feed '{"fileName":"test.jpg","format":"jpg","source":"motion","contentType":"image/jpeg"}'
+npm run auth:token POST /urls/feed '{"fileName":"test","format":"jpg","source":"motion","contentLength":1024}'
 
 # Generate token for detection URL endpoint
-npm run auth:token POST /urls/detection '{"fileName":"detection.jpg","format":"jpg","feedEventId":"123","contentType":"image/jpeg"}' pi-motion
+npm run auth:token POST /urls/detection '{"fileName":"detection","format":"jpg","contentLength":1024}' pi-motion
 ```
 
 ## Image Upload System
@@ -380,6 +375,7 @@ Feed events progress through the following automated status transitions:
 ### Device Coordination
 
 #### Feeder Pi Device (pi-feeder)
+
 - **Polling Interval**: Checks server every 30 seconds.
 - **Status Monitoring**: `GET /feed/status/latest` - looks for `PENDING` status.
 - **Trigger Feeding**: `PATCH /feed/status/{id}` with `{"status": "FEEDING"}`.
@@ -387,6 +383,7 @@ Feed events progress through the following automated status transitions:
 - **Hardware Control**: Activates relay to dispense crow feed.
 
 #### Camera Pi Device (pi-motion or dedicated camera)
+
 - **Polling Interval**: Checks server every 30 seconds.
 - **Status Monitoring**: `GET /feed/status/latest` - looks for `FEEDING_COMPLETE` status.
 - **Photo Capture**: Takes verification photo of feeding area.
@@ -408,7 +405,7 @@ Feed events progress through the following automated status transitions:
 
 ## Commits & Commitizen
 
-This project uses **Commitizen** to ensure commit messages follow a structured format and versioning is consistent. Commit linting is enforced via a pre-commit husky hook.
+This project uses **Commitizen** to ensure commit messages follow a structured format and versioning is consistent. Commit linting runs in the `commit-msg` Husky hook. The pre-commit hook runs lint-staged.
 
 ### Making a Commit
 
@@ -573,7 +570,7 @@ The following secrets must be configured in AWS Secrets Manager:
 
 - **`crow-detector-keys`**: Contains device public keys for authentication
   - `pi-user-public-key`
-  - `pi-motion-public-key` 
+  - `pi-motion-public-key`
   - `pi-feeder-public-key`
   - `lambda-s3-public-key`
 - **`crow-detector-db-{environment}`**: Database credentials
@@ -611,21 +608,7 @@ The S3 bucket is configured with:
 
 ## License
 
-    Apache License
-    Version 2.0, January 2004
-    http://www.apache.org/licenses/
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This package is `UNLICENSED`. See `package.json`.
 
 ---
 

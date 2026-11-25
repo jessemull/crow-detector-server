@@ -4,7 +4,12 @@ import { DetectionEvent } from './entity/detection-event.entity';
 import { DetectionEventService } from './services/detection-event.service';
 import { FeedEvent } from '../feed/entity/feed-event.entity';
 import { PatchDetectionDTO } from './dto/patch-detection.dto';
-import { Source, Status, ProcessingStatus } from '../common/types';
+import {
+  FeedEventStatus,
+  Source,
+  Status,
+  ProcessingStatus,
+} from '../common/types';
 import { Test, TestingModule } from '@nestjs/testing';
 
 describe('DetectionController', () => {
@@ -22,6 +27,7 @@ describe('DetectionController', () => {
     createdAt: new Date(),
     updatedAt: new Date(),
     detectionEvents: [],
+    feedEventStatus: FeedEventStatus.PENDING,
   };
 
   const mockDetectionEvent: DetectionEvent = {
@@ -129,9 +135,10 @@ describe('DetectionController', () => {
       const mockEvents = [mockDetectionEvent];
       mockDetectionEventService.find.mockResolvedValue(mockEvents);
 
-      const result = await controller.getDetectionEvents(limit, from, to);
+      const query = { limit, from, to } as never;
+      const result = await controller.getDetectionEvents(query);
 
-      expect(service.find).toHaveBeenCalledWith(limit, from, to);
+      expect(service.find).toHaveBeenCalledWith(query);
       expect(result).toEqual(mockEvents);
     });
 
@@ -139,9 +146,10 @@ describe('DetectionController', () => {
       const mockEvents = [mockDetectionEvent];
       mockDetectionEventService.find.mockResolvedValue(mockEvents);
 
-      const result = await controller.getDetectionEvents(0, '', '');
+      const query = { limit: 50 } as never;
+      const result = await controller.getDetectionEvents(query);
 
-      expect(service.find).toHaveBeenCalledWith(0, '', '');
+      expect(service.find).toHaveBeenCalledWith(query);
       expect(result).toEqual(mockEvents);
     });
 
@@ -150,7 +158,11 @@ describe('DetectionController', () => {
       mockDetectionEventService.find.mockRejectedValue(error);
 
       await expect(
-        controller.getDetectionEvents(10, '2024-01-01', '2024-12-31'),
+        controller.getDetectionEvents({
+          limit: 10,
+          from: '2024-01-01',
+          to: '2024-12-31',
+        }),
       ).rejects.toThrow('Service error');
     });
   });

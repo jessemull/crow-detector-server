@@ -13,7 +13,7 @@ export class DetectionEventSeeder extends BaseSeeder {
     // Get existing feed events to reference...
 
     const feedEventRepository = this.dataSource.getRepository(FeedEvent);
-    const feedEvents = await feedEventRepository.find();
+    const feedEvents = await feedEventRepository.find({ take: 100 });
 
     if (feedEvents.length === 0) {
       this.logger.warn('No feed events found. Please seed feed events first.');

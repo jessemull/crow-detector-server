@@ -34,7 +34,7 @@ const REQUIRED_GATES = [
   {
     name: 'typecheck',
     command:
-      'npx tsc --noEmit -p tsconfig.build.json && (cd lambda && npx tsc --noEmit -p tsconfig.json)',
+      'npx tsc --noEmit -p tsconfig.build.json && npx tsc --noEmit -p tsconfig.spec.json && (cd lambda && npx tsc --noEmit -p tsconfig.json && npx tsc --noEmit -p tsconfig.spec.json)',
   },
   {
     name: 'format',
@@ -62,7 +62,7 @@ const CRITERIA_FILE_PATTERN = /^[a-z0-9-]+\.md$/;
 const LOCATION_PATTERN = /^([^\s:]+):(\d+)(?:-(\d+))?$/;
 const FINDING_ID_PATTERN = /^F-\d+$/;
 const EVIDENCE_REFERENCE_PATTERNS = [
-  /`[^`]+`/,
+  /`[^`\n]*(?:\/|\s)[^`\n]*`/,
   /[\w@.-]+(?:\/[\w@.-]+)*\.[A-Za-z0-9]+:\d+/,
   /[\w@.-]+\/[\w@./-]+:\d+/,
 ];
@@ -126,6 +126,14 @@ const parseNameStatus = (output) => {
 };
 
 const isBinaryBuffer = (buffer) => buffer.subarray(0, 8000).includes(0);
+
+const countExistingLines = (filePath) => {
+  try {
+    return countLines(fs.readFileSync(filePath));
+  } catch {
+    return null;
+  }
+};
 
 const countLines = (buffer) => {
   if (buffer.length === 0) {
@@ -438,7 +446,9 @@ const checkFiles = (ledger, inventory, errors) => {
     }
     if (
       current.lineCount !== file.lineCount ||
-      current.change !== file.change
+      current.change !== file.change ||
+      ((current.change === 'R' || current.change === 'C') &&
+        file.oldPath !== current.oldPath)
     ) {
       errors.push(
         `${label}: changed since the inventory (now ${current.change}, ${current.lineCount} lines); review it again`,
@@ -606,6 +616,17 @@ const checkFindings = (ledger, criteriaRows, fileExists, errors) => {
       errors.push(`${label}: location must be path:line or path:start-end`);
     } else if (!fileExists(location[1])) {
       errors.push(`${label}: location path ${location[1]} does not exist`);
+    } else {
+      const lineCount = countExistingLines(location[1]);
+      if (lineCount !== null) {
+        const start = Number(location[2]);
+        const end = location[3] ? Number(location[3]) : start;
+        if (end < start || start < 1 || end > lineCount) {
+          errors.push(
+            `${label}: location is outside ${location[1]} (1-${lineCount})`,
+          );
+        }
+      }
     }
 
     for (const field of ['title', 'detail', 'evidence']) {

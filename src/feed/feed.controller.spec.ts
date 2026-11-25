@@ -3,7 +3,12 @@ import { FeedController } from './feed.controller';
 import { FeedEvent } from './entity/feed-event.entity';
 import { FeedEventService } from './services/feed-event.service';
 import { PatchFeedDTO } from './dto/patch-feed.dto';
-import { Source, Status, ProcessingStatus } from '../common/types';
+import {
+  FeedEventStatus,
+  Source,
+  Status,
+  ProcessingStatus,
+} from '../common/types';
 import { Test, TestingModule } from '@nestjs/testing';
 
 describe('FeedController', () => {
@@ -21,6 +26,7 @@ describe('FeedController', () => {
     updatedAt: new Date(),
     processingStatus: ProcessingStatus.COMPLETED,
     faceDetected: false,
+    feedEventStatus: FeedEventStatus.PENDING,
   };
 
   const mockFeedEventService = {
@@ -135,9 +141,10 @@ describe('FeedController', () => {
       const mockEvents = [mockFeedEvent];
       mockFeedEventService.find.mockResolvedValue(mockEvents);
 
-      const result = await controller.getFeedEvents(0, '', '');
+      const query = { limit: 50 } as never;
+      const result = await controller.getFeedEvents(query);
 
-      expect(service.find).toHaveBeenCalledWith(0, '', '');
+      expect(service.find).toHaveBeenCalledWith(query);
       expect(result).toEqual(mockEvents);
     });
 
@@ -149,9 +156,10 @@ describe('FeedController', () => {
 
       mockFeedEventService.find.mockResolvedValue(mockEvents);
 
-      const result = await controller.getFeedEvents(limit, from, to);
+      const query = { limit, from, to } as never;
+      const result = await controller.getFeedEvents(query);
 
-      expect(service.find).toHaveBeenCalledWith(limit, from, to);
+      expect(service.find).toHaveBeenCalledWith(query);
       expect(result).toEqual(mockEvents);
     });
 
@@ -160,7 +168,11 @@ describe('FeedController', () => {
       mockFeedEventService.find.mockRejectedValue(error);
 
       await expect(
-        controller.getFeedEvents(10, '2024-01-01', '2024-12-31'),
+        controller.getFeedEvents({
+          limit: 10,
+          from: '2024-01-01',
+          to: '2024-12-31',
+        }),
       ).rejects.toThrow('Service error');
     });
   });

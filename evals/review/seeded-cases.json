@@ -141,8 +141,8 @@
       "edits": [
         {
           "path": "lambda/src/index.ts",
-          "find": "    throw new Error('Some SQS events failed to process');",
-          "replace": "    return { statusCode: 200, body: JSON.stringify({ message: 'done', results }) };"
+          "find": "      if (!result.success) {\n        batchItemFailures.push({ itemIdentifier: record.messageId });\n      }",
+          "replace": "      if (!result.success) {\n        // acknowledge the failure so the batch is not retried\n      }"
         }
       ],
       "expected": [

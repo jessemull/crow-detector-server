@@ -145,7 +145,7 @@ describe('inventory main', () => {
     ).toBe(0);
     expect(err).toEqual([
       'warning: Working tree has uncommitted changes that this inventory ignores. Commit them or use --worktree.',
-      'warning: Husky hooks are not installed. Run npm run prepare.',
+      'warning: core.hooksPath must be .husky/_. Run npm run prepare.',
       'warning: Node v24.0.0 does not match .nvmrc (26). Run nvm use before running gates.',
     ]);
 
@@ -158,7 +158,7 @@ describe('inventory main', () => {
     err = [];
     expect(run(['--kind', 'pr', '--base', 'base', '--worktree'])).toBe(0);
     expect(err).toEqual([
-      'warning: Husky hooks are not installed. Run npm run prepare.',
+      'warning: core.hooksPath must be .husky/_. Run npm run prepare.',
     ]);
   });
 

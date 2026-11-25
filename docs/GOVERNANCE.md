@@ -10,13 +10,13 @@
 
 When guidance conflicts, the higher-ranked document wins:
 
-| Rank | Document                                            | Scope                                        |
-| ---- | --------------------------------------------------- | -------------------------------------------- |
-| 1    | `CONTEXT.md`                                        | Project identity, constraints, quality gates |
-| 2    | `GOVERNANCE.md`                                     | Process, constraints, authority, enforcement |
-| 3    | `ARCHITECTURE.md`                                   | Structure, modules, dependency rules         |
-| 4    | Feature docs (`ENVIRONMENT.md`, `SECURITY.md`, etc.) | Domain-specific guidance                    |
-| 5    | Inline code comments                                | Local intent, non-obvious rationale          |
+| Rank | Document                                             | Scope                                        |
+| ---- | ---------------------------------------------------- | -------------------------------------------- |
+| 1    | `CONTEXT.md`                                         | Project identity, constraints, quality gates |
+| 2    | `GOVERNANCE.md`                                      | Process, constraints, authority, enforcement |
+| 3    | `ARCHITECTURE.md`                                    | Structure, modules, dependency rules         |
+| 4    | Feature docs (`ENVIRONMENT.md`, `SECURITY.md`, etc.) | Domain-specific guidance                     |
+| 5    | Inline code comments                                 | Local intent, non-obvious rationale          |
 
 Resolve upward, never downward.
 
@@ -26,7 +26,7 @@ Resolve upward, never downward.
 
 ### Language and type safety
 
-- **TypeScript strict mode is mandatory.**
+- **TypeScript checks are mandatory:** `strictNullChecks`, `strictPropertyInitialization`, `noImplicitAny`, `strictBindCallApply`, and `noFallthroughCasesInSwitch`. The root tsconfig leaves `"strict": true` off. `lambda/tsconfig.json` enables it.
 - **No `any` in production code** without a justification comment. Tests may relax this.
 - Prefer explicit types on public APIs.
 
@@ -92,14 +92,14 @@ Resolve upward, never downward.
 
 ## Enforcement mechanisms
 
-| Mechanism                        | What it checks                                                                                         | Blocks?       |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------- |
-| Husky pre-commit (`lint-staged`) | ESLint + Prettier on staged files                                                                      | Yes (commit)  |
-| Husky commit-msg                 | Conventional Commits + scope enum                                                                      | Yes (commit)  |
-| Husky pre-push                   | `make preflight` (root + lambda)                                                                       | Yes (push)    |
-| GitHub Actions PR workflow       | lint, format-check, test (Jest 80%), build; npm audit (high+, blocking once clean)                     | Yes (merge)   |
-| GitHub Actions lambda PR         | lambda lint, test, package                                                                             | Yes (merge)   |
-| GitHub Actions deploy workflows  | quality gates then deploy                                                                              | Yes (deploy)  |
+| Mechanism                        | What it checks                                                                       | Blocks?       |
+| -------------------------------- | ------------------------------------------------------------------------------------ | ------------- |
+| Husky pre-commit (`lint-staged`) | ESLint + Prettier on staged files                                                    | Yes (commit)  |
+| Husky commit-msg                 | Conventional Commits + scope enum                                                    | Yes (commit)  |
+| Husky pre-push                   | `make preflight` (root + lambda)                                                     | Yes (push)    |
+| GitHub Actions PR workflow       | lint, format-check, test (Jest 80%), build; npm audit (high+, blocking once clean)   | Yes (merge)   |
+| GitHub Actions lambda PR         | lambda lint, test, package                                                           | Yes (merge)   |
+| GitHub Actions deploy workflows  | quality gates then deploy                                                            | Yes (deploy)  |
 | PR review                        | Architecture, security, tests, and the `docs/review/` criteria with a checked ledger | Yes (process) |
 
 Skipping hooks is not acceptable for shared branches — CI will catch violations regardless.

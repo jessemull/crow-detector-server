@@ -16,12 +16,21 @@ jobs:
   deploy:
     name: Deploy to ECS Fargate
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DEPLOY_ENVIRONMENT: ${{ github.event.inputs.environment }}
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: false
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Install Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
@@ -49,7 +58,7 @@ jobs:
         run: npm run test:cov
 
       - name: Upload Coverage Report
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: coverage-report
           path: coverage
@@ -66,32 +75,30 @@ jobs:
         run: npm run build
 
       - name: Set Up AWS CLI
-        uses: aws-actions/configure-aws-credentials@v6
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-west-2
 
       - name: Log Into AWS ECR
         id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
+        uses: aws-actions/amazon-ecr-login@7290e214a610b32bc0eef81748948b6d466a8783
 
       - name: Build Docker Image
         run: |
           docker build -t crow-detector-server:$GITHUB_SHA .
-          docker tag crow-detector-server:$GITHUB_SHA ${{ steps.login-ecr.outputs.registry }}/crow-detector-server-${{ github.event.inputs.environment }}:$GITHUB_SHA
+          docker tag crow-detector-server:$GITHUB_SHA ${{ steps.login-ecr.outputs.registry }}/crow-detector-server-${DEPLOY_ENVIRONMENT}:$GITHUB_SHA
 
       - name: Push Docker Image to ECR
         run: |
-          docker push ${{ steps.login-ecr.outputs.registry }}/crow-detector-server-${{ github.event.inputs.environment }}:$GITHUB_SHA
-          echo "CONTAINER_IMAGE_URI=${{ steps.login-ecr.outputs.registry }}/crow-detector-server-${{ github.event.inputs.environment }}:$GITHUB_SHA" >> $GITHUB_ENV
+          docker push ${{ steps.login-ecr.outputs.registry }}/crow-detector-server-${DEPLOY_ENVIRONMENT}:$GITHUB_SHA
+          echo "CONTAINER_IMAGE_URI=${{ steps.login-ecr.outputs.registry }}/crow-detector-server-${DEPLOY_ENVIRONMENT}:$GITHUB_SHA" >> $GITHUB_ENV
 
       - name: Deploy ECS Task Definition
         run: |
           aws cloudformation deploy \
-            --stack-name crow-detector-task-stack-${{ github.event.inputs.environment }} \
+            --stack-name crow-detector-task-stack-${DEPLOY_ENVIRONMENT} \
             --template-file cloudformation/crow-detector-ecs-task.yaml \
-            --parameter-overrides ContainerImage=${{ env.CONTAINER_IMAGE_URI }} Environment=${{ github.event.inputs.environment }} \
+            --parameter-overrides ContainerImage=${{ env.CONTAINER_IMAGE_URI }} Environment=${DEPLOY_ENVIRONMENT} \
             --capabilities CAPABILITY_NAMED_IAM \
             --region us-west-2
-

@@ -40,8 +40,7 @@ RDS_USERNAME=your-username
 RDS_PASSWORD=your-password
 RDS_DATABASE=crow_detector_db_dev
 
-# SSL Configuration
-SSL_REJECT_UNAUTHORIZED=false  # For RDS compatibility
+# RDS TLS uses the bundled CA. Leave SSL_REJECT_UNAUTHORIZED unset.
 NODE_ENV=development
 ```
 
@@ -62,18 +61,11 @@ npm run db:seed
 # Reset the database (clear all data)
 npm run db:reset
 
-# Reset and then seed the database
-npm run db:reset-and-seed
+# Check the connection
+npm run db:test
 ```
 
-### Individual Scripts
-
-```bash
-# Run individual scripts directly
-npx ts-node -r tsconfig-paths/register src/database/seed.ts
-npx ts-node -r tsconfig-paths/register src/database/reset.ts
-npx ts-node -r tsconfig-paths/register src/database/reset-and-seed.ts
-```
+The scripts live under `scripts/db-seed/`. `npm run db:synchronize` is local-only and does not run as part of seed.
 
 ## Seeding Process
 
@@ -85,6 +77,7 @@ The seeding process follows this order to respect foreign key constraints:
 ### Generated Data
 
 #### Feed Events
+
 - **ID**: UUID (auto-generated)
 - **Confidence**: Random float (0.1 - 1.0)
 - **Image URLs**: Realistic image URLs
@@ -93,6 +86,7 @@ The seeding process follows this order to respect foreign key constraints:
 - **Timestamps**: Random dates within reasonable range
 
 #### Detection Events
+
 - **ID**: UUID (auto-generated)
 - **Confidence**: Random float (0.1 - 1.0)
 - **Crow Count**: Random integer (1-20)
@@ -156,4 +150,4 @@ When adding new entities:
 1. Create a new seeder extending `BaseSeeder`
 2. Implement `seed()` and `clear()` methods
 3. Add to the main `DatabaseSeeder` orchestrator
-4. Update this README with new entity details 
+4. Update this README with new entity details

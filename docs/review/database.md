@@ -6,7 +6,7 @@
 
 ## How to review
 
-This repo uses TypeORM 0.3 against RDS. There is no migration folder today; schema changes go through entities and a synchronize path used by seed scripts. Treat `synchronize: true` on any deployed path as data loss. For each query, ask how many rows it can return and how many round trips a request makes.
+This repo uses TypeORM 0.3 against RDS. There is no migration folder today. `synchronize` stays false in the app and in the seed script, so schema changes are applied manually. `npm run db:synchronize` is a separate local-only command and refuses a non-local database. Treat `synchronize: true` on any deployed path as data loss. For each query, ask how many rows it can return and how many round trips a request makes.
 
 ## Criteria
 

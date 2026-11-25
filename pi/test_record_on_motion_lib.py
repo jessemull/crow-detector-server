@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import http.client
+import importlib.util
+import json
 import tempfile
 import threading
 import time
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from record_on_motion_lib import (
     ContinuousRetainPipeline,
@@ -22,12 +26,23 @@ from record_on_motion_lib import (
     prune_segments_older_than,
     rtsp_substream_url,
     select_segments_overlapping_window,
+    signed_payload,
     visit_keep_after_epoch,
     visit_limits_from_env,
     visit_retain_window,
     wait_for_motion,
     write_concat_list,
 )
+
+
+class SignedPayloadTests(unittest.TestCase):
+    def test_porch_upload_matches_api_guard(self) -> None:
+        body = {"fileName": "clip-1", "contentLength": 1200}
+        payload = signed_payload("POST", "/urls/porch", body, "1700000000000")
+        self.assertEqual(
+            payload,
+            'POST/urls/porch{"fileName":"clip-1","contentLength":1200}1700000000000',
+        )
 
 
 class ParseEnvLineTests(unittest.TestCase):
@@ -454,7 +469,7 @@ class PipelineTests(unittest.TestCase):
             try:
                 deadline = time.monotonic() + 2.0
                 while stdout.reads < total and time.monotonic() < deadline:
-                    time.sleep(0.01)
+                    time.sleep(0)
                 self.assertEqual(stdout.reads, total)
             finally:
                 pipeline.close()
@@ -663,6 +678,34 @@ class MotionLoopTests(unittest.TestCase):
         )
         self.assertEqual(reason, "cap")
         self.assertGreater(end, 5_000.0)
+
+
+class UploadRetryTests(unittest.TestCase):
+    def test_retries_incomplete_read_and_bad_json(self) -> None:
+        spec = importlib.util.spec_from_file_location(
+            "record_on_motion",
+            Path(__file__).with_name("record-on-motion.py"),
+        )
+        assert spec is not None and spec.loader is not None
+        recorder = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(recorder)
+
+        path = Path("clip.mp4")
+        with (
+            mock.patch.object(
+                recorder,
+                "upload_clip",
+                side_effect=[
+                    http.client.IncompleteRead(partial=b""),
+                    json.JSONDecodeError("bad", "doc", 0),
+                    None,
+                ],
+            ) as upload,
+            mock.patch.object(recorder.time, "sleep"),
+            mock.patch.object(Path, "unlink"),
+        ):
+            recorder.upload_and_remove(path, attempts=3)
+        self.assertEqual(upload.call_count, 3)
 
 
 if __name__ == "__main__":

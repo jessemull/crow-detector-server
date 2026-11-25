@@ -30,7 +30,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - secretsmanager:GetSecretValue
-                Resource: 
+                Resource:
                   - !Sub 'arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:crow-detector-db-${Environment}*'
                   - !Sub 'arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:crow-detector-claude-api-key*'
 
@@ -45,8 +45,6 @@ Resources:
             Principal:
               Service: ecs-tasks.amazonaws.com
             Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
       Policies:
         - PolicyName: S3Access
           PolicyDocument:
@@ -85,4 +83,4 @@ Outputs:
     Description: The ARN of the ECS task role
     Value: !GetAtt TaskRole.Arn
     Export:
-      Name: !Sub 'crow-detector-iam-roles-${Environment}-TaskRoleArn' 
+      Name: !Sub 'crow-detector-iam-roles-${Environment}-TaskRoleArn'

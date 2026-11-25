@@ -17,6 +17,39 @@ Commands:
   apply <id> [--force]      Apply a case to the working tree (clean, non-main branch only)
   score <id> <ledger.json>  Score a review ledger against a case's expected findings`;
 
+const resolveInsideRepo = (cwd, relativePath) => {
+  if (
+    typeof relativePath !== 'string' ||
+    path.isAbsolute(relativePath) ||
+    relativePath.split(/[/\\]/).includes('..')
+  ) {
+    throw new Error(`Refusing path outside the repository: ${relativePath}`);
+  }
+  const root = fs.realpathSync(path.resolve(cwd));
+  const target = path.resolve(root, relativePath);
+  if (target !== root && !target.startsWith(`${root}${path.sep}`)) {
+    throw new Error(`Refusing path outside the repository: ${relativePath}`);
+  }
+  let realParent;
+  try {
+    realParent = fs.realpathSync(path.dirname(target));
+  } catch {
+    throw new Error(`Refusing path outside the repository: ${relativePath}`);
+  }
+  const realTarget = path.join(realParent, path.basename(target));
+  if (realTarget !== root && !realTarget.startsWith(`${root}${path.sep}`)) {
+    throw new Error(`Refusing path outside the repository: ${relativePath}`);
+  }
+  if (!fs.existsSync(realTarget)) {
+    return realTarget;
+  }
+  const resolved = fs.realpathSync(realTarget);
+  if (resolved !== root && !resolved.startsWith(`${root}${path.sep}`)) {
+    throw new Error(`Refusing path outside the repository: ${relativePath}`);
+  }
+  return resolved;
+};
+
 const countOccurrences = (text, search) => {
   if (search === '') {
     return 0;
@@ -46,14 +79,19 @@ const resolveEdits = (cases, id, trail = []) => {
   return [...included, ...(found.edits || [])];
 };
 
-const resolveExpected = (cases, id) => {
+const resolveExpected = (cases, id, trail = []) => {
   const found = cases.find((item) => item.id === id);
   if (!found) {
     throw new Error(`Unknown case "${id}"`);
   }
+  if (trail.includes(id)) {
+    throw new Error(
+      `Case "${id}" includes itself through ${trail.join(' -> ')}`,
+    );
+  }
   return [
     ...(found.includes || []).flatMap((childId) =>
-      resolveExpected(cases, childId),
+      resolveExpected(cases, childId, [...trail, id]),
     ),
     ...(found.expected || []),
   ];
@@ -180,7 +218,7 @@ const main = (argv, deps = {}) => {
   const stdout = deps.stdout || ((text) => process.stdout.write(`${text}\n`));
   const stderr = deps.stderr || ((text) => process.stderr.write(`${text}\n`));
   const readText = (relativePath) => {
-    const absolute = path.join(cwd, relativePath);
+    const absolute = resolveInsideRepo(cwd, relativePath);
     return fsImpl.existsSync(absolute)
       ? fsImpl.readFileSync(absolute, 'utf8')
       : null;
@@ -232,7 +270,17 @@ const main = (argv, deps = {}) => {
       }
       const force = flag === '--force';
       const branch = git(['rev-parse', '--abbrev-ref', 'HEAD']).trim();
-      if (PROTECTED_BRANCHES.includes(branch)) {
+      const head = git(['rev-parse', 'HEAD']).trim();
+      const onProtectedCommit =
+        branch === 'HEAD' &&
+        PROTECTED_BRANCHES.some((name) => {
+          try {
+            return git(['rev-parse', name]).trim() === head;
+          } catch {
+            return false;
+          }
+        });
+      if (PROTECTED_BRANCHES.includes(branch) || onProtectedCommit) {
         stderr(
           `Refusing to apply a seeded case on ${branch}. Create an eval branch first.`,
         );
@@ -253,7 +301,7 @@ const main = (argv, deps = {}) => {
         return 1;
       }
       for (const [relativePath, text] of files) {
-        fsImpl.writeFileSync(path.join(cwd, relativePath), text);
+        fsImpl.writeFileSync(resolveInsideRepo(cwd, relativePath), text);
       }
       stdout(
         `Applied ${id} to ${files.size} file(s). Commit it on this branch, then run pr-review against the parent commit.`,

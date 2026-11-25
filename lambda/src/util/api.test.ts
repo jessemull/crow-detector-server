@@ -16,6 +16,7 @@ jest.mock('./images', () => ({
 
 describe('callAPI', () => {
   beforeEach(() => {
+    process.env.API_BASE_URL = 'https://api.example.com';
     jest.useFakeTimers();
     jest.clearAllMocks();
   });
@@ -48,5 +49,23 @@ describe('callAPI', () => {
     expect(abortSpy).toHaveBeenCalled();
 
     jest.spyOn(global, 'AbortController').mockRestore();
+  });
+
+  it('resolves a 409 conflict without throwing', async () => {
+    process.env.API_BASE_URL = 'https://api.example.com';
+    global.fetch = jest.fn().mockResolvedValue({
+      status: 409,
+      ok: false,
+      json: () => Promise.resolve({}),
+    }) as unknown as typeof fetch;
+
+    await expect(
+      callAPI({
+        bucket: 'bucket',
+        key: 'feed/a.jpg',
+        size: 1,
+        eventName: 'ObjectCreated:Put',
+      }),
+    ).resolves.toBeUndefined();
   });
 });

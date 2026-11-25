@@ -12,10 +12,9 @@ There are two packages. Root gates do not cover `lambda/`, and lambda gates do n
 
 Known blind spots (check by hand, do not assume the tools did):
 
-- `tsconfig.json` sets `noImplicitAny: false`, `strictBindCallApply: false`, and `strictPropertyInitialization: false`, and `noFallthroughCasesInSwitch` is off. `npx tsc --noEmit -p tsconfig.json` also fails today because Jest globals are not in the type scope for `*.spec.ts`; the gate uses `tsconfig.build.json`, which excludes tests, so tests are not typechecked.
-- Root ESLint uses `recommendedTypeChecked`, but `no-explicit-any` is off, and `no-floating-promises`, `no-unsafe-*`, and `no-unused-vars` are warnings. `npm run lint` passes `--fix` and does not use `--max-warnings 0`.
-- `scripts/**/*.ts` and tests have the `no-unsafe-*` rules turned off entirely.
-- `lint-staged` only lists `*.ts`. YAML, Python, shell, Markdown, and JSON are not formatted on commit.
+- `tsconfig.build.json` excludes tests so the production build stays free of Jest. Tests are typechecked by `tsconfig.spec.json` and `lambda/tsconfig.spec.json`, which add the Jest types. `tsc -p tsconfig.json` at the root still fails, because that config does not include the Jest types.
+- `scripts/**/*.ts` and tests turn `no-explicit-any` and the `no-unsafe-*` rules off. Production code does not.
+- `lint-staged` formats TypeScript, JSON, Markdown, and YAML. Python and shell have no formatter in this repo, so those files are checked by reading them.
 - Coverage thresholds are global, so one file can sit below 80%. `*.dto.ts`, `*.entity.ts`, `main.ts`, and `index.ts` are excluded from coverage.
 - `make preflight` runs porch tests; the lambda PR workflow does not.
 
@@ -23,9 +22,9 @@ Known blind spots (check by hand, do not assume the tools did):
 
 - **GATE-01** (MUST) Husky hooks are installed and the branch's commits pass commitlint. Verify: `git config core.hooksPath` is `.husky/_`, `test -d .husky/_`, and `npx --no-install commitlint --from <base> --to HEAD` exits 0.
 - **GATE-02** (MUST) The Node version matches `.nvmrc` and root `engines` (26). Lambda runtime stays Node 24. Verify: `node -v`; record it in the gates evidence.
-- **GATE-03** (MUST) `make lint` and `make lambda-lint` exit 0, and changed files add no new warnings. Verify: run both and list warnings in changed files; each new warning is a finding because lint does not fail on warnings.
-- **GATE-04** (MUST) Typecheck exits 0 for both packages. Verify: `npx tsc --noEmit -p tsconfig.build.json` and `(cd lambda && npx tsc --noEmit -p tsconfig.json)`.
-- **GATE-05** (SHOULD) Formatting is clean for both packages. Verify: `make format-check` and `make lambda-format-check` exit 0. Changed YAML, Python, shell, and Markdown are formatted consistently by inspection, since lint-staged does not cover them.
+- **GATE-03** (MUST) `make lint` and `make lambda-lint` exit 0. Both commands use `--max-warnings 0`. Verify: run both.
+- **GATE-04** (MUST) Typecheck exits 0 for both packages, including tests. Verify: `npx tsc --noEmit -p tsconfig.build.json`, `npx tsc --noEmit -p tsconfig.spec.json`, and in `lambda/` the same two commands against `tsconfig.json` and `tsconfig.spec.json`.
+- **GATE-05** (SHOULD) Formatting is clean for both packages. Verify: `make format-check` and `make lambda-format-check` exit 0. Changed YAML, Markdown, and JSON are formatted by lint-staged. Changed Python and shell are formatted consistently by inspection.
 - **GATE-06** (MUST) `make test`, `make lambda-test`, and `make porch-test` exit 0 with the 80% thresholds met. Verify: run them and read the coverage summary; note per-file branch coverage for changed files.
 - **GATE-07** (MUST) `make build` and `make lambda-build` exit 0. Verify: run them.
 - **GATE-08** (MUST) `npm audit --audit-level=high` was run in the root and in `lambda/`, and every high or critical finding is triaged. Verify: run both and record the counts.

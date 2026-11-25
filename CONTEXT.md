@@ -30,13 +30,13 @@ Domain doc when touching porch/feeder/Pi/hardware capture: **`docs/DEVICES.md`**
 
 When instructions conflict, the **higher-ranked source wins**:
 
-| Priority    | Source                                              | Scope                                         |
-| ----------- | --------------------------------------------------- | --------------------------------------------- |
-| 1 (highest) | `CONTEXT.md`                                        | Repository-wide constraints and quality gates |
-| 2           | `docs/GOVERNANCE.md`                                | Contribution workflow and review policy       |
-| 3           | `docs/ARCHITECTURE.md`                              | System design and module boundaries           |
-| 4           | Feature docs (`docs/ENVIRONMENT.md`, SECURITY, etc.) | Domain-level design decisions                |
-| 5 (lowest)  | Inline code comments                                | Local implementation notes                    |
+| Priority    | Source                                               | Scope                                         |
+| ----------- | ---------------------------------------------------- | --------------------------------------------- |
+| 1 (highest) | `CONTEXT.md`                                         | Repository-wide constraints and quality gates |
+| 2           | `docs/GOVERNANCE.md`                                 | Contribution workflow and review policy       |
+| 3           | `docs/ARCHITECTURE.md`                               | System design and module boundaries           |
+| 4           | Feature docs (`docs/ENVIRONMENT.md`, SECURITY, etc.) | Domain-level design decisions                 |
+| 5 (lowest)  | Inline code comments                                 | Local implementation notes                    |
 
 **Lower-precedence instructions MUST NOT contradict higher-precedence instructions.** If a conflict is detected, flag it for human review and follow the higher-precedence source.
 
@@ -48,7 +48,7 @@ These constraints apply to **every change** in this repository. No exceptions wi
 
 ### Language & Type Safety
 
-- **TypeScript strict mode**: always enabled; never weaken `tsconfig.json` strictness
+- **TypeScript checks**: `strictNullChecks`, `strictPropertyInitialization`, `noImplicitAny`, `strictBindCallApply`, and `noFallthroughCasesInSwitch` are on. Do not weaken them. The root `tsconfig.json` does not enable `"strict": true`. `lambda/tsconfig.json` does.
 - **No `any` without justification**: avoid unjustified `any` in production code (relaxed in `*.spec.ts` / `*.test.ts`)
 - **Named exports preferred**: follow existing Nest module patterns
 
@@ -84,7 +84,7 @@ These constraints apply to **every change** in this repository. No exceptions wi
 
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
 │  S3 upload      │ ──► │  SQS + Lambda   │ ──► │  Nest API       │
-│  (Pi / client)  │     │  (ECDSA signed) │     │  /feed|/detect  │
+│  (Pi / client)  │     │  (ECDSA signed) │     │ /feed|/detection│
 └─────────────────┘     └─────────────────┘     └─────────────────┘
 ```
 
@@ -100,22 +100,22 @@ These constraints apply to **every change** in this repository. No exceptions wi
 
 ## Mandatory Quality Gates
 
-| When               | Gate                                                                                                                          | Failure policy |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------------------- | -------------- |
-| **Commit**         | Husky `pre-commit` — `lint-staged` (ESLint + Prettier on staged files)                                                        | Block commit   |
-| **Commit message** | Husky `commit-msg` — commitlint (Conventional Commits + scope enum)                                                           | Block commit   |
-| **Push**           | Husky `pre-push` — `make preflight` (root + lambda quality)                                                                   | Block push     |
-| **PR / CI**        | GitHub Actions: lint, format-check, test (Jest 80%), build; lambda workflows; npm audit (high+, blocking once clean)          | Block merge    |
-| **Review**         | `pr-review` / `repo-review` skills against `docs/review/`; a ledger must pass `npm run review:check`                          | Block merge    |
+| When               | Gate                                                                                                                 | Failure policy |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------- | -------------- |
+| **Commit**         | Husky `pre-commit` — `lint-staged` (ESLint + Prettier on staged files)                                               | Block commit   |
+| **Commit message** | Husky `commit-msg` — commitlint (Conventional Commits + scope enum)                                                  | Block commit   |
+| **Push**           | Husky `pre-push` — `make preflight` (root + lambda quality)                                                          | Block push     |
+| **PR / CI**        | GitHub Actions: lint, format-check, test (Jest 80%), build; lambda workflows; npm audit (high+, blocking once clean) | Block merge    |
+| **Review**         | `pr-review` / `repo-review` skills against `docs/review/`; a ledger must pass `npm run review:check`                 | Block merge    |
 
 ### When to run what (avoid duplicate work)
 
-| Situation              | Command             | Notes                                             |
-| ---------------------- | ------------------- | ------------------------------------------------- |
-| **During development** | `make lint`, `make test`, scoped Jest | Fast iteration                      |
-| **Before push**        | **`git push`**      | Husky runs full push validation                   |
-| **Local full check**   | `make preflight`    | Optional before PR; same suite as push            |
-| **Full repo audit**    | `make preflight`    | Release / `repo-review` skill only                |
+| Situation              | Command                               | Notes                                  |
+| ---------------------- | ------------------------------------- | -------------------------------------- |
+| **During development** | `make lint`, `make test`, scoped Jest | Fast iteration                         |
+| **Before push**        | **`git push`**                        | Husky runs full push validation        |
+| **Local full check**   | `make preflight`                      | Optional before PR; same suite as push |
+| **Full repo audit**    | `make preflight`                      | Release / `repo-review` skill only     |
 
 **Do not** run `make preflight` and then `git push` in the same session unless you need an extra local confirmation — push re-runs the same suite.
 
@@ -171,19 +171,19 @@ Before implementing any changes, confirm you have read and understood:
 
 ## Project Summary
 
-| Field       | Value                                                         |
-| ----------- | ------------------------------------------------------------- |
-| Project     | Crow Detector Server                                          |
-| Type        | NestJS 11 + Fastify TypeScript API + nested S3 Lambda         |
+| Field       | Value                                                                                  |
+| ----------- | -------------------------------------------------------------------------------------- |
+| Project     | Crow Detector Server                                                                   |
+| Type        | NestJS 11 + Fastify TypeScript API + nested S3 Lambda                                  |
 | Runtime     | Node.js 26 (API / ECS); Node.js 24 (Lambda runtime — AWS max; Node 26 not offered yet) |
-| Language    | TypeScript (strict)                                           |
-| Compute     | AWS ECS Fargate + Lambda                                      |
-| Storage     | PostgreSQL (TypeORM) + S3                                     |
-| AI / Vision | AWS Rekognition + Anthropic Claude                            |
-| Auth        | ECDSA device signatures                                       |
-| IaC         | CloudFormation (`ImportValue` for `aws-infra-*`)              |
-| Logging     | Bunyan → CloudWatch                                           |
-| Testing     | Jest (80% coverage)                                           |
-| Lint/Format | ESLint + Prettier                                             |
-| Git         | Husky + lint-staged + Commitizen + Commitlint                 |
-| CI          | GitHub Actions                                                |
+| Language    | TypeScript (strict)                                                                    |
+| Compute     | AWS ECS Fargate + Lambda                                                               |
+| Storage     | PostgreSQL (TypeORM) + S3                                                              |
+| AI / Vision | AWS Rekognition + Anthropic Claude                                                     |
+| Auth        | ECDSA device signatures                                                                |
+| IaC         | CloudFormation (`ImportValue` for `aws-infra-*`)                                       |
+| Logging     | Bunyan → CloudWatch                                                                    |
+| Testing     | Jest (80% coverage)                                                                    |
+| Lint/Format | ESLint + Prettier                                                                      |
+| Git         | Husky + lint-staged + Commitizen + Commitlint                                          |
+| CI          | GitHub Actions                                                                         |

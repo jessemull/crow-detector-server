@@ -4,6 +4,7 @@ import {
   Get,
   Headers,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -15,6 +16,7 @@ import { FeedEventService } from './services/feed-event.service';
 import { FeedResponse } from 'src/common/types';
 import { PatchFeedDTO } from './dto/patch-feed.dto';
 import { UpdateFeedStatusDto } from './dto/update-feed-status.dto';
+import { ListEventsQueryDto } from 'src/common/dto/list-events-query.dto';
 import { EcdsaAuthGuard } from '../auth/middleware/ecdsa-auth.guard';
 
 @Controller('feed')
@@ -39,23 +41,25 @@ export class FeedController {
   }
 
   @Get('events')
+  @UseGuards(EcdsaAuthGuard)
   async getFeedEvents(
-    @Query('limit') limit: number,
-    @Query('from') from: string,
-    @Query('to') to: string,
+    @Query() query: ListEventsQueryDto,
   ): Promise<FeedEvent[]> {
-    return this.feedEventService.find(limit, from, to);
+    return this.feedEventService.find(query);
   }
 
   @Get(':id')
-  async getFeedEventById(@Param('id') id: string): Promise<FeedEvent> {
+  @UseGuards(EcdsaAuthGuard)
+  async getFeedEventById(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<FeedEvent> {
     return this.feedEventService.findById(id);
   }
 
   @Patch(':id')
   @UseGuards(EcdsaAuthGuard)
   async updateFeedEvent(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() patchFeedDTO: PatchFeedDTO,
   ): Promise<FeedResponse> {
     const event = await this.feedEventService.update(id, patchFeedDTO);
@@ -67,7 +71,9 @@ export class FeedController {
 
   @Post('reprocess/:id')
   @UseGuards(EcdsaAuthGuard)
-  async reprocessImage(@Param('id') id: string): Promise<FeedResponse> {
+  async reprocessImage(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<FeedResponse> {
     await this.feedEventService.reprocessImage(id);
     return {
       data: null,
@@ -76,6 +82,7 @@ export class FeedController {
   }
 
   @Get('status/latest')
+  @UseGuards(EcdsaAuthGuard)
   async getLatestFeedEventStatus() {
     const status = await this.feedEventService.getLatestFeedEventStatus();
     if (!status) {
@@ -93,7 +100,7 @@ export class FeedController {
   @Patch('status/:id')
   @UseGuards(EcdsaAuthGuard)
   async updateFeedEventStatus(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() updateFeedStatusDto: UpdateFeedStatusDto,
   ): Promise<FeedResponse> {
     const event = await this.feedEventService.updateFeedEventStatus(

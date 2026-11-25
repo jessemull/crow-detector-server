@@ -3,6 +3,24 @@ import { DetectionEvent } from '../../src/detection/entity/detection-event.entit
 import { FeedEvent } from '../../src/feed/entity/feed-event.entity';
 import { FeedEventSeeder, DetectionEventSeeder } from './seeders';
 import { createLogger } from '../../src/common/logger/logger.config';
+import { buildRdsSslOptions } from '../../src/config/rds-ca';
+
+function assertLocalDatabase(operation: string): void {
+  const nodeEnv = process.env.NODE_ENV;
+  if (nodeEnv !== 'development' && nodeEnv !== 'test') {
+    throw new Error(
+      `Refusing to ${operation} unless NODE_ENV is development or test`,
+    );
+  }
+}
+
+function postgresSsl(): { rejectUnauthorized: boolean; ca?: string } {
+  const isProdLike =
+    process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'prod';
+  return buildRdsSslOptions(
+    isProdLike || process.env.SSL_REJECT_UNAUTHORIZED !== 'false',
+  );
+}
 
 export class DatabaseSeeder {
   private dataSource: DataSource;
@@ -19,9 +37,7 @@ export class DatabaseSeeder {
       entities: [FeedEvent, DetectionEvent],
       synchronize: false,
       logging: process.env.NODE_ENV === 'development',
-      ssl: {
-        rejectUnauthorized: process.env.SSL_REJECT_UNAUTHORIZED === 'true',
-      },
+      ssl: postgresSsl(),
     });
   }
 
@@ -43,6 +59,7 @@ export class DatabaseSeeder {
   }
 
   async seed(): Promise<void> {
+    assertLocalDatabase('seed');
     try {
       this.logger.info('Starting database seeding...');
 
@@ -60,6 +77,7 @@ export class DatabaseSeeder {
   }
 
   async reset(): Promise<void> {
+    assertLocalDatabase('reset');
     try {
       this.logger.info('Starting database reset...');
 
@@ -77,6 +95,8 @@ export class DatabaseSeeder {
   }
 
   async synchronize(): Promise<void> {
+    assertLocalDatabase('synchronize');
+
     try {
       this.logger.info('Starting database synchronization...');
 
@@ -88,9 +108,9 @@ export class DatabaseSeeder {
 
       this.logger.info('Tables dropped successfully');
       this.logger.info(
-        'Now restart your NestJS app to recreate tables with new schema',
+        'Nest will not recreate them: TypeORM synchronize is false.',
       );
-      this.logger.info('Then run: npm run db:seed');
+      this.logger.info('Apply the schema yourself, then run: npm run db:seed');
     } catch (error) {
       this.logger.error({ error }, 'Synchronization failed');
       throw error;

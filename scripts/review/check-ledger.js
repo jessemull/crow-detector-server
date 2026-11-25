@@ -51,6 +51,45 @@ const main = (argv, deps = {}) => {
     return 1;
   }
 
+  let mergeBaseOmission = '';
+  if (ledger.kind === 'pr' && ledger.base) {
+    let headCommit = '';
+    let baseCommit = '';
+    try {
+      headCommit = git(['rev-parse', 'HEAD']).trim();
+      baseCommit = git(['rev-parse', ledger.base]).trim();
+    } catch (error) {
+      stderr(`Could not resolve the ledger base: ${error.message}`);
+      return 1;
+    }
+    if (baseCommit === headCommit) {
+      stderr(
+        'PR ledger base resolves to HEAD, so the checker would see an empty diff.',
+      );
+      return 1;
+    }
+    try {
+      const honest = collectInventory({
+        kind: 'pr',
+        base: ledger.base,
+        baseSha: null,
+        worktree: ledger.worktree === true,
+        git,
+        readWorktreeFile: deps.readWorktreeFile || readWorktreeFileFrom(cwd),
+      });
+      const covered = new Set((ledger.files || []).map((file) => file.path));
+      const missing = honest.files.filter((file) => !covered.has(file.path));
+      if (missing.length > 0) {
+        mergeBaseOmission = `Ledger omits files from the merge-base diff: ${missing
+          .map((file) => file.path)
+          .join(', ')}`;
+      }
+    } catch (error) {
+      stderr(`Could not rebuild the merge-base diff: ${error.message}`);
+      return 1;
+    }
+  }
+
   let inventory;
   let headSha;
   try {
@@ -79,6 +118,9 @@ const main = (argv, deps = {}) => {
     headSha,
     fileExists,
   });
+  if (mergeBaseOmission) {
+    errors.unshift(mergeBaseOmission);
+  }
   const summary = summarizeLedger(ledger);
 
   stdout(`Ledger ${argv[0]}`);

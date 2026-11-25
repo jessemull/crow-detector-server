@@ -46,7 +46,7 @@ describe('UrlsController', () => {
         fileName: 'test-image',
         format: ImageFormat.JPG,
         source: 'pi-feeder-001',
-        contentType: 'image/jpeg',
+        contentLength: 1024,
       };
 
       const expectedResult = {
@@ -81,6 +81,7 @@ describe('UrlsController', () => {
         fileName: 'test-image',
         format: ImageFormat.JPG,
         source: 'pi-feeder-001',
+        contentLength: 1024,
       };
 
       const error = new Error('S3 service error');
@@ -100,7 +101,7 @@ describe('UrlsController', () => {
       const createDetectionImageUrlDto: CreateDetectionImageUrlDto = {
         fileName: 'motion-detected',
         format: ImageFormat.PNG,
-        contentType: 'image/png',
+        contentLength: 1024,
       };
 
       const expectedResult = {
@@ -134,6 +135,7 @@ describe('UrlsController', () => {
       const createDetectionImageUrlDto: CreateDetectionImageUrlDto = {
         fileName: 'motion-detected',
         format: ImageFormat.PNG,
+        contentLength: 1024,
       };
 
       const error = new Error('S3 service error');
@@ -152,7 +154,7 @@ describe('UrlsController', () => {
     it('should create a porch clip signed URL for pi-porch', async () => {
       const createPorchClipUrlDto: CreatePorchClipUrlDto = {
         fileName: 'clip-20261114-210000',
-        contentType: 'video/mp4',
+        contentLength: 1200,
       };
 
       const expectedResult = {
@@ -184,9 +186,10 @@ describe('UrlsController', () => {
 
     it('should reject other devices', async () => {
       await expect(
-        controller.createPorchClipSignedUrl({ fileName: 'clip-1' }, {
-          deviceId: 'pi-user',
-        } as any),
+        controller.createPorchClipSignedUrl(
+          { fileName: 'clip-1', contentLength: 1200 },
+          { deviceId: 'pi-user' } as any,
+        ),
       ).rejects.toThrow(ForbiddenException);
       expect(service.createPorchClipSignedUrl).not.toHaveBeenCalled();
     });

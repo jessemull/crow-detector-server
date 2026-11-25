@@ -10,8 +10,9 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "lint": "eslint --ext .ts src/",
-    "lint:fix": "eslint --ext .ts --fix src/",
+    "lint": "eslint --ext .ts src/ --max-warnings 0",
+    "lint:fix": "eslint --ext .ts --fix src/ --max-warnings 0",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.spec.json",
     "format:check": "prettier --check \"src/**/*.ts\"",
     "package": "cd dist && zip -rq crow-detector-s3-lambda.zip ./*",
     "build:package": "npm run build && npm run package"

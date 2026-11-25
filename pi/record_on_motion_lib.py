@@ -2,16 +2,23 @@
 
 from __future__ import annotations
 
+import json
 import os
 import queue
 import select
 import subprocess
+import sys
 import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import IO, Any
+
+
+def signed_payload(method: str, path: str, body: dict, timestamp: str) -> str:
+    """Bytes the API guard verifies: method + path + compact JSON + timestamp."""
+    return f"{method}{path}{json.dumps(body, separators=(',', ':'))}{timestamp}"
 
 
 def parse_env_line(line: str) -> tuple[str, str] | None:
@@ -405,13 +412,16 @@ def _kill_process(proc: Any) -> None:
         proc.terminate()
         proc.wait(timeout=0.5)
         return
-    except Exception:
-        pass
+    except Exception as error:
+        print(
+            f"ffmpeg terminate failed: {type(error).__name__}",
+            file=sys.stderr,
+        )
     try:
         proc.kill()
         proc.wait(timeout=0.5)
-    except Exception:
-        pass
+    except Exception as error:
+        print(f"ffmpeg kill failed: {type(error).__name__}", file=sys.stderr)
 
 
 class ContinuousRetainPipeline:

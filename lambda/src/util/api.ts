@@ -1,5 +1,5 @@
 import {
-  API_BASE_URL,
+  requireApiBaseUrl,
   DETECTION_ENDPOINT,
   FEED_ENDPOINT,
   API_TIMEOUT_MS,
@@ -14,8 +14,12 @@ export async function callAPI(s3Info: S3ObjectInfo): Promise<void> {
   const imageType = getImageType(s3Info.key);
   const endpoint = imageType === 'feed' ? FEED_ENDPOINT : DETECTION_ENDPOINT;
 
+  const encodedKey = s3Info.key
+    .split('/')
+    .map((segment) => encodeURIComponent(segment))
+    .join('/');
   const payload = {
-    imageUrl: `https://${s3Info.bucket}.s3.amazonaws.com/${s3Info.key}`,
+    imageUrl: `https://${s3Info.bucket}.s3.amazonaws.com/${encodedKey}`,
   };
 
   const controller = new AbortController();
@@ -23,7 +27,7 @@ export async function callAPI(s3Info: S3ObjectInfo): Promise<void> {
 
   try {
     const authHeaders = generateAuthHeaders('POST', endpoint, payload);
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const response = await fetch(`${requireApiBaseUrl()}${endpoint}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -34,13 +38,21 @@ export async function callAPI(s3Info: S3ObjectInfo): Promise<void> {
       signal: controller.signal,
     });
 
-    clearTimeout(timeoutId);
+    if (response.status === 409) {
+      clearTimeout(timeoutId);
+      lambdaLogger.info('API conflict is final and will not be retried', {
+        imageType,
+        status: 409,
+      });
+      return;
+    }
 
     if (!response.ok) {
       throw new Error(`API call failed with status: ${response.status}`);
     }
 
     await response.json();
+    clearTimeout(timeoutId);
 
     lambdaLogger.info('API call succeeded', {
       imageType,

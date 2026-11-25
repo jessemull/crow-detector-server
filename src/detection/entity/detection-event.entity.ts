@@ -9,10 +9,12 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
+// Column values are assigned by TypeORM when a row is loaded, not by a constructor.
+
 @Entity('detection_event')
 export class DetectionEvent {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @Column({
     nullable: true,
@@ -27,7 +29,7 @@ export class DetectionEvent {
   confidence?: number;
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 
   @Column({ nullable: true })
   crowCount?: number;
@@ -55,9 +57,9 @@ export class DetectionEvent {
   })
   feedEvent?: FeedEvent;
 
-  @Column()
-  imageUrl: string;
+  @Column({ unique: true })
+  imageUrl!: string;
 
   @UpdateDateColumn()
-  updatedAt: Date;
+  updatedAt!: Date;
 }

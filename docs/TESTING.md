@@ -8,13 +8,13 @@
 
 ## Strategy
 
-| Layer                    | What to test                              | How                                      |
-| ------------------------ | ----------------------------------------- | ---------------------------------------- |
-| Nest services            | Business logic with mocked deps           | Unit `*.spec.ts`                         |
-| Nest controllers / guards| HTTP mapping, ECDSA auth edges            | Unit with Nest testing module            |
-| Nest DTOs / pipes        | Validation behavior when relevant         | Unit or e2e                              |
-| Lambda processors / auth | SQS/S3 parsing, signing, API client       | Unit `*.test.ts`                         |
-| e2e                      | Smoke bootstrap / ValidationPipe wiring   | `test/*.e2e-spec.ts` (optional locally)  |
+| Layer                     | What to test                            | How                                     |
+| ------------------------- | --------------------------------------- | --------------------------------------- |
+| Nest services             | Business logic with mocked deps         | Unit `*.spec.ts`                        |
+| Nest controllers / guards | HTTP mapping, ECDSA auth edges          | Unit with Nest testing module           |
+| Nest DTOs / pipes         | Validation behavior when relevant       | Unit or e2e                             |
+| Lambda processors / auth  | SQS/S3 parsing, signing, API client     | Unit `*.test.ts`                        |
+| e2e                       | Smoke bootstrap / ValidationPipe wiring | `test/*.e2e-spec.ts` (optional locally) |
 
 Integration against real AWS, RDS, or Claude is **out of scope** for the default Jest suite.
 
@@ -25,7 +25,7 @@ Integration against real AWS, RDS, or Claude is **out of scope** for the default
 ### Root (Nest)
 
 - Co-located: `foo.ts` → `foo.spec.ts`
-- Jest config: `jest.config.js` (`testRegex: src/.*\\.spec\\.ts$`)
+- Jest config: `jest.config.js` (`testRegex: (src/.*\\.spec\\.ts|scripts/review/.*\\.test\\.js)$`)
 - Setup: `test/setup.ts`
 
 ### Lambda
@@ -83,9 +83,9 @@ Tests should serve **documentation**, **confidence**, and **safety**.
 
 ## Commands
 
-| Command              | Scope                          |
-| -------------------- | ------------------------------ |
-| `make test`          | Root Jest                      |
-| `make test-cov`      | Root Jest + coverage           |
-| `make lambda-test`   | Lambda Jest + coverage script  |
-| `npm run test:e2e`   | Nest e2e (when needed)         |
+| Command            | Scope                         |
+| ------------------ | ----------------------------- |
+| `make test`        | Root Jest                     |
+| `make test-cov`    | Root Jest + coverage          |
+| `make lambda-test` | Lambda Jest + coverage script |
+| `npm run test:e2e` | Nest e2e (when needed)        |

@@ -1,4 +1,5 @@
 import * as crypto from 'crypto';
+import { lambdaLogger } from './logger';
 
 export function decodePrivateKey(
   base64Key: string | undefined,
@@ -19,7 +20,9 @@ export function generateSignature(data: string, privateKey: string): string {
     sign.update(data);
     return sign.sign(privateKey, 'base64');
   } catch (error) {
-    console.error('Error generating signature:', error);
+    lambdaLogger.error('Error generating signature', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     throw new Error(
       `Failed to generate signature: ${error instanceof Error ? error.message : 'Unknown error'}`,
       { cause: error },

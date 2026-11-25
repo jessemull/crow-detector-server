@@ -1,6 +1,10 @@
 import { FastifyAdapter } from '@nestjs/platform-fastify';
 import { NestFactory } from '@nestjs/core';
-import { bootstrap, CLASSIFY_JSON_BODY_LIMIT_BYTES } from './main';
+import {
+  bootstrap,
+  CLASSIFY_JSON_BODY_LIMIT_BYTES,
+  trustImmediateProxy,
+} from './main';
 
 jest.mock('@nestjs/core');
 jest.mock('@nestjs/platform-fastify');
@@ -12,15 +16,18 @@ describe('bootstrap', () => {
     listenMock = jest.fn().mockResolvedValue(undefined);
     process.env.NODE_ENV = 'test';
 
-    jest.spyOn(NestFactory, 'create').mockResolvedValue({
+    const app: any = {
       listen: listenMock,
       useGlobalPipes: jest.fn(),
       enableCors: jest.fn(),
-    });
+    };
+    jest.spyOn(NestFactory, 'create').mockResolvedValue(app);
 
-    jest.spyOn(process, 'exit').mockImplementation((code?: number) => {
-      throw new Error(`process.exit called with code ${code}`);
-    });
+    jest
+      .spyOn(process, 'exit')
+      .mockImplementation((code?: string | number | null) => {
+        throw new Error(`process.exit called with code ${String(code)}`);
+      });
   });
 
   afterEach(() => {
@@ -36,6 +43,7 @@ describe('bootstrap', () => {
     );
     expect(FastifyAdapter).toHaveBeenCalledWith({
       bodyLimit: CLASSIFY_JSON_BODY_LIMIT_BYTES,
+      trustProxy: trustImmediateProxy,
     });
     expect(listenMock).toHaveBeenCalledWith(3000, '0.0.0.0');
   });
@@ -50,6 +58,11 @@ describe('bootstrap', () => {
     delete process.env.PORT;
     await bootstrap();
     expect(listenMock).toHaveBeenCalledWith(3000, '0.0.0.0');
+  });
+
+  it('trusts only the socket peer when reading forwarded headers', () => {
+    expect(trustImmediateProxy('10.0.0.5', 0)).toBe(true);
+    expect(trustImmediateProxy('3.3.3.3', 1)).toBe(false);
   });
 
   it('should handle bootstrap errors', async () => {

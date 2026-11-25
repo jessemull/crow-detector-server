@@ -53,9 +53,9 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     awsRegion: env.AWS_REGION || 'us-west-2',
     claudeApiKey: env.CLAUDE_API_KEY,
     claudeModel: env.CLAUDE_MODEL || 'claude-haiku-5-5',
-    feedCooldownHours: parseInt(env.FEED_COOLDOWN_HOURS || '4', 10),
+    feedCooldownHours: parseFeedCooldownHours(env.FEED_COOLDOWN_HOURS),
     logLevel: env.LOG_LEVEL || 'info',
-    nodeEnv: env.NODE_ENV || 'development',
+    nodeEnv: env.NODE_ENV || '',
     port: parseInt(env.PORT || '3000', 10) || 3000,
     rds: {
       database: env.RDS_DATABASE,
@@ -86,6 +86,14 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   };
 }
 
+function parseFeedCooldownHours(raw: string | undefined): number {
+  const parsed = Number.parseInt(raw ?? '4', 10);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new Error('FEED_COOLDOWN_HOURS must be a non-negative integer');
+  }
+  return parsed;
+}
+
 function parseCorsOrigins(env: NodeJS.ProcessEnv): string[] {
   if (env.CORS_ALLOWED_ORIGINS) {
     return env.CORS_ALLOWED_ORIGINS.split(',')
@@ -105,13 +113,16 @@ function parseCorsOrigins(env: NodeJS.ProcessEnv): string[] {
 }
 
 /**
- * Fail fast on missing required secrets outside development/test.
+ * Fail fast on missing required secrets unless the process is an explicit
+ * local or ECS-dev environment. An unset NODE_ENV must not look like development.
  */
 export function validateAppConfig(config: AppConfig): void {
-  const isProdLike =
-    config.nodeEnv === 'production' || config.nodeEnv === 'prod';
+  const skipFailFast =
+    config.nodeEnv === 'development' ||
+    config.nodeEnv === 'test' ||
+    config.nodeEnv === 'dev';
 
-  if (!isProdLike) {
+  if (skipFailFast) {
     return;
   }
 
@@ -132,7 +143,7 @@ export function validateAppConfig(config: AppConfig): void {
   const missing = required.filter(([, value]) => !value).map(([name]) => name);
 
   if (missing.length > 0) {
-    const message = `Missing required environment variables for production: ${missing.join(', ')}`;
+    const message = `Missing required environment variables for ${config.nodeEnv || 'unset NODE_ENV'}: ${missing.join(', ')}`;
     logger.error(message);
     throw new Error(message);
   }

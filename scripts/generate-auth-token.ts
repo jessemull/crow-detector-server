@@ -23,13 +23,18 @@ function generatePrivateKey() {
   return { privateKey, publicKey };
 }
 
-function generateSignature(data, privateKey) {
+function generateSignature(data: string, privateKey: string): string {
   const sign = crypto.createSign('SHA256');
   sign.update(data);
   return sign.sign(privateKey, 'base64');
 }
 
-function generateAuthToken(method, path, body = {}, deviceId = 'pi-user') {
+function generateAuthToken(
+  method: string,
+  path: string,
+  body: object = {},
+  deviceId = 'pi-user',
+) {
   const timestamp = Date.now();
   const dataToSign = `${method}${path}${JSON.stringify(body)}${timestamp}`;
 
@@ -59,6 +64,20 @@ function generateAuthToken(method, path, body = {}, deviceId = 'pi-user') {
       'x-timestamp': timestamp.toString(),
     },
   };
+}
+
+function parseBody(raw: string | undefined): object {
+  if (!raw) {
+    return {};
+  }
+
+  const parsed: unknown = JSON.parse(raw);
+
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('Body must be a JSON object');
+  }
+
+  return parsed;
 }
 
 function main() {
@@ -98,7 +117,13 @@ function main() {
 
   const method = args[0];
   const path = args[1];
-  const body = args[2] ? JSON.parse(args[2]) : {};
+
+  if (!method || path === undefined) {
+    logger.error('Method and path are required');
+    process.exit(1);
+  }
+
+  const body = parseBody(args[2]);
   const deviceId = args[3] || 'pi-user';
 
   try {
@@ -108,28 +133,20 @@ function main() {
     logger.info(`Device ID: ${deviceId}`);
     logger.info(`Method: ${method}`);
     logger.info(`Path: ${path}`);
-    logger.info(`Body: ${JSON.stringify(body)}`);
     logger.info(`Timestamp: ${auth.timestamp}`);
-    logger.info(`Data to sign: ${auth.dataToSign}`);
-    logger.info(`Signature: ${auth.signature}`);
-
-    logger.info('\n=== cURL Headers ===');
-    logger.info(`-H "x-device-id: ${auth.headers['x-device-id']}"`);
-    logger.info(`-H "x-signature: ${auth.headers['x-signature']}"`);
-    logger.info(`-H "x-timestamp: ${auth.headers['x-timestamp']}"`);
-
-    logger.info('\n=== Full cURL Example ===');
 
     const bodyArg =
-      Object.keys(body).length > 0 ? `-d '${JSON.stringify(body)}'` : '';
-
-    logger.info(
-      `curl -X ${method} https://api-dev.crittercanteen.com${path} ${bodyArg} \\`,
-    );
-    logger.info(`  -H "Content-Type: application/json" \\`);
-    logger.info(`  -H "x-device-id: ${auth.headers['x-device-id']}" \\`);
-    logger.info(`  -H "x-signature: ${auth.headers['x-signature']}" \\`);
-    logger.info(`  -H "x-timestamp: ${auth.headers['x-timestamp']}"`);
+      Object.keys(body).length > 0
+        ? `-d ${shellSingleQuote(JSON.stringify(body))}`
+        : '';
+    const curl = [
+      `curl -X ${shellSingleQuote(method)} ${shellSingleQuote(`https://api-dev.crittercanteen.com${path}`)} ${bodyArg}`,
+      `-H ${shellSingleQuote('Content-Type: application/json')}`,
+      `-H ${shellSingleQuote(`x-device-id: ${auth.headers['x-device-id']}`)}`,
+      `-H ${shellSingleQuote(`x-signature: ${auth.headers['x-signature']}`)}`,
+      `-H ${shellSingleQuote(`x-timestamp: ${auth.headers['x-timestamp']}`)}`,
+    ].join(' \\\n  ');
+    process.stdout.write(`${curl}\n`);
   } catch (error) {
     logger.error(
       { error: error instanceof Error ? error.message : String(error) },
@@ -137,6 +154,10 @@ function main() {
     );
     process.exit(1);
   }
+}
+
+function shellSingleQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
 if (require.main === module) {
