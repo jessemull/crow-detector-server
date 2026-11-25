@@ -113,7 +113,18 @@ Feeder LAN recorder (host laptop/server, not Nest) — see `docs/DEVICES.md` and
 | `FEEDER_POST_ROLL_SECONDS`    | Seconds after the last motion kept in the file     | No       | `20`                                               |
 | `FEEDER_SEGMENT_TIME_SECONDS` | Continuous remux segment length                    | No       | `2`                                                |
 
-Host secrets live in `~/feeder.env` (`chmod 600`) and are never committed. Apply `scripts/db-seed/feeder-video.sql` before the routes are used. The default recorder loop claims dispense proofs only (a fixed 12-second clip from the button). `python3 pi/feeder-recorder.py --visits` watches the feeder camera with the same motion detector as the shelter and publishes a visit only when classification finds an animal. `--visit-once` records the next visit, and `--dispense-id` links that visit to a proof.
+Host secrets live in `~/feeder.env` (`chmod 600`) and are never committed. Prefer systemd (`scripts/feeder-recorder.service`) on the LAN host; deploy code with `./scripts/deploy-feeder-host.sh`. Apply `scripts/db-seed/feeder-video.sql` before the routes are used. The service runs the proof loop (a fixed 12-second clip from the button). `python3 pi/feeder-recorder.py --visits` watches the feeder camera with the same motion detector as the shelter and publishes a visit only when classification finds an animal. `--visit-once` records the next visit, and `--dispense-id` links that visit to a proof.
+
+Deploy script env (Mac → host):
+
+| Variable          | Description                                                   | Default                              |
+| ----------------- | ------------------------------------------------------------- | ------------------------------------ |
+| `DEPLOY_HOST`     | SSH target (`juzu-inui` via Tailscale + `~/.ssh/config`)      | required                             |
+| `FEEDER_REPO_DIR` | Clone path **on the host** (quote `~` so it expands remotely) | `~/Development/crow-detector-server` |
+| `FEEDER_SERVICE`  | systemd unit                                                  | `feeder-recorder`                    |
+| `FEEDER_GIT_REF`  | Branch to fast-forward on the host                            | current local branch                 |
+
+Example: `DEPLOY_HOST=juzu-inui FEEDER_GIT_REF=feat/feeder-video ./scripts/deploy-feeder-host.sh`
 
 Legacy Pi helpers still exist: `npm run pi:sync` / `pi:start` / `pi:stop` (hardcoded old `critter-cam.local` paths). The outdoor porch path is **LAN host + RTSP**, not Pi CSI/PIR.
 

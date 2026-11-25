@@ -7,12 +7,12 @@
 
 ## Decisions (current)
 
-| Role (API `x-device-id`) | Job | Hardware plan |
-| ------------------------ | --- | ------------- |
-| **Shelter / porch video** (`pi-porch` uploader) | Motion clips → S3 `porch/` → `/porch` Shelter Cam | **2× outdoor sealed IP cams** (e.g. Tapo C120/C121): IP66, IR, on-camera motion, **RTSP local**, Tapo Care / vendor cloud **off**, WAN blocked after setup. **Always-on LAN computer** (home laptop/server) pulls RTSP, cuts visit clips, ECDSA-uploads. **Not** CAM008 / COM1708 outdoors. **Not** a Pi CSI camera in a DIY box. |
-| **Feeder detection video** (`pi-motion` path) | Visit photos at feeder | Same class of sealed outdoor cam + same LAN uploader (second camera). |
-| **Feeder video** (`pi-feeder`) | Dispense proofs and separate animal-visit clips → S3 `feeder/` → Feeder Cam | A sealed RTSP camera that is **not** the porch camera, pulled by `pi/feeder-recorder.py` on a LAN host. The default loop records proofs only (12 seconds from the button). Animal visits use the same motion detector and two-minute join as the shelter: `python3 pi/feeder-recorder.py --visits`. The relay Pi is later hardware and is not in this recorder. The relay box stays closed: no camera hole. |
-| **User device** (`pi-user`) | LCD / captcha / user photo | Unchanged / later; not part of porch shelter work. |
+| Role (API `x-device-id`)                        | Job                                                                         | Hardware plan                                                                                                                                                                                                                                                                                                                                                                                               |
+| ----------------------------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Shelter / porch video** (`pi-porch` uploader) | Motion clips → S3 `porch/` → `/porch` Shelter Cam                           | **2× outdoor sealed IP cams** (e.g. Tapo C120/C121): IP66, IR, on-camera motion, **RTSP local**, Tapo Care / vendor cloud **off**, WAN blocked after setup. **Always-on LAN computer** (home laptop/server) pulls RTSP, cuts visit clips, ECDSA-uploads. **Not** CAM008 / COM1708 outdoors. **Not** a Pi CSI camera in a DIY box.                                                                           |
+| **Feeder detection video** (`pi-motion` path)   | Visit photos at feeder                                                      | Same class of sealed outdoor cam + same LAN uploader (second camera).                                                                                                                                                                                                                                                                                                                                       |
+| **Feeder video** (`pi-feeder`)                  | Dispense proofs and separate animal-visit clips → S3 `feeder/` → Feeder Cam | A sealed RTSP camera that is **not** the porch camera, pulled by `pi/feeder-recorder.py` on a LAN host. The default loop records proofs only (12 seconds from the button). Animal visits use the same motion detector and two-minute join as the shelter: `python3 pi/feeder-recorder.py --visits`. The relay Pi is later hardware and is not in this recorder. The relay box stays closed: no camera hole. |
+| **User device** (`pi-user`)                     | LCD / captcha / user photo                                                  | Unchanged / later; not part of porch shelter work.                                                                                                                                                                                                                                                                                                                                                          |
 
 Device id `pi-porch` may still be the ECDSA identity for uploads even if the recorder runs on a laptop, not a Pi.
 
@@ -77,7 +77,11 @@ The feeder camera is a second RTSP source. Do not point it at `PORCH_RTSP_URL` o
 2. On the LAN host, copy `pi/feeder.env.example` to `~/feeder.env` (`chmod 600`). Set `FEEDER_API_BASE_URL` (bring-up: `https://api-dev.crittercanteen.com`) and `FEEDER_RTSP_URL`. The private key defaults to `~/keys/pi-feeder-private.pem` (`PI_FEEDER_PRIVATE_KEY_PATH` overrides it).
 3. Prove RTSP, then `python3 pi/feeder-recorder.py --once` after `POST /feeder/dispense`.
 4. Animal visits are not part of that loop. Run `python3 pi/feeder-recorder.py --visits` to watch the feeder camera with the shelter motion detector. `--visit-once` records the next visit and exits. Pass `--dispense-id <uuid>` when that visit belongs to a proof. A visit is uploaded only when classification finds an animal.
-5. Local clips stay in `~/feeder-staging` until the database write succeeds, then a 45-minute sweeper removes anything left behind.
+5. **Daemon:** install `scripts/feeder-recorder.service` (paths target `juzu-inui`), `systemctl enable --now feeder-recorder`. The unit runs the proof loop. It does not start `--visits`.
+6. **Ship code from a dev machine:** push the branch, then  
+   `DEPLOY_HOST=juzu-inui FEEDER_GIT_REF=feat/feeder-video ./scripts/deploy-feeder-host.sh`  
+   (SSH + `git pull` in `~/Development/crow-detector-server` + restart unit). Same clone as the shelter recorder.
+7. Local clips stay in `~/feeder-staging` until the database write succeeds, then a 45-minute sweeper removes anything left behind.
 
 Public `POST /feeder/dispense` and the `feeder/` lifecycle rule in `cloudformation/crow-detector-s3.yaml` need human review before production (`docs/GOVERNANCE.md`). The relay is still out of this recorder.
 

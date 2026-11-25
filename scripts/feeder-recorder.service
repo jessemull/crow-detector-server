@@ -1,0 +1,26 @@
+[Unit]
+Description=Critter Canteen feeder RTSP recorder
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Paths match the LAN host (juzu-inui): clone under ~/Development, secrets in ~.
+# If you reinstall on another account, edit User/Group/WorkingDirectory/EnvironmentFile/ExecStart.
+# This unit runs the proof loop. Animal visits stay a separate process: feeder-recorder.py --visits.
+User=juzu-inui
+Group=juzu-inui
+WorkingDirectory=/home/juzu-inui/Development/crow-detector-server
+EnvironmentFile=-/home/juzu-inui/feeder.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /home/juzu-inui/Development/crow-detector-server/pi/feeder-recorder.py
+Restart=on-failure
+RestartSec=10
+# feeder.env holds the camera URL and device key path. Keep that file mode 600.
+# Clips are written to ~/feeder-staging.
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/home/juzu-inui/feeder-staging
+
+[Install]
+WantedBy=multi-user.target
