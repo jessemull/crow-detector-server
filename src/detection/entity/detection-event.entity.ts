@@ -57,7 +57,7 @@ export class DetectionEvent {
   })
   feedEvent?: FeedEvent;
 
-  @Column()
+  @Column({ unique: true })
   imageUrl!: string;
 
   @UpdateDateColumn()

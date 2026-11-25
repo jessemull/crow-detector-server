@@ -143,11 +143,6 @@ describe('Processor Utility', () => {
         message: 'Failed to process: Test error message',
         timestamp: expect.any(String),
       });
-
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Error processing S3 record:',
-        'Test error message',
-      );
     });
 
     it('should handle non-Error objects during processing', async () => {
@@ -163,11 +158,6 @@ describe('Processor Utility', () => {
         message: 'Failed to process: Unknown error',
         timestamp: expect.any(String),
       });
-
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Error processing S3 record:',
-        'String error message',
-      );
     });
 
     it('should handle errors from callAPI', async () => {
@@ -181,11 +171,6 @@ describe('Processor Utility', () => {
         message: 'Failed to process: API call failed',
         timestamp: expect.any(String),
       });
-
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Error processing S3 record:',
-        'API call failed',
-      );
     });
 
     it('should handle errors from isImageFile', async () => {
@@ -201,11 +186,6 @@ describe('Processor Utility', () => {
         message: 'Failed to process: Image validation failed',
         timestamp: expect.any(String),
       });
-
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Error processing S3 record:',
-        'Image validation failed',
-      );
     });
 
     it('should handle errors from isRelevantEvent', async () => {
@@ -221,11 +201,6 @@ describe('Processor Utility', () => {
         message: 'Failed to process: Event validation failed',
         timestamp: expect.any(String),
       });
-
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Error processing S3 record:',
-        'Event validation failed',
-      );
     });
   });
 });

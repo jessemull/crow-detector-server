@@ -1,6 +1,12 @@
 import { ConfigService } from '@nestjs/config';
-import { Injectable } from '@nestjs/common';
-import { S3Client, HeadObjectCommand } from '@aws-sdk/client-s3';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  GetObjectCommand,
+  HeadObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { s3ClientOptions } from 'src/common/aws/client-options';
 import { Source, S3Metadata } from 'src/common/types';
 import { createLogger } from 'src/common/logger/logger.config';
 
@@ -10,43 +16,51 @@ export class S3MetadataService {
   private readonly s3: S3Client;
 
   constructor(private readonly configService: ConfigService) {
-    this.s3 = new S3Client({
-      region: this.configService.get<string>('awsRegion') || 'us-west-2',
-    });
+    const region = this.configService.get<string>('awsRegion') || 'us-west-2';
+    this.s3 = new S3Client(s3ClientOptions(region));
   }
 
   async extractMetadataFromUrl(imageUrl: string): Promise<S3Metadata> {
+    this.logger.info('Parsing S3 object reference');
+
+    let url: URL;
     try {
-      // Parse S3 URL: https://bucket-name.s3.region.amazonaws.com/key...
+      url = new URL(imageUrl);
+    } catch {
+      throw new BadRequestException('Invalid S3 URL format');
+    }
 
-      this.logger.info(`Parsing S3 URL: ${imageUrl}`);
+    const hostnameParts = url.hostname.split('.');
+    if (
+      hostnameParts.length < 4 ||
+      !hostnameParts[1]?.startsWith('s3') ||
+      url.pathname.length < 2
+    ) {
+      throw new BadRequestException('Invalid S3 URL format');
+    }
 
-      const url = new URL(imageUrl);
-      this.logger.info(`URL parsed successfully: ${url.hostname}`);
+    const bucket = hostnameParts[0];
+    const configured = this.configService.get<string>('s3BucketName');
+    if (configured && bucket !== configured) {
+      throw new BadRequestException(
+        'Image URL must use the configured S3 bucket',
+      );
+    }
 
-      const hostnameParts = url.hostname.split('.');
-      this.logger.info(`Hostname parts: ${JSON.stringify(hostnameParts)}`);
-
-      if (hostnameParts.length < 4 || !hostnameParts[1].startsWith('s3')) {
-        this.logger.error(
-          `Invalid hostname format: length=${hostnameParts.length}, s3 part=${hostnameParts[1]}`,
-        );
-        throw new Error('Invalid S3 URL format');
-      }
-
-      const bucket = hostnameParts[0];
-      const key = url.pathname.substring(1); // Remove leading slash
-
-      this.logger.info(`Extracted bucket: ${bucket}, key: ${key}`);
-
-      // Extract metadata from S3 object and key path...
-
+    const key = decodeURIComponent(url.pathname.substring(1));
+    try {
       return await this.extractMetadataFromS3Object(bucket, key);
     } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      if (error instanceof Error && isKeyFormatError(error.message)) {
+        throw new BadRequestException(error.message);
+      }
       this.logger.error(
-        `Failed to extract metadata from URL: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to read S3 object metadata: ${error instanceof Error ? error.message : String(error)}`,
       );
-      throw new Error('Invalid S3 URL format', { cause: error });
+      throw error;
     }
   }
 
@@ -111,10 +125,12 @@ export class S3MetadataService {
       throw new Error('Could not extract timestamp from filename');
     }
 
-    const timestampSeconds = parseInt(timestampMatch[1], 10);
-    const timestamp = timestampSeconds * 1000; // Convert seconds to milliseconds
+    const rawTimestamp = parseInt(timestampMatch[1], 10);
+    // New keys use Date.now() (13 digits). Older keys used epoch seconds.
+    const timestamp =
+      rawTimestamp >= 1_000_000_000_000 ? rawTimestamp : rawTimestamp * 1000;
     this.logger.info(
-      `Extracted timestamp: ${timestampSeconds} seconds = ${timestamp} milliseconds`,
+      `Extracted timestamp: ${rawTimestamp} (stored as ${timestamp} ms)`,
     );
 
     // Extract source from S3 metadata (uploaded with the image)...
@@ -139,6 +155,7 @@ export class S3MetadataService {
       source,
       timestamp,
       type,
+      ...(feedEventId ? { feedEventId } : {}),
     };
   }
 
@@ -162,14 +179,49 @@ export class S3MetadataService {
   }
 
   async getObjectSize(bucket: string, key: string): Promise<number> {
-    try {
-      const metadata = await this.getObjectMetadata(bucket, key);
-      return metadata.ContentLength || 0;
-    } catch (error) {
-      this.logger.error(
-        `Failed to get object size: ${error instanceof Error ? error.message : String(error)}`,
-      );
-      return 0;
+    const metadata = await this.getObjectMetadata(bucket, key);
+    if (metadata.ContentLength === undefined) {
+      throw new Error(`S3 object ${key} has no content length`);
     }
+    return metadata.ContentLength;
   }
+
+  /** Short-lived read URL. Callers store the object key, not this URL. */
+  async presignGet(
+    key: string,
+    allowedPrefix: string,
+    expiresInSeconds = 900,
+  ): Promise<string> {
+    if (!isAllowedObjectKey(key, allowedPrefix)) {
+      throw new Error(`Refusing to presign a key outside ${allowedPrefix}`);
+    }
+    const bucket = this.configService.get<string>('s3BucketName');
+    if (!bucket) {
+      throw new Error('s3BucketName (S3_BUCKET_NAME) is required');
+    }
+    return getSignedUrl(
+      this.s3,
+      new GetObjectCommand({ Bucket: bucket, Key: key }),
+      { expiresIn: expiresInSeconds },
+    );
+  }
+}
+
+function isKeyFormatError(message: string): boolean {
+  return (
+    message.startsWith('Invalid S3 key') ||
+    message.startsWith('Could not extract timestamp')
+  );
+}
+
+export function isAllowedObjectKey(
+  key: string,
+  allowedPrefix: string,
+): boolean {
+  return (
+    key.startsWith(allowedPrefix) &&
+    !key.includes('..') &&
+    !key.includes('://') &&
+    !key.includes('\\')
+  );
 }

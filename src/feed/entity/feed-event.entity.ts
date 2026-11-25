@@ -48,7 +48,7 @@ export class FeedEvent {
   )
   detectionEvents!: DetectionEvent[];
 
-  @Column()
+  @Column({ unique: true })
   imageUrl!: string;
 
   @Column({ nullable: true })

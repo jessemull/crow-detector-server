@@ -13,20 +13,22 @@ export type AnimalPhotoMediaType =
 @Injectable()
 export class ClaudeService {
   private readonly logger = createLogger(ClaudeService.name);
-  private readonly anthropic: Anthropic;
+  private readonly anthropic: Anthropic | undefined;
 
   constructor(private readonly configService: ConfigService) {
     const apiKey = this.configService.get<string>('claudeApiKey');
 
     if (!apiKey) {
       this.logger.warn('CLAUDE_API_KEY not found in environment variables');
-    } else {
-      this.logger.info('CLAUDE_API_KEY loaded');
+      this.anthropic = undefined;
+      return;
     }
 
-    // Do not construct the SDK with a dummy key — callers must check configuration.
+    this.logger.info('CLAUDE_API_KEY loaded');
     this.anthropic = new Anthropic({
-      apiKey: apiKey || '',
+      apiKey,
+      timeout: 30_000,
+      maxRetries: 2,
     });
   }
 
@@ -39,7 +41,8 @@ export class ClaudeService {
     mediaType: AnimalPhotoMediaType,
   ): Promise<AnimalAnalysisResult> {
     try {
-      if (!this.configService.get<string>('claudeApiKey')) {
+      const client = this.anthropic;
+      if (!client || !this.configService.get<string>('claudeApiKey')) {
         throw new Error('Claude API key not configured');
       }
 
@@ -65,7 +68,7 @@ Rules:
 - confidence is from 0 to 100.
 - If there are no living animals, hasAnimals is false, both counts are 0, and detectedAnimals is empty.`;
 
-      const message = await this.anthropic.messages.create({
+      const message = await client.messages.create({
         model: this.getClaudeModel(),
         max_tokens: 1000,
         messages: [
@@ -106,10 +109,11 @@ Rules:
         throw new Error('No JSON found in Claude response');
       }
 
-      const result = JSON.parse(jsonMatch[0]) as AnimalAnalysisResult;
-      if (!this.isAnalysisResult(result)) {
+      const parsed: unknown = JSON.parse(jsonMatch[0]);
+      if (!this.isAnalysisResult(parsed)) {
         throw new Error('Invalid response structure from Claude');
       }
+      const result = parsed;
 
       const normalized = this.normalize(result);
       this.logger.info(
@@ -119,7 +123,6 @@ Rules:
     } catch (error) {
       this.logger.error(
         `Claude analysis failed: ${error instanceof Error ? error.message : String(error)}`,
-        error instanceof Error ? error.stack : undefined,
       );
       throw error;
     }
@@ -183,9 +186,8 @@ Rules:
   }
 
   private isCrowName(name: string): boolean {
-    const normalized = name.toLowerCase();
-    return ['crow', 'raven', 'blackbird', 'corvid'].some((term) =>
-      normalized.includes(term),
+    return /(?:^|[^a-z])(crows?|ravens?|blackbirds?|corvids?)(?:[^a-z]|$)/i.test(
+      name,
     );
   }
 }

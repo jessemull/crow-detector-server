@@ -6,9 +6,9 @@ Parameters:
     Type: String
     Default: 'dev'
     AllowedValues: ['dev', 'prod']
-  
+
   # VPC ID is imported from aws-infra VPC
-  
+
   CertificateArn:
     Type: String
     Description: ARN of the SSL certificate from ACM for the domain
@@ -34,10 +34,10 @@ Resources:
       Type: application
       IpAddressType: ipv4
       Subnets:
-        - !ImportValue 'aws-infra-public-subnet-1-id'  # Public subnet us-west-2a
-        - !ImportValue 'aws-infra-public-subnet-2-id'  # Public subnet us-west-2b
+        - !ImportValue 'aws-infra-public-subnet-1-id' # Public subnet us-west-2a
+        - !ImportValue 'aws-infra-public-subnet-2-id' # Public subnet us-west-2b
       SecurityGroups:
-        - !ImportValue 'aws-infra-alb-sg-id'  # Use aws-infra ALB security group
+        - !ImportValue 'aws-infra-alb-sg-id' # Use aws-infra ALB security group
 
   # ALB Security Group is imported from aws-infra
 
@@ -69,6 +69,7 @@ Resources:
       LoadBalancerArn: !Ref ApplicationLoadBalancer
       Port: 443
       Protocol: HTTPS
+      SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
       Certificates:
         - CertificateArn: !Ref CertificateArn
 
@@ -114,5 +115,3 @@ Outputs:
     Value: !Ref ApplicationLoadBalancer
     Export:
       Name: !Sub 'crow-detector-alb-${Environment}-Arn'
-
-

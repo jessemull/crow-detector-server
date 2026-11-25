@@ -53,7 +53,7 @@ preflight: ## Root + lambda lint, format-check, typecheck, test, build + porch t
 	npm run lint
 	npm run format:check
 	npm run typecheck
-	npm test
+	npm run test:cov
 	npm run build
 	npm run lambda:lint
 	npm run lambda:format:check

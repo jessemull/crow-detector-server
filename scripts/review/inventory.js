@@ -84,7 +84,9 @@ const collectWarnings = ({ options, git, cwd, fsImpl, nodeVersion }) => {
   } catch {
     hooksPath = '';
   }
-  if (hooksPath === '' || !fsImpl.existsSync(path.join(cwd, hooksPath))) {
+  if (hooksPath !== '.husky/_') {
+    warnings.push('core.hooksPath must be .husky/_. Run npm run prepare.');
+  } else if (!fsImpl.existsSync(path.join(cwd, hooksPath))) {
     warnings.push('Husky hooks are not installed. Run npm run prepare.');
   }
 

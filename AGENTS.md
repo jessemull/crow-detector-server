@@ -36,7 +36,7 @@ crow-detector-server/
 │   ├── urls/                   # Presigned S3 URL issuance
 │   ├── app.module.ts
 │   └── main.ts
-├── pi/                         # Porch recorder synced to the Pi
+├── pi/                         # Porch recorder. The LAN host runs the git checkout; pi-sync is the legacy copy path.
 ├── lambda/                     # Nested package: S3 → SQS → API glue
 │   ├── src/
 │   ├── cloudformation/
@@ -65,39 +65,39 @@ Prefer `make` targets. Run **`make`** or **`make help`** for a compact list.
 
 ### Quality / CI
 
-| Command               | Description                                      |
-| --------------------- | ------------------------------------------------ |
-| `make lint`           | Root ESLint                                      |
-| `make format`         | Prettier write                                   |
-| `make format-check`   | Prettier check (no write)                        |
-| `make test`           | Root Jest suite                                  |
-| `make test-cov`       | Root Jest with coverage                          |
-| `make build`          | Nest production build                            |
-| `make lambda-lint`    | Lambda ESLint                                    |
-| `make lambda-format-check` | Lambda Prettier check                       |
-| `make lambda-test`    | Lambda Jest                                      |
-| `make lambda-build`   | Lambda webpack build + zip package               |
-| `make preflight`      | Root + lambda lint/format/test/build             |
-| `make ci`             | Alias for `preflight`                            |
-| `make commit`         | Interactive Commitizen commit                    |
-| `make review-inventory` | Review file inventory (`KIND=pr` or `repo`)    |
-| `make review-check`   | Check a review ledger (`LEDGER=path`)            |
-| `make review-eval-validate` | Check seeded review cases still apply      |
+| Command                     | Description                                 |
+| --------------------------- | ------------------------------------------- |
+| `make lint`                 | Root ESLint                                 |
+| `make format`               | Prettier write                              |
+| `make format-check`         | Prettier check (no write)                   |
+| `make test`                 | Root Jest suite                             |
+| `make test-cov`             | Root Jest with coverage                     |
+| `make build`                | Nest production build                       |
+| `make lambda-lint`          | Lambda ESLint                               |
+| `make lambda-format-check`  | Lambda Prettier check                       |
+| `make lambda-test`          | Lambda Jest                                 |
+| `make lambda-build`         | Lambda webpack build + zip package          |
+| `make preflight`            | Root + lambda lint/format/test/build        |
+| `make ci`                   | Alias for `preflight`                       |
+| `make commit`               | Interactive Commitizen commit               |
+| `make review-inventory`     | Review file inventory (`KIND=pr` or `repo`) |
+| `make review-check`         | Check a review ledger (`LEDGER=path`)       |
+| `make review-eval-validate` | Check seeded review cases still apply       |
 
 ### Local API / DB
 
-| Command            | Description                                      |
-| ------------------ | ------------------------------------------------ |
-| `npm run start:dev`| Nest watch + SSH tunnel to RDS                   |
-| `npm run db:seed`  | Seed database                                    |
-| `npm run db:reset` | Reset + seed                                     |
-| `npm run auth:token` | Generate ECDSA auth token helper               |
-| `npm run pi:sync`  | Legacy: copy recorder + `porch.env` over SSH, then restart |
-| `npm run pi:start` | Legacy: restart the porch recorder over SSH (no copy) |
-| `npm run pi:stop`  | Legacy: stop the porch recorder over SSH |
-| `./scripts/deploy-porch-host.sh` | LAN host: SSH `git pull` + restart `porch-recorder` (`DEPLOY_HOST=juzu-inui`; repo default `~/Development/crow-detector-server`) |
-| `python3 pi/record-on-motion.py --once` | One RTSP clip + upload (host bring-up) |
-| `python3 -m unittest pi/test_record_on_motion_lib.py` | Porch recorder helper unit tests |
+| Command                                               | Description                                                                                                                      |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run start:dev`                                   | Nest watch + SSH tunnel to RDS                                                                                                   |
+| `npm run db:seed`                                     | Seed database                                                                                                                    |
+| `npm run db:reset`                                    | Reset + seed                                                                                                                     |
+| `npm run auth:token`                                  | Generate ECDSA auth token helper                                                                                                 |
+| `npm run pi:sync`                                     | Legacy: copy recorder + `porch.env` over SSH, then restart                                                                       |
+| `npm run pi:start`                                    | Legacy: restart the porch recorder over SSH (no copy)                                                                            |
+| `npm run pi:stop`                                     | Legacy: stop the porch recorder over SSH                                                                                         |
+| `./scripts/deploy-porch-host.sh`                      | LAN host: SSH `git pull` + restart `porch-recorder` (`DEPLOY_HOST=juzu-inui`; repo default `~/Development/crow-detector-server`) |
+| `python3 pi/record-on-motion.py --once`               | One RTSP clip + upload (host bring-up)                                                                                           |
+| `python3 -m unittest pi/test_record_on_motion_lib.py` | Porch recorder helper unit tests                                                                                                 |
 
 ---
 
@@ -105,7 +105,7 @@ Prefer `make` targets. Run **`make`** or **`make help`** for a compact list.
 
 ### TypeScript
 
-- Strict mode is **always enabled**. Do not weaken `tsconfig.json`.
+- `tsconfig.json` enables `strictNullChecks`, `strictPropertyInitialization`, `noImplicitAny`, `strictBindCallApply`, and `noFallthroughCasesInSwitch`. Do not weaken those flags. The full `"strict": true` bundle is not on.
 - Do **not** use `any` in production code without a justification comment. Tests may use `any` where needed.
 - Prefer `interface` for object shapes; use `type` for unions/intersections/aliases.
 - Prefer named exports over default exports.
@@ -122,21 +122,21 @@ Prefer `make` targets. Run **`make`** or **`make help`** for a compact list.
 
 ### Naming
 
-| Element               | Convention          | Example                    |
-| --------------------- | ------------------- | -------------------------- |
-| Files                 | `kebab-case.ts`     | `ecdsa-auth.guard.ts`      |
-| Classes               | `PascalCase`        | `FeedEventService`         |
-| Functions / variables | `camelCase`         | `createFeedEvent`          |
-| Constants             | `UPPER_SNAKE_CASE`  | `FEED_COOLDOWN_HOURS`      |
-| Types / Interfaces    | `PascalCase`        | `AnimalAnalysisResult`     |
-| Nest tests            | `<module>.spec.ts`  | `feed.controller.spec.ts`  |
-| Lambda tests          | `<module>.test.ts`  | `processor.test.ts`        |
+| Element               | Convention         | Example                   |
+| --------------------- | ------------------ | ------------------------- |
+| Files                 | `kebab-case.ts`    | `ecdsa-auth.guard.ts`     |
+| Classes               | `PascalCase`       | `FeedEventService`        |
+| Functions / variables | `camelCase`        | `createFeedEvent`         |
+| Constants             | `UPPER_SNAKE_CASE` | `FEED_COOLDOWN_HOURS`     |
+| Types / Interfaces    | `PascalCase`       | `AnimalAnalysisResult`    |
+| Nest tests            | `<module>.spec.ts` | `feed.controller.spec.ts` |
+| Lambda tests          | `<module>.test.ts` | `processor.test.ts`       |
 
 ### Error Handling
 
 - Never swallow errors with empty `catch` blocks.
 - Log errors with context via bunyan (`src/common/logger`).
-- Fail fast on missing required configuration in non-development environments.
+- Fail fast on missing required configuration unless `NODE_ENV` is `development`, `test`, or ECS `dev`.
 - Map domain failures to appropriate Nest HTTP exceptions.
 
 ### Immutability & Style
@@ -155,13 +155,13 @@ Prefer `make` targets. Run **`make`** or **`make help`** for a compact list.
 controller → service → TypeORM repository / AWS SDK / Claude SDK
 ```
 
-| Layer      | Responsibility                                              |
-| ---------- | ----------------------------------------------------------- |
-| Controller | Routes, guards, DTO validation                              |
-| Service    | Business logic, orchestration, status workflows             |
-| Entity     | Persistence shape                                           |
-| Guard      | ECDSA (and future) authentication                           |
-| Config     | Typed env loading; no ad-hoc `process.env` in feature code  |
+| Layer      | Responsibility                                             |
+| ---------- | ---------------------------------------------------------- |
+| Controller | Routes, guards, DTO validation                             |
+| Service    | Business logic, orchestration, status workflows            |
+| Entity     | Persistence shape                                          |
+| Guard      | ECDSA (and future) authentication                          |
+| Config     | Typed env loading; no ad-hoc `process.env` in feature code |
 
 ### Lambda package
 

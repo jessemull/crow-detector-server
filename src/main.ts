@@ -12,6 +12,11 @@ import { loadAppConfig } from './config/app.config';
  * Trust only the socket peer (hop 0). The ALB appends the client address, and
  * earlier X-Forwarded-For entries are supplied by the caller. Fastify's numeric
  * trustProxy ignores forwarded headers entirely, so a hop function is required.
+ *
+ * Hop 0 is the ALB only when the task security group (ImportValue
+ * aws-infra-ecs-sg-id) allows ingress from the ALB security group and nothing
+ * else. This repository does not own that group, so the live rule is an
+ * operator check, not something this process can prove.
  */
 export function trustImmediateProxy(_address: string, hop: number): boolean {
   return hop === 0;

@@ -13,7 +13,7 @@ New configuration belongs in `src/config` and in `docs/ENVIRONMENT.md` plus `.en
 - **CFG-01** (MUST) Every new or renamed variable appears in code, `.env.example`, and `docs/ENVIRONMENT.md` under the same name and the same required/default story. Verify: search the name.
 - **CFG-02** (MUST) Feature services do not read `process.env` directly. They take typed config. The guard's request-time `NODE_ENV` read is the documented exception. Verify: search `process.env` under `src/` outside `src/config` and the guard.
 - **CFG-03** (MUST) A branch that treats `production` as deployed also treats `prod`, or the task definition's value is the one the code checks. They must not disagree. Verify: read each `NODE_ENV` comparison and the task definition.
-- **CFG-04** (MUST) Missing required config fails closed outside development. Verify: read `loadAppConfig` for the variable.
+- **CFG-04** (MUST) Missing required config fails closed outside development, test, and ECS `dev`. Verify: read `loadAppConfig` for the variable.
 - **CFG-05** (SHOULD) Defaults match the docs. A code default the doc does not mention, or a doc default the code does not use, is a finding. Verify: compare the two.
 - **CFG-06** (SHOULD) `.gitignore` covers `.env` and key files, and the examples contain placeholders only. Verify: read `.gitignore` and `.env.example`.
 - **CFG-07** (SHOULD) Lambda env and root env are not mixed. A variable read in `lambda/src` is documented in the Lambda section of `docs/ENVIRONMENT.md`. Verify: search in `lambda/src`.

@@ -38,4 +38,6 @@ export interface S3Metadata {
   source: Source;
   timestamp: number;
   type: 'feed' | 'detection';
+  /** Present when the key is detection/{feedEventId}/... */
+  feedEventId?: string;
 }

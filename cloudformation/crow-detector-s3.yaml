@@ -7,11 +7,14 @@ Parameters:
     Default: dev
     AllowedValues: [dev, prod]
     Description: Environment name (dev or prod)
-  
+
   BucketName:
     Type: String
     Default: crow-detector-images
     Description: Base name for the S3 bucket
+
+Conditions:
+  IsProd: !Equals [!Ref Environment, prod]
 
 Resources:
   CrowDetectorImagesBucket:
@@ -44,14 +47,21 @@ Resources:
       CorsConfiguration:
         CorsRules:
           - AllowedHeaders: ['*']
-            AllowedMethods: [GET, PUT, POST, DELETE]
-            AllowedOrigins: ['*']
+            AllowedMethods: [GET, PUT, HEAD]
+            AllowedOrigins: !If
+              - IsProd
+              - - https://www.crittercanteen.com
+                - https://crittercanteen.com
+              - - https://www.crittercanteen.com
+                - https://crittercanteen.com
+                - http://localhost:3000
+                - http://127.0.0.1:3000
             MaxAge: 3000
       NotificationConfiguration:
         QueueConfigurations:
           - Event: s3:ObjectCreated:Put
-            Queue: !ImportValue 
-              Fn::Sub: "CrowDetectorSQSQueueArn-${Environment}"
+            Queue: !ImportValue
+              Fn::Sub: 'CrowDetectorSQSQueueArn-${Environment}'
             Filter:
               S3Key:
                 Rules:
@@ -60,8 +70,8 @@ Resources:
                   - Name: suffix
                     Value: .jpg
           - Event: s3:ObjectCreated:Put
-            Queue: !ImportValue 
-              Fn::Sub: "CrowDetectorSQSQueueArn-${Environment}"
+            Queue: !ImportValue
+              Fn::Sub: 'CrowDetectorSQSQueueArn-${Environment}'
             Filter:
               S3Key:
                 Rules:
@@ -70,8 +80,8 @@ Resources:
                   - Name: suffix
                     Value: .jpeg
           - Event: s3:ObjectCreated:Put
-            Queue: !ImportValue 
-              Fn::Sub: "CrowDetectorSQSQueueArn-${Environment}"
+            Queue: !ImportValue
+              Fn::Sub: 'CrowDetectorSQSQueueArn-${Environment}'
             Filter:
               S3Key:
                 Rules:
@@ -80,8 +90,8 @@ Resources:
                   - Name: suffix
                     Value: .png
           - Event: s3:ObjectCreated:Put
-            Queue: !ImportValue 
-              Fn::Sub: "CrowDetectorSQSQueueArn-${Environment}"
+            Queue: !ImportValue
+              Fn::Sub: 'CrowDetectorSQSQueueArn-${Environment}'
             Filter:
               S3Key:
                 Rules:
@@ -90,8 +100,8 @@ Resources:
                   - Name: suffix
                     Value: .gif
           - Event: s3:ObjectCreated:Put
-            Queue: !ImportValue 
-              Fn::Sub: "CrowDetectorSQSQueueArn-${Environment}"
+            Queue: !ImportValue
+              Fn::Sub: 'CrowDetectorSQSQueueArn-${Environment}'
             Filter:
               S3Key:
                 Rules:
@@ -100,8 +110,8 @@ Resources:
                   - Name: suffix
                     Value: .bmp
           - Event: s3:ObjectCreated:Put
-            Queue: !ImportValue 
-              Fn::Sub: "CrowDetectorSQSQueueArn-${Environment}"
+            Queue: !ImportValue
+              Fn::Sub: 'CrowDetectorSQSQueueArn-${Environment}'
             Filter:
               S3Key:
                 Rules:
@@ -110,8 +120,8 @@ Resources:
                   - Name: suffix
                     Value: .webp
           - Event: s3:ObjectCreated:Put
-            Queue: !ImportValue 
-              Fn::Sub: "CrowDetectorSQSQueueArn-${Environment}"
+            Queue: !ImportValue
+              Fn::Sub: 'CrowDetectorSQSQueueArn-${Environment}'
             Filter:
               S3Key:
                 Rules:
@@ -120,8 +130,8 @@ Resources:
                   - Name: suffix
                     Value: .jpg
           - Event: s3:ObjectCreated:Put
-            Queue: !ImportValue 
-              Fn::Sub: "CrowDetectorSQSQueueArn-${Environment}"
+            Queue: !ImportValue
+              Fn::Sub: 'CrowDetectorSQSQueueArn-${Environment}'
             Filter:
               S3Key:
                 Rules:
@@ -130,8 +140,8 @@ Resources:
                   - Name: suffix
                     Value: .jpeg
           - Event: s3:ObjectCreated:Put
-            Queue: !ImportValue 
-              Fn::Sub: "CrowDetectorSQSQueueArn-${Environment}"
+            Queue: !ImportValue
+              Fn::Sub: 'CrowDetectorSQSQueueArn-${Environment}'
             Filter:
               S3Key:
                 Rules:
@@ -140,8 +150,8 @@ Resources:
                   - Name: suffix
                     Value: .png
           - Event: s3:ObjectCreated:Put
-            Queue: !ImportValue 
-              Fn::Sub: "CrowDetectorSQSQueueArn-${Environment}"
+            Queue: !ImportValue
+              Fn::Sub: 'CrowDetectorSQSQueueArn-${Environment}'
             Filter:
               S3Key:
                 Rules:
@@ -150,8 +160,8 @@ Resources:
                   - Name: suffix
                     Value: .gif
           - Event: s3:ObjectCreated:Put
-            Queue: !ImportValue 
-              Fn::Sub: "CrowDetectorSQSQueueArn-${Environment}"
+            Queue: !ImportValue
+              Fn::Sub: 'CrowDetectorSQSQueueArn-${Environment}'
             Filter:
               S3Key:
                 Rules:
@@ -160,8 +170,8 @@ Resources:
                   - Name: suffix
                     Value: .bmp
           - Event: s3:ObjectCreated:Put
-            Queue: !ImportValue 
-              Fn::Sub: "CrowDetectorSQSQueueArn-${Environment}"
+            Queue: !ImportValue
+              Fn::Sub: 'CrowDetectorSQSQueueArn-${Environment}'
             Filter:
               S3Key:
                 Rules:
@@ -193,6 +203,16 @@ Resources:
             Condition:
               'Null':
                 's3:x-amz-server-side-encryption': 'true'
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !GetAtt CrowDetectorImagesBucket.Arn
+              - !Sub '${CrowDetectorImagesBucket.Arn}/*'
+            Condition:
+              Bool:
+                'aws:SecureTransport': 'false'
 
 Outputs:
   BucketName:
@@ -200,11 +220,9 @@ Outputs:
     Value: !Ref CrowDetectorImagesBucket
     Export:
       Name: !Sub '${AWS::StackName}-BucketName'
-  
+
   BucketArn:
     Description: ARN of the S3 bucket
     Value: !GetAtt CrowDetectorImagesBucket.Arn
     Export:
       Name: !Sub '${AWS::StackName}-BucketArn'
-  
-

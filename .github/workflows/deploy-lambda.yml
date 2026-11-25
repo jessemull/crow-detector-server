@@ -16,12 +16,21 @@ jobs:
   deploy-lambda:
     name: Deploy Lambda
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DEPLOY_ENVIRONMENT: ${{ github.event.inputs.environment }}
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: false
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Install Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: '24'
           cache: 'npm'
@@ -48,7 +57,7 @@ jobs:
         run: npm run test:coverage
 
       - name: Upload Coverage Report
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: coverage-report
           path: lambda/coverage
@@ -63,16 +72,15 @@ jobs:
           fi
 
       - name: Set Up AWS CLI
-        uses: aws-actions/configure-aws-credentials@v6
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-west-2
 
       - name: Build Lambda Package
         working-directory: lambda
         run: |
-          export NODE_ENV="${{ github.event.inputs.environment }}"
+          export NODE_ENV="${DEPLOY_ENVIRONMENT}"
           npm run build
           npm run package
 
@@ -88,14 +96,14 @@ jobs:
 
       - name: Upload Lambda to S3
         run: |
-          S3_BUCKET="crow-detector-lambda-${{ github.event.inputs.environment }}"
+          S3_BUCKET="crow-detector-lambda-${DEPLOY_ENVIRONMENT}"
           aws s3 cp "lambda/dist/crow-detector-s3-lambda.zip" s3://${S3_BUCKET}/crow-detector-s3-lambda/${ARTIFACT_NAME} --region us-west-2
 
-      - name: Check Change Set Update/Create 
+      - name: Check Change Set Update/Create
         id: change_set_type
         run: |
-          ENVIRONMENT="${{ github.event.inputs.environment }}"
-          STACK_NAME="crow-detector-s3-lambda-stack-${{ github.event.inputs.environment }}"
+          ENVIRONMENT="${DEPLOY_ENVIRONMENT}"
+          STACK_NAME="crow-detector-s3-lambda-stack-${DEPLOY_ENVIRONMENT}"
           if aws cloudformation describe-stacks --stack-name "$STACK_NAME" --region us-west-2 >/dev/null 2>&1; then
             echo "Updating change set..."
             echo "change_set_type=UPDATE" >> $GITHUB_ENV
@@ -108,25 +116,26 @@ jobs:
         id: stack_status
         if: env.change_set_type == 'UPDATE'
         run: |
-          STACK_NAME="crow-detector-s3-lambda-stack-${{ github.event.inputs.environment }}"
+          STACK_NAME="crow-detector-s3-lambda-stack-${DEPLOY_ENVIRONMENT}"
           STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "NOT_FOUND")
           echo "Status: $STATUS"
-          FAILED_STATES=("CREATE_FAILED" "ROLLBACK_FAILED" "UPDATE_FAILED" "DELETE_FAILED" "UPDATE_ROLLBACK_FAILED" "UPDATE_ROLLBACK_COMPLETE" "ROLLBACK_COMPLETE")
+          ROLLED_BACK=("ROLLBACK_COMPLETE" "UPDATE_ROLLBACK_COMPLETE")
+          if [[ " ${ROLLED_BACK[@]} " =~ " ${STATUS} " ]]; then
+            echo "Stack rolled back to the previous template. Refusing to delete it."
+            exit 1
+          fi
+          FAILED_STATES=("CREATE_FAILED" "ROLLBACK_FAILED" "UPDATE_FAILED" "DELETE_FAILED" "UPDATE_ROLLBACK_FAILED")
           if [[ " ${FAILED_STATES[@]} " =~ " ${STATUS} " ]]; then
-            echo "Deleting stack due to status..."
-            aws cloudformation delete-stack --stack-name "$STACK_NAME" --region us-west-2
-            echo "Waiting for stack deletion to complete..."
-            aws cloudformation wait stack-delete-complete --stack-name "$STACK_NAME" --region us-west-2
-            echo "Stack deleted successfully!"
-            echo "change_set_type=CREATE" >> $GITHUB_ENV
+            echo "Stack is ${STATUS}. Refusing to delete it."
+            exit 1
           fi
 
       - name: Create CloudFormation Change Set
         run: |
-          ENVIRONMENT=${{ github.event.inputs.environment }}
-          STACK_NAME="crow-detector-s3-lambda-stack-${{ github.event.inputs.environment }}"
+          ENVIRONMENT=${DEPLOY_ENVIRONMENT}
+          STACK_NAME="crow-detector-s3-lambda-stack-${DEPLOY_ENVIRONMENT}"
           TEMPLATE_FILE="lambda/cloudformation/crow-detector-s3-lambda.yaml"
-          CHANGE_SET_NAME="crow-detector-s3-lambda-change-set-${{ github.event.inputs.environment }}"
+          CHANGE_SET_NAME="crow-detector-s3-lambda-change-set-${DEPLOY_ENVIRONMENT}"
           CHANGE_SET_TYPE=${{ env.change_set_type }}
           aws cloudformation create-change-set \
             --stack-name $STACK_NAME \
@@ -146,8 +155,8 @@ jobs:
 
       - name: Check for Applied Changes
         run: |
-          STACK_NAME="crow-detector-s3-lambda-stack-${{ github.event.inputs.environment }}"
-          CHANGE_SET_NAME="crow-detector-s3-lambda-change-set-${{ github.event.inputs.environment }}"
+          STACK_NAME="crow-detector-s3-lambda-stack-${DEPLOY_ENVIRONMENT}"
+          CHANGE_SET_NAME="crow-detector-s3-lambda-change-set-${DEPLOY_ENVIRONMENT}"
           CHANGES=$(aws cloudformation describe-change-set \
                     --stack-name $STACK_NAME \
                     --change-set-name $CHANGE_SET_NAME \
@@ -164,8 +173,8 @@ jobs:
       - name: Execute CloudFormation Change Set
         if: env.no_changes == 'false'
         run: |
-          STACK_NAME="crow-detector-s3-lambda-stack-${{ github.event.inputs.environment }}"
-          CHANGE_SET_NAME="crow-detector-s3-lambda-change-set-${{ github.event.inputs.environment }}"
+          STACK_NAME="crow-detector-s3-lambda-stack-${DEPLOY_ENVIRONMENT}"
+          CHANGE_SET_NAME="crow-detector-s3-lambda-change-set-${DEPLOY_ENVIRONMENT}"
           aws cloudformation execute-change-set \
             --stack-name $STACK_NAME \
             --change-set-name $CHANGE_SET_NAME \
@@ -174,9 +183,9 @@ jobs:
       - name: Monitor CloudFormation Stack Status
         if: env.no_changes == 'false'
         run: |
-          DONE_STATUSES=("CREATE_COMPLETE" "UPDATE_COMPLETE" "ROLLBACK_COMPLETE" "UPDATE_ROLLBACK_COMPLETE" "DELETE_COMPLETE")
-          FAILED_STATUSES=("CREATE_FAILED" "UPDATE_FAILED" "ROLLBACK_FAILED" "DELETE_FAILED" "UPDATE_ROLLBACK_FAILED" "ROLLBACK_IN_PROGRESS" "DELETE_IN_PROGRESS")
-          STACK_NAME="crow-detector-s3-lambda-stack-${{ github.event.inputs.environment }}"
+          DONE_STATUSES=("CREATE_COMPLETE" "UPDATE_COMPLETE")
+          FAILED_STATUSES=("CREATE_FAILED" "UPDATE_FAILED" "ROLLBACK_FAILED" "DELETE_FAILED" "UPDATE_ROLLBACK_FAILED" "ROLLBACK_COMPLETE" "UPDATE_ROLLBACK_COMPLETE" "ROLLBACK_IN_PROGRESS" "DELETE_IN_PROGRESS" "DELETE_COMPLETE")
+          STACK_NAME="crow-detector-s3-lambda-stack-${DEPLOY_ENVIRONMENT}"
           MAX_RETRIES=30
           RETRY_COUNT=0
           while true; do
@@ -204,7 +213,7 @@ jobs:
 
       - name: Prune Backups
         run: |
-          S3_BUCKET="crow-detector-lambda-${{ github.event.inputs.environment }}"
+          S3_BUCKET="crow-detector-lambda-${DEPLOY_ENVIRONMENT}"
           OBJECTS=$(aws s3 ls s3://${S3_BUCKET}/crow-detector-s3-lambda/ | sort | awk '{print $4}')
           TOTAL_OBJECTS=$(echo "$OBJECTS" | wc -l)
           if [ "$TOTAL_OBJECTS" -gt 5 ]; then

@@ -9,10 +9,12 @@ same stream for motion. On motion, retain overlapping segments, join, upload.
 from __future__ import annotations
 
 import argparse
+import http.client
 import base64
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -34,6 +36,7 @@ from record_on_motion_lib import (  # noqa: E402
     prune_segments_older_than,
     rtsp_substream_url,
     select_segments_overlapping_window,
+    signed_payload,
     wait_for_motion,
     write_concat_list,
 )
@@ -220,7 +223,7 @@ def retain_event_clip(
 
 
 def sign_request(method: str, path: str, body: dict, timestamp: str) -> str:
-    payload = f"{method}{path}{json.dumps(body, separators=(',', ':'))}{timestamp}"
+    payload = signed_payload(method, path, body, timestamp)
     result = subprocess.run(
         ["openssl", "dgst", "-sha256", "-sign", str(PRIVATE_KEY_PATH)],
         input=payload.encode("utf-8"),
@@ -230,9 +233,9 @@ def sign_request(method: str, path: str, body: dict, timestamp: str) -> str:
     return base64.b64encode(result.stdout).decode("ascii")
 
 
-def request_upload_url(file_name: str) -> dict:
+def request_upload_url(file_name: str, content_length: int) -> dict:
     path = "/urls/porch"
-    body = {"fileName": file_name, "contentType": "video/mp4"}
+    body = {"fileName": file_name, "contentLength": content_length}
     body_bytes = json.dumps(body, separators=(",", ":")).encode("utf-8")
     timestamp = str(int(time.time() * 1000))
     signature = sign_request("POST", path, body, timestamp)
@@ -256,9 +259,9 @@ def upload_clip(path: Path) -> None:
         raise FileNotFoundError(
             f"Porch private key missing at {PRIVATE_KEY_PATH}"
         )
-    upload = request_upload_url(path.stem)
-    signed_url = upload["signedUrl"]
     size = path.stat().st_size
+    upload = request_upload_url(path.stem, size)
+    signed_url = upload["signedUrl"]
     with path.open("rb") as handle:
         put = urllib.request.Request(
             signed_url,
@@ -291,6 +294,8 @@ def upload_and_remove(path: Path, *, attempts: int = 3) -> None:
         except (
             OSError,
             urllib.error.URLError,
+            http.client.IncompleteRead,
+            json.JSONDecodeError,
             KeyError,
             subprocess.SubprocessError,
         ) as error:
@@ -407,7 +412,14 @@ def run_loop() -> None:
                             keep_after_epoch=time.time()
                             - float(LOCAL_RETENTION),
                         )
-                except (RuntimeError, OSError, subprocess.SubprocessError) as error:
+                except (
+                    RuntimeError,
+                    OSError,
+                    urllib.error.URLError,
+                    http.client.IncompleteRead,
+                    json.JSONDecodeError,
+                    subprocess.SubprocessError,
+                ) as error:
                     # Empty/failed harvest or transient ffmpeg — stay alive.
                     print(f"retain/upload error (continuing): {error}")
                     time.sleep(2.0)
@@ -425,6 +437,11 @@ def main() -> None:
         help="Warm segments, retain one window, upload, exit",
     )
     args = parser.parse_args()
+
+    def stop_for_sigterm(_signum: int, _frame: object) -> None:
+        raise KeyboardInterrupt
+
+    signal.signal(signal.SIGTERM, stop_for_sigterm)
     if args.once:
         run_once()
     else:

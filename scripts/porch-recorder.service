@@ -15,8 +15,11 @@ Environment=PYTHONUNBUFFERED=1
 ExecStart=/usr/bin/python3 /home/juzu-inui/Development/crow-detector-server/pi/record-on-motion.py
 Restart=on-failure
 RestartSec=10
-# Keep the laptop awake while this unit runs when supported.
-# ExecStartPre may be added for systemd-inhibit if the host sleeps aggressively.
+# porch.env holds the device key. Keep that file mode 600.
+# Clips are written to ~/clips (see OUTPUT_DIR in the recorder).
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/home/juzu-inui/clips
 
 [Install]
 WantedBy=multi-user.target

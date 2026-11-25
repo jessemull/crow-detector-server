@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -12,6 +13,7 @@ import { CreateDetectionDTO } from './dto/create-detection.dto';
 import { DetectionEventService } from './services/detection-event.service';
 import { DetectionEvent } from './entity/detection-event.entity';
 import { DetectionResponse } from 'src/common/types';
+import { ListEventsQueryDto } from 'src/common/dto/list-events-query.dto';
 import { EcdsaAuthGuard } from '../auth/middleware/ecdsa-auth.guard';
 import { PatchDetectionDTO } from './dto/patch-detection.dto';
 
@@ -32,18 +34,17 @@ export class DetectionController {
   }
 
   @Get()
+  @UseGuards(EcdsaAuthGuard)
   async getDetectionEvents(
-    @Query('limit') limit: number,
-    @Query('from') from: string,
-    @Query('to') to: string,
+    @Query() query: ListEventsQueryDto,
   ): Promise<DetectionEvent[]> {
-    return this.detectionEventService.find(limit, from, to);
+    return this.detectionEventService.find(query);
   }
 
   @Get(':id')
   @UseGuards(EcdsaAuthGuard)
   async getDetectionEventById(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ): Promise<DetectionResponse> {
     const event = await this.detectionEventService.findById(id);
     return {
@@ -55,7 +56,7 @@ export class DetectionController {
   @Patch(':id')
   @UseGuards(EcdsaAuthGuard)
   async updateCrowDetectedEvent(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() patchDetectionDTO: PatchDetectionDTO,
   ): Promise<DetectionResponse> {
     const event = await this.detectionEventService.update(

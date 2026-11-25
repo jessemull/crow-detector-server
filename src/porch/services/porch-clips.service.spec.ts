@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { S3Client } from '@aws-sdk/client-s3';
@@ -103,7 +103,9 @@ describe('PorchClipsService', () => {
 
   it('throws when listing fails', async () => {
     sendMock.mockRejectedValue(new Error('S3 down'));
-    await expect(service.listClips()).rejects.toThrow(BadRequestException);
+    await expect(service.listClips()).rejects.toThrow(
+      InternalServerErrorException,
+    );
   });
 
   it('requires a bucket name', () => {

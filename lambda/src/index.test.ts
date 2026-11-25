@@ -1,12 +1,7 @@
 import { SQSEvent, SQSRecord, Context } from 'aws-lambda';
 
 process.env.LAMBDA_S3_PRIVATE_KEY = Buffer.from(
-  `-----BEGIN EC PRIVATE KEY-----
-MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgR3AvaHdwoFmc/ZPp
-OM1i6/Mi8hIOhEsdWXm8iFHYAQhabVoAoGCCqGSM49AwEHoUQDQgAE8OmBTWgAbW
-BgKdDZ7TihYwGHxEdOQsjr/tP6Npnrrmr04+ANVy43H57PBfjPSG90Tb8VOVV6c5
-Pq8qB9wBHipQ==
------END EC PRIVATE KEY-----`,
+  'test-key-not-a-secret',
 ).toString('base64');
 
 import { handler } from './index';
@@ -67,7 +62,7 @@ describe('S3 Event Lambda Handler', () => {
 
       expect(result).toEqual({ batchItemFailures: [] });
       expect(mockedFetch).toHaveBeenCalledWith(
-        'https://api-dev.crittercanteen.com/detection',
+        'https://test-api.com/detection',
         expect.objectContaining({
           method: 'POST',
           headers: expect.objectContaining({
@@ -214,7 +209,7 @@ describe('S3 Event Lambda Handler', () => {
       const result = await handler(mockEvent, mockContext);
 
       expect(mockedFetch).toHaveBeenCalledWith(
-        'https://api-dev.crittercanteen.com/feed',
+        'https://test-api.com/feed',
         expect.objectContaining({
           method: 'POST',
           headers: expect.objectContaining({
@@ -314,7 +309,7 @@ describe('S3 Event Lambda Handler', () => {
       });
     });
 
-    it('should use default API URL when environment variable is not set', async () => {
+    it('fails the message when API_BASE_URL is unset', async () => {
       delete process.env.API_BASE_URL;
 
       const mockEvent: SQSEvent = {
@@ -327,18 +322,10 @@ describe('S3 Event Lambda Handler', () => {
         ],
       };
 
-      mockedFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve({ success: true }),
-      } as Response);
-
-      const result = await handler(mockEvent, mockContext);
-
-      expect(mockedFetch).toHaveBeenCalledWith(
-        'https://api-dev.crittercanteen.com/detection',
-        expect.any(Object),
-      );
+      await expect(handler(mockEvent, mockContext)).resolves.toEqual({
+        batchItemFailures: [{ itemIdentifier: 'test-message-id' }],
+      });
+      expect(mockedFetch).not.toHaveBeenCalled();
     });
   });
 

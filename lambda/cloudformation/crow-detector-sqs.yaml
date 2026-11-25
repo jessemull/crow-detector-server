@@ -1,9 +1,9 @@
-AWSTemplateFormatVersion: "2010-09-09"
+AWSTemplateFormatVersion: '2010-09-09'
 
 Parameters:
   Environment:
     Type: String
-    Description: "The environment for the deployment (dev or prod)"
+    Description: 'The environment for the deployment (dev or prod)'
     AllowedValues:
       - dev
       - prod
@@ -16,8 +16,8 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      QueueName: !Sub "crow-detector-s3-events-${Environment}"
-      VisibilityTimeout: 30
+      QueueName: !Sub 'crow-detector-s3-events-${Environment}'
+      VisibilityTimeout: 720
       MessageRetentionPeriod: 1209600
       RedrivePolicy:
         deadLetterTargetArn: !GetAtt CrowDetectorSQSDLQ.Arn
@@ -26,20 +26,20 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
         - Key: Project
-          Value: "crow-detector"
+          Value: 'crow-detector'
 
   CrowDetectorSQSDLQ:
     Type: AWS::SQS::Queue
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      QueueName: !Sub "crow-detector-s3-events-dlq-${Environment}"
+      QueueName: !Sub 'crow-detector-s3-events-dlq-${Environment}'
       MessageRetentionPeriod: 1209600
       Tags:
         - Key: Environment
           Value: !Ref Environment
         - Key: Project
-          Value: "crow-detector"
+          Value: 'crow-detector'
 
   CrowDetectorSQSQueuePolicy:
     Type: AWS::SQS::QueuePolicy
@@ -47,7 +47,7 @@ Resources:
       Queues:
         - !Ref CrowDetectorSQSQueue
       PolicyDocument:
-        Version: "2012-10-17"
+        Version: '2012-10-17'
         Statement:
           - Effect: Allow
             Principal:
@@ -56,23 +56,23 @@ Resources:
             Resource: !GetAtt CrowDetectorSQSQueue.Arn
             Condition:
               ArnLike:
-                aws:SourceArn: !Sub "arn:${AWS::Partition}:s3:::crow-detector-images-${Environment}"
+                aws:SourceArn: !Sub 'arn:${AWS::Partition}:s3:::crow-detector-images-${Environment}'
 
 Outputs:
   CrowDetectorSQSQueueUrl:
-    Description: "URL of the SQS queue for S3 events"
+    Description: 'URL of the SQS queue for S3 events'
     Value: !Ref CrowDetectorSQSQueue
     Export:
-      Name: !Sub "CrowDetectorSQSQueueUrl-${Environment}"
+      Name: !Sub 'CrowDetectorSQSQueueUrl-${Environment}'
 
   CrowDetectorSQSQueueArn:
-    Description: "ARN of the SQS queue for S3 events"
+    Description: 'ARN of the SQS queue for S3 events'
     Value: !GetAtt CrowDetectorSQSQueue.Arn
     Export:
-      Name: !Sub "CrowDetectorSQSQueueArn-${Environment}"
+      Name: !Sub 'CrowDetectorSQSQueueArn-${Environment}'
 
   CrowDetectorSQSDLQUrl:
-    Description: "URL of the SQS Dead Letter Queue"
+    Description: 'URL of the SQS Dead Letter Queue'
     Value: !Ref CrowDetectorSQSDLQ
     Export:
-      Name: !Sub "CrowDetectorSQSDLQUrl-${Environment}"
+      Name: !Sub 'CrowDetectorSQSDLQUrl-${Environment}'

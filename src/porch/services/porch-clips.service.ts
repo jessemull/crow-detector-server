@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   GetObjectCommand,
@@ -7,6 +7,7 @@ import {
   _Object,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { s3ClientOptions } from 'src/common/aws/client-options';
 import { logger } from 'src/common/logger/logger.config';
 
 export type PorchClipListItem = {
@@ -19,6 +20,8 @@ export type PorchClipListItem = {
 const PLAYBACK_EXPIRES_SECONDS = 300;
 const MAX_CLIPS = 50;
 const PORCH_PREFIX = 'porch/';
+/** Matches DeleteOldPorchClips (30 days) plus one day of clock skew. */
+const PORCH_LIST_WINDOW_MS = 31 * 24 * 60 * 60 * 1000;
 
 @Injectable()
 export class PorchClipsService {
@@ -26,9 +29,11 @@ export class PorchClipsService {
   private readonly bucketName: string;
 
   constructor(private readonly configService: ConfigService) {
-    this.s3Client = new S3Client({
-      region: this.configService.get<string>('awsRegion') || 'us-west-2',
-    });
+    this.s3Client = new S3Client(
+      s3ClientOptions(
+        this.configService.get<string>('awsRegion') || 'us-west-2',
+      ),
+    );
 
     const bucketName = this.configService.get<string>('s3BucketName');
     if (!bucketName) {
@@ -50,7 +55,7 @@ export class PorchClipsService {
         { error: error instanceof Error ? error.message : String(error) },
         'Failed to list porch clips',
       );
-      throw new BadRequestException('Failed to list porch clips');
+      throw new InternalServerErrorException('Failed to list porch clips');
     }
   }
 
@@ -63,6 +68,7 @@ export class PorchClipsService {
         new ListObjectsV2Command({
           Bucket: this.bucketName,
           Prefix: PORCH_PREFIX,
+          StartAfter: `${PORCH_PREFIX}${Date.now() - PORCH_LIST_WINDOW_MS}`,
           ContinuationToken: continuationToken,
           MaxKeys: 1000,
         }),

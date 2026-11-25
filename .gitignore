@@ -37,6 +37,11 @@ lerna-debug.log*
 
 # dotenv environment variable files
 .env
+*.pem
+*.key
+id_rsa
+id_rsa.pub
+!certs/rds-global-bundle.pem
 .env.development.local
 .env.test.local
 .env.production.local

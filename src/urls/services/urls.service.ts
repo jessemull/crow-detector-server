@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -14,6 +15,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { s3ClientOptions } from 'src/common/aws/client-options';
 import { logger } from 'src/common/logger/logger.config';
 
 @Injectable()
@@ -26,9 +28,11 @@ export class UrlsService {
     @InjectRepository(FeedEvent)
     private readonly feedEventRepository: Repository<FeedEvent>,
   ) {
-    this.s3Client = new S3Client({
-      region: this.configService.get<string>('awsRegion') || 'us-west-2',
-    });
+    this.s3Client = new S3Client(
+      s3ClientOptions(
+        this.configService.get<string>('awsRegion') || 'us-west-2',
+      ),
+    );
 
     const bucketName = this.configService.get<string>('s3BucketName');
 
@@ -40,20 +44,17 @@ export class UrlsService {
   }
 
   async createFeedImageSignedUrl(createFeedImageUrlDto: CreateFeedImageUrlDto) {
-    const { fileName, format, source, contentType } = createFeedImageUrlDto;
+    const { fileName, format, source, contentLength } = createFeedImageUrlDto;
 
     const timestamp = Date.now();
     const uniqueFileName = `${timestamp}-${fileName}`;
     const key = `feed/${uniqueFileName}.${format}`;
 
-    const finalContentType = contentType || this.getContentType(format);
-
-    // Create the S3 command with metadata...
-
     const command = new PutObjectCommand({
       Bucket: this.bucketName,
       Key: key,
-      ContentType: finalContentType,
+      ContentType: this.getContentType(format),
+      ContentLength: contentLength,
       ServerSideEncryption: 'AES256',
       Metadata: {
         'x-amz-meta-timestamp': timestamp.toString(),
@@ -63,9 +64,11 @@ export class UrlsService {
     });
 
     try {
-      const signedUrl = await getSignedUrl(this.s3Client, command, {
-        expiresIn: 900, // 15 minutes
-      });
+      const signedUrl = await getSignedUrl(
+        this.s3Client,
+        command,
+        presignPutOptions(),
+      );
 
       return {
         signedUrl,
@@ -83,14 +86,16 @@ export class UrlsService {
         { error: error instanceof Error ? error.message : String(error) },
         'Failed to generate feed image signed URL',
       );
-      throw new BadRequestException('Failed to generate feed image signed URL');
+      throw new InternalServerErrorException(
+        'Failed to generate feed image signed URL',
+      );
     }
   }
 
   async createDetectionImageSignedUrl(
     createDetectionImageUrlDto: CreateDetectionImageUrlDto,
   ) {
-    const { fileName, format, contentType } = createDetectionImageUrlDto;
+    const { fileName, format, contentLength } = createDetectionImageUrlDto;
 
     // Get the latest feed event ID from the database...
 
@@ -112,14 +117,11 @@ export class UrlsService {
     const uniqueFileName = `${timestamp}-${fileName}`;
     const key = `detection/${feedEventId}/${uniqueFileName}.${format}`;
 
-    const finalContentType = contentType || this.getContentType(format);
-
-    // Create the S3 command with metadata...
-
     const command = new PutObjectCommand({
       Bucket: this.bucketName,
       Key: key,
-      ContentType: finalContentType,
+      ContentType: this.getContentType(format),
+      ContentLength: contentLength,
       ServerSideEncryption: 'AES256',
       Metadata: {
         'x-amz-meta-timestamp': timestamp.toString(),
@@ -129,9 +131,11 @@ export class UrlsService {
     });
 
     try {
-      const signedUrl = await getSignedUrl(this.s3Client, command, {
-        expiresIn: 900, // 15 minutes
-      });
+      const signedUrl = await getSignedUrl(
+        this.s3Client,
+        command,
+        presignPutOptions(),
+      );
 
       return {
         signedUrl,
@@ -149,23 +153,23 @@ export class UrlsService {
         { error: error instanceof Error ? error.message : String(error) },
         'Failed to generate detection image signed URL',
       );
-      throw new BadRequestException(
+      throw new InternalServerErrorException(
         'Failed to generate detection image signed URL',
       );
     }
   }
 
   async createPorchClipSignedUrl(createPorchClipUrlDto: CreatePorchClipUrlDto) {
-    const { fileName, contentType } = createPorchClipUrlDto;
+    const { fileName, contentLength } = createPorchClipUrlDto;
     const safeName = this.sanitizePorchFileName(fileName);
     const timestamp = Date.now();
     const key = `porch/${timestamp}-${safeName}.mp4`;
-    const finalContentType = contentType || 'video/mp4';
 
     const command = new PutObjectCommand({
       Bucket: this.bucketName,
       Key: key,
-      ContentType: finalContentType,
+      ContentType: 'video/mp4',
+      ContentLength: contentLength,
       ServerSideEncryption: 'AES256',
       Metadata: {
         'x-amz-meta-timestamp': timestamp.toString(),
@@ -174,9 +178,11 @@ export class UrlsService {
     });
 
     try {
-      const signedUrl = await getSignedUrl(this.s3Client, command, {
-        expiresIn: 900,
-      });
+      const signedUrl = await getSignedUrl(
+        this.s3Client,
+        command,
+        presignPutOptions(),
+      );
 
       return {
         signedUrl,
@@ -193,7 +199,9 @@ export class UrlsService {
         { error: error instanceof Error ? error.message : String(error) },
         'Failed to generate porch clip signed URL',
       );
-      throw new BadRequestException('Failed to generate porch clip signed URL');
+      throw new InternalServerErrorException(
+        'Failed to generate porch clip signed URL',
+      );
     }
   }
 
@@ -226,4 +234,14 @@ export class UrlsService {
         return 'application/octet-stream';
     }
   }
+}
+
+function presignPutOptions(): {
+  expiresIn: number;
+  signableHeaders: Set<string>;
+} {
+  return {
+    expiresIn: 900,
+    signableHeaders: new Set(['content-type']),
+  };
 }

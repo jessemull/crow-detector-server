@@ -9,6 +9,19 @@ export async function processSQSRecord(
   record: SQSRecord,
 ): Promise<ApiCallResult> {
   try {
+    try {
+      const body = JSON.parse(record.body) as { Event?: string };
+      if (body.Event === 's3:TestEvent') {
+        return {
+          success: true,
+          message: 'Ignored S3 test event',
+          timestamp: new Date().toISOString(),
+        };
+      }
+    } catch {
+      // Malformed bodies are reported by extractS3Info.
+    }
+
     const s3Info = extractS3Info(record);
 
     lambdaLogger.info('Processing S3 object', {
@@ -42,10 +55,10 @@ export async function processSQSRecord(
       timestamp: new Date().toISOString(),
     };
   } catch (error) {
-    console.error(
-      'Error processing S3 record:',
-      error instanceof Error ? error.message : String(error),
-    );
+    lambdaLogger.error('Error processing S3 record', {
+      error: error instanceof Error ? error.message : String(error),
+      messageId: record.messageId,
+    });
     return {
       success: false,
       message: `Failed to process: ${error instanceof Error ? error.message : 'Unknown error'}`,

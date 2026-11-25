@@ -18,11 +18,9 @@ type AuthenticatedRequest = FastifyRequest & {
 @Injectable()
 export class EcdsaAuthGuard implements CanActivate {
   private readonly devicePublicKeys: Record<string, string | undefined>;
-  private readonly nodeEnv: string;
 
   constructor() {
     const config = loadAppConfig();
-    this.nodeEnv = config.nodeEnv;
     this.devicePublicKeys = {
       'pi-user': this.decodePublicKey(config.devicePublicKeys.piUser),
       'pi-motion': this.decodePublicKey(config.devicePublicKeys.piMotion),
@@ -38,7 +36,7 @@ export class EcdsaAuthGuard implements CanActivate {
     // Development-only bypass — must never activate when NODE_ENV is production/prod.
     // Read env at request time so local tests / hot-reload pick up NODE_ENV changes.
 
-    const nodeEnv = process.env.NODE_ENV || this.nodeEnv;
+    const nodeEnv = process.env.NODE_ENV;
     if (nodeEnv === 'development' && request.headers['x-dev-mode'] === 'true') {
       request.deviceId = 'dev-mode';
       request.requestTime = Date.now();
@@ -51,9 +49,9 @@ export class EcdsaAuthGuard implements CanActivate {
 
     // Extract required headers...
 
-    const deviceId = request.headers['x-device-id'] as string;
-    const signature = request.headers['x-signature'] as string;
-    const timestamp = request.headers['x-timestamp'] as string;
+    const deviceId = singleHeader(request.headers['x-device-id']);
+    const signature = singleHeader(request.headers['x-signature']);
+    const timestamp = singleHeader(request.headers['x-timestamp']);
 
     // Validate required headers...
 
@@ -75,7 +73,10 @@ export class EcdsaAuthGuard implements CanActivate {
 
     // Verify timestamp (prevent replay attacks)...
 
-    const requestTime = parseInt(timestamp, 10);
+    if (!/^\d+$/.test(timestamp)) {
+      throw new UnauthorizedException('Request timestamp expired');
+    }
+    const requestTime = Number(timestamp);
     const currentTime = Date.now();
     const timeWindow = 5 * 60 * 1000; // 5 minutes
 
@@ -135,4 +136,10 @@ export class EcdsaAuthGuard implements CanActivate {
       return false;
     }
   }
+}
+
+function singleHeader(
+  value: string | string[] | undefined,
+): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
 }

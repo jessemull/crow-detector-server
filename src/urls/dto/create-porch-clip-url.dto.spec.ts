@@ -5,7 +5,7 @@ describe('CreatePorchClipUrlDto', () => {
   it('accepts a clip file name', async () => {
     const dto = new CreatePorchClipUrlDto();
     dto.fileName = 'clip-20261114-210000';
-    dto.contentType = 'video/mp4';
+    dto.contentLength = 1200;
 
     expect(await validate(dto)).toHaveLength(0);
   });
