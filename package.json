@@ -48,6 +48,7 @@
     "pi:sync": "bash scripts/pi-sync.sh",
     "porch:deploy": "bash scripts/deploy-porch-host.sh",
     "feeder:deploy": "bash scripts/deploy-feeder-host.sh",
+    "feeder:deploy-visits": "bash scripts/deploy-feeder-visits-host.sh",
     "porch:test": "python3 -m unittest discover -s pi -p 'test_*.py'"
   },
   "dependencies": {

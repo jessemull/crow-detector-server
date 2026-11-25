@@ -7,7 +7,7 @@ Wants=network-online.target
 Type=simple
 # Paths match the LAN host (juzu-inui): clone under ~/Development, secrets in ~.
 # If you reinstall on another account, edit User/Group/WorkingDirectory/EnvironmentFile/ExecStart.
-# This unit runs the proof loop. Animal visits stay a separate process: feeder-recorder.py --visits.
+# This unit records the 12-second dispense proof. Animal visits are feeder-visits.service.
 User=juzu-inui
 Group=juzu-inui
 WorkingDirectory=/home/juzu-inui/Development/crow-detector-server

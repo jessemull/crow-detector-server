@@ -77,10 +77,11 @@ The feeder camera is a second RTSP source. Do not point it at `PORCH_RTSP_URL` o
 2. On the LAN host, copy `pi/feeder.env.example` to `~/feeder.env` (`chmod 600`). Set `FEEDER_API_BASE_URL` (bring-up: `https://api-dev.crittercanteen.com`) and `FEEDER_RTSP_URL`. The private key defaults to `~/keys/pi-feeder-private.pem` (`PI_FEEDER_PRIVATE_KEY_PATH` overrides it).
 3. Prove RTSP, then `python3 pi/feeder-recorder.py --once` after `POST /feeder/dispense`.
 4. Animal visits are not part of that loop. Run `python3 pi/feeder-recorder.py --visits` to watch the feeder camera with the shelter motion detector. `--visit-once` records the next visit and exits. Pass `--dispense-id <uuid>` when that visit belongs to a proof. A visit is uploaded only when classification finds an animal.
-5. **Daemon:** install `scripts/feeder-recorder.service` (paths target `juzu-inui`), `systemctl enable --now feeder-recorder`. The unit runs the proof loop. It does not start `--visits`.
-6. **Ship code from a dev machine:** push the branch, then  
+5. **Daemons:** install `scripts/feeder-recorder.service` and `scripts/feeder-visits.service` (paths target `juzu-inui`). `systemctl enable --now feeder-recorder feeder-visits`. The first records the dispense proof. The second runs `pi/feeder-recorder.py --visits`.
+6. **Ship code from a dev machine:** push the branch, then run both  
    `DEPLOY_HOST=juzu-inui FEEDER_GIT_REF=feat/feeder-video ./scripts/deploy-feeder-host.sh`  
-   (SSH + `git pull` in `~/Development/crow-detector-server` + restart unit). Same clone as the shelter recorder.
+   `DEPLOY_HOST=juzu-inui FEEDER_GIT_REF=feat/feeder-video ./scripts/deploy-feeder-visits-host.sh`  
+   Each pulls the same clone and restarts its own unit.
 7. Local clips stay in `~/feeder-staging` until the database write succeeds, then a 45-minute sweeper removes anything left behind.
 
 Public `POST /feeder/dispense` and the `feeder/` lifecycle rule in `cloudformation/crow-detector-s3.yaml` need human review before production (`docs/GOVERNANCE.md`). The relay is still out of this recorder.
