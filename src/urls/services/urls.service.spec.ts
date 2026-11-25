@@ -310,6 +310,12 @@ describe('UrlsService', () => {
       expect(result.key).toMatch(/^feeder\/\d+-clip-20261122-201000\.mp4$/);
       expect(result.metadata.type).toBe('feeder');
       expect(result.bucket).toBe('test-bucket');
+      const signedOptions = mockGetSignedUrl.mock.calls.at(-1)?.[2] as {
+        expiresIn: number;
+        signableHeaders: Set<string>;
+      };
+      expect(signedOptions.expiresIn).toBe(900);
+      expect(signedOptions.signableHeaders).toEqual(new Set(['content-type']));
       expect(PutObjectCommand).toHaveBeenCalledWith(
         expect.objectContaining({
           ContentLength: 4096,
@@ -337,14 +343,14 @@ describe('UrlsService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('should throw BadRequestException when signing fails', async () => {
+    it('should throw InternalServerErrorException when signing fails', async () => {
       mockGetSignedUrl.mockRejectedValue(new Error('S3 error'));
       await expect(
         service.createFeederClipSignedUrl({
           fileName: 'clip-1',
           contentLength: 128,
         }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InternalServerErrorException);
     });
   });
 

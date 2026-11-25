@@ -1065,7 +1065,8 @@ components:
       properties:
         fileName:
           type: string
-          description: Clip file name without path
+          maxLength: 120
+          description: Clip file name without a path or ".."
           example: 'proof-req'
         contentLength:
           type: integer

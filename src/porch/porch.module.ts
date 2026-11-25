@@ -6,5 +6,6 @@ import { PorchClipsService } from './services/porch-clips.service';
 @Module({
   controllers: [PorchController],
   providers: [PorchClipsService, InMemoryRateLimitGuard],
+  exports: [InMemoryRateLimitGuard],
 })
 export class PorchModule {}

@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DetectionModule } from '../detection/detection.module';
-import { InMemoryRateLimitGuard } from '../porch/guards/in-memory-rate-limit.guard';
+import { PorchModule } from '../porch/porch.module';
 import { DispenseRequest } from './entity/dispense-request.entity';
 import { FeederVisit } from './entity/feeder-visit.entity';
 import { FeederController } from './feeder.controller';
@@ -13,6 +13,7 @@ import { FeederVisitService } from './services/feeder-visit.service';
 @Module({
   imports: [
     DetectionModule,
+    PorchModule,
     TypeOrmModule.forFeature([DispenseRequest, FeederVisit]),
   ],
   controllers: [FeederHostController, FeederController],
@@ -20,7 +21,6 @@ import { FeederVisitService } from './services/feeder-visit.service';
     DispenseRequestService,
     FeederVisitService,
     FeederPlaybackService,
-    InMemoryRateLimitGuard,
   ],
 })
 export class FeederModule {}

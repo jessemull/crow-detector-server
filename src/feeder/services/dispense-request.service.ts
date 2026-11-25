@@ -107,21 +107,26 @@ export class DispenseRequestService {
     status: DispenseStatus.READY | DispenseStatus.FAILED,
     proofKey?: string,
   ): Promise<DispenseRequest> {
-    const request = await this.findById(id);
-    if (request.status !== DispenseStatus.RECORDING) {
-      throw new BadRequestException('Dispense request is not recording');
-    }
-
     if (status === DispenseStatus.READY) {
       if (!proofKey) {
         throw new BadRequestException('A feeder proof key is required');
       }
-      assertFeederMp4Key(proofKey, 'A feeder proof key is required');
-      request.proofKey = proofKey;
+      assertFeederMp4Key(proofKey, 'Proof key must be a feeder mp4');
     }
 
-    request.status = status;
-    return this.dispenseRepository.save(request);
+    const updated = await this.dispenseRepository.update(
+      { id, status: DispenseStatus.RECORDING },
+      {
+        status,
+        updatedAt: new Date(),
+        ...(status === DispenseStatus.READY ? { proofKey } : {}),
+      },
+    );
+    if (!updated.affected) {
+      await this.findById(id);
+      throw new BadRequestException('Dispense request is not recording');
+    }
+    return this.findById(id);
   }
 
   private async claimStatus(

@@ -45,7 +45,13 @@ export class UrlsController {
   async createFeederClipSignedUrl(
     @Body() createFeederClipUrlDto: CreateFeederClipUrlDto,
     @Req() request: DeviceRequest,
-  ) {
+  ): Promise<{
+    signedUrl: string;
+    key: string;
+    expiresAt: string;
+    bucket: string;
+    metadata: { timestamp: number; type: string };
+  }> {
     if (request.deviceId !== 'pi-feeder' && request.deviceId !== 'dev-mode') {
       throw new ForbiddenException(
         'Only the feeder host can request feeder upload URLs',

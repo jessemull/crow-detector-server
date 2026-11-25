@@ -23,19 +23,31 @@ describe('DispenseRequestService', () => {
     orderBy: jest.fn().mockReturnThis(),
     getOne: jest.fn(() => Promise.resolve(rows.shift() ?? null)),
   };
-  const manager = {
+  type DispenseManager = {
+    query: typeof query;
+    findOne: typeof findOne;
+    create: typeof create;
+    save: typeof save;
+    update: typeof update;
+    createQueryBuilder: () => typeof queryBuilder;
+    transaction: (
+      work: (value: DispenseManager) => Promise<unknown>,
+    ) => Promise<unknown>;
+  };
+  const manager: DispenseManager = {
     query,
     findOne,
     create,
     save,
     update,
     createQueryBuilder: jest.fn(() => queryBuilder),
-    transaction: (work: (value: typeof manager) => Promise<unknown>) =>
-      work(manager),
+    transaction: (work) => work(manager),
   };
+  const repositoryUpdate = jest.fn();
   const repository = {
     findOne,
     save,
+    update: repositoryUpdate,
     manager,
   } as unknown as Repository<DispenseRequest>;
 
@@ -124,9 +136,11 @@ describe('DispenseRequestService', () => {
   });
 
   it('completes a recording proof', async () => {
+    repositoryUpdate.mockResolvedValue({ affected: 1 });
     findOne.mockResolvedValue({
       id: 'req-1',
-      status: DispenseStatus.RECORDING,
+      status: DispenseStatus.READY,
+      proofKey: 'feeder/proof.mp4',
     });
 
     const result = await service.complete(
@@ -137,20 +151,33 @@ describe('DispenseRequestService', () => {
 
     expect(result.status).toBe(DispenseStatus.READY);
     expect(result.proofKey).toBe('feeder/proof.mp4');
+    expect(repositoryUpdate).toHaveBeenCalledWith(
+      { id: 'req-1', status: DispenseStatus.RECORDING },
+      expect.objectContaining({
+        status: DispenseStatus.READY,
+        proofKey: 'feeder/proof.mp4',
+      }),
+    );
   });
 
   it('marks a recording dispense failed without a proof key', async () => {
+    repositoryUpdate.mockResolvedValue({ affected: 1 });
     findOne.mockResolvedValue({
       id: 'req-1',
-      status: DispenseStatus.RECORDING,
+      status: DispenseStatus.FAILED,
     });
 
     const result = await service.complete('req-1', DispenseStatus.FAILED);
 
     expect(result.status).toBe(DispenseStatus.FAILED);
+    expect(repositoryUpdate).toHaveBeenCalledWith(
+      { id: 'req-1', status: DispenseStatus.RECORDING },
+      expect.objectContaining({ status: DispenseStatus.FAILED }),
+    );
   });
 
   it('rejects completion before the row is claimed', async () => {
+    repositoryUpdate.mockResolvedValue({ affected: 0 });
     findOne.mockResolvedValue({
       id: 'req-1',
       status: DispenseStatus.REQUESTED,
@@ -158,22 +185,19 @@ describe('DispenseRequestService', () => {
 
     await expect(
       service.complete('req-1', DispenseStatus.READY, 'feeder/proof.mp4'),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    ).rejects.toThrow('Dispense request is not recording');
     expect(save).not.toHaveBeenCalled();
   });
 
   it('rejects a ready proof that has no key', async () => {
-    findOne.mockResolvedValue({
-      id: 'req-1',
-      status: DispenseStatus.RECORDING,
-    });
-
     await expect(
       service.complete('req-1', DispenseStatus.READY),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    ).rejects.toThrow('A feeder proof key is required');
+    expect(repositoryUpdate).not.toHaveBeenCalled();
   });
 
   it('rejects a missing dispense when completing', async () => {
+    repositoryUpdate.mockResolvedValue({ affected: 0 });
     findOne.mockResolvedValue(null);
 
     await expect(
@@ -182,17 +206,13 @@ describe('DispenseRequestService', () => {
   });
 
   it('rejects a proof key that is not a bounded feeder mp4', async () => {
-    findOne.mockResolvedValue({
-      id: 'req-1',
-      status: DispenseStatus.RECORDING,
-    });
-
     await expect(
       service.complete(
         'req-1',
         DispenseStatus.READY,
         `feeder/${'a'.repeat(1100)}.mp4`,
       ),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    ).rejects.toThrow('Proof key must be a feeder mp4');
+    expect(repositoryUpdate).not.toHaveBeenCalled();
   });
 });

@@ -30,4 +30,22 @@ describe('CreateFeederClipUrlDto', () => {
     const errors = await validate(dto);
     expect(errors.some((error) => error.property === 'contentType')).toBe(true);
   });
+
+  it('rejects a file name that contains a parent segment', async () => {
+    const dto = new CreateFeederClipUrlDto();
+    dto.fileName = 'clip..1';
+    dto.contentLength = 128;
+
+    const errors = await validate(dto);
+    expect(errors.some((error) => error.property === 'fileName')).toBe(true);
+  });
+
+  it('rejects a file name longer than 120 characters', async () => {
+    const dto = new CreateFeederClipUrlDto();
+    dto.fileName = 'a'.repeat(121);
+    dto.contentLength = 128;
+
+    const errors = await validate(dto);
+    expect(errors.some((error) => error.property === 'fileName')).toBe(true);
+  });
 });

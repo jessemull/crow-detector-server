@@ -13,6 +13,11 @@ import {
 import { FastifyRequest } from 'fastify';
 import { EcdsaAuthGuard } from '../auth/middleware/ecdsa-auth.guard';
 import { ClaudeService } from '../detection/services/claude.service';
+import { AnimalAnalysisResult } from 'src/common/types';
+import {
+  DispenseRequest,
+  DispenseStatus,
+} from './entity/dispense-request.entity';
 import { CompleteDispenseDto } from './dto/complete-dispense.dto';
 import { ClassifyFrameDto } from './dto/classify-frame.dto';
 import { CreateFeederVisitDto } from './dto/create-feeder-visit.dto';
@@ -31,7 +36,9 @@ export class FeederHostController {
   ) {}
 
   @Get('dispense/pending')
-  async claimPending(@Req() request: DeviceRequest) {
+  async claimPending(
+    @Req() request: DeviceRequest,
+  ): Promise<{ request: DispenseRequest | null }> {
     this.assertFeeder(request);
     const claimed = await this.dispenseRequestService.claimNext();
     return { request: claimed };
@@ -42,7 +49,7 @@ export class FeederHostController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: CompleteDispenseDto,
     @Req() request: DeviceRequest,
-  ) {
+  ): Promise<{ id: string; status: DispenseStatus }> {
     this.assertFeeder(request);
     const updated = await this.dispenseRequestService.complete(
       id,
@@ -56,7 +63,7 @@ export class FeederHostController {
   async classify(
     @Body() body: ClassifyFrameDto,
     @Req() request: DeviceRequest,
-  ) {
+  ): Promise<AnimalAnalysisResult> {
     this.assertFeeder(request);
     const image = Buffer.from(body.imageBase64, 'base64');
     if (image.length === 0 || image.length > 2_000_000) {
@@ -69,7 +76,7 @@ export class FeederHostController {
   async createVisit(
     @Body() body: CreateFeederVisitDto,
     @Req() request: DeviceRequest,
-  ) {
+  ): Promise<{ id: string }> {
     this.assertFeeder(request);
     const visit = await this.feederVisitService.create(body);
     return { id: visit.id };

@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { s3ClientOptions } from 'src/common/aws/client-options';
 
 const PLAYBACK_EXPIRES_SECONDS = 300;
 
@@ -11,9 +12,11 @@ export class FeederPlaybackService {
   private readonly bucketName: string;
 
   constructor(private readonly configService: ConfigService) {
-    this.s3Client = new S3Client({
-      region: this.configService.get<string>('awsRegion') || 'us-west-2',
-    });
+    this.s3Client = new S3Client(
+      s3ClientOptions(
+        this.configService.get<string>('awsRegion') || 'us-west-2',
+      ),
+    );
     const bucketName = this.configService.get<string>('s3BucketName');
     if (!bucketName) {
       throw new Error('s3BucketName (S3_BUCKET_NAME) is required');

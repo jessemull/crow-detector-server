@@ -4,7 +4,7 @@ import { FEEDER_OBJECT_KEY_MAX_LENGTH } from '../services/dispense-request.servi
 
 export class CompleteDispenseDto {
   @IsIn([DispenseStatus.READY, DispenseStatus.FAILED])
-  status: DispenseStatus.READY | DispenseStatus.FAILED;
+  status!: DispenseStatus.READY | DispenseStatus.FAILED;
 
   @IsOptional()
   @IsString()

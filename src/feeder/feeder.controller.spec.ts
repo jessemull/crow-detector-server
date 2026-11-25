@@ -56,6 +56,7 @@ describe('FeederController', () => {
       id: 'req-1',
       status: DispenseStatus.READY,
       proofKey: 'feeder/proof.mp4',
+      createdAt: new Date(),
     });
     feederPlaybackService.signPlayback.mockResolvedValue({
       playbackUrl: 'https://cdn.example.com/proof.mp4',
@@ -68,6 +69,21 @@ describe('FeederController', () => {
       proofClipUrl: 'https://cdn.example.com/proof.mp4',
       expiresAt: '2026-11-22T20:15:00.000Z',
     });
+  });
+
+  it('does not sign a proof older than the feeder lifecycle', async () => {
+    dispenseRequestService.findById.mockResolvedValue({
+      id: 'req-1',
+      status: DispenseStatus.READY,
+      proofKey: 'feeder/proof.mp4',
+      createdAt: new Date(Date.now() - 31 * 24 * 60 * 60 * 1000),
+    });
+
+    await expect(controller.getDispense('req-1')).resolves.toEqual({
+      id: 'req-1',
+      status: DispenseStatus.READY,
+    });
+    expect(feederPlaybackService.signPlayback).not.toHaveBeenCalled();
   });
 
   it('lists signed visit clips', async () => {

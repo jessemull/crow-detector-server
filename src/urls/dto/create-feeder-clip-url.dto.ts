@@ -4,7 +4,9 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  Matches,
   Max,
+  MaxLength,
   Min,
 } from 'class-validator';
 
@@ -16,12 +18,14 @@ export const FEEDER_CLIP_CONTENT_TYPE = 'video/mp4';
 export class CreateFeederClipUrlDto {
   @IsString()
   @IsNotEmpty()
-  fileName: string;
+  @MaxLength(120)
+  @Matches(/^(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/)
+  fileName!: string;
 
   @IsInt()
   @Min(1)
   @Max(FEEDER_CLIP_MAX_BYTES)
-  contentLength: number;
+  contentLength!: number;
 
   @IsOptional()
   @IsIn([FEEDER_CLIP_CONTENT_TYPE])

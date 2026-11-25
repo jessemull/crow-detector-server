@@ -2,23 +2,25 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { DetectedAnimal } from 'src/common/types';
 
 @Entity('feeder_visit')
+@Index('feeder_visit_created_at_idx', ['createdAt'])
 export class FeederVisit {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @Column()
-  videoKey: string;
+  videoKey!: string;
 
   @Column({ type: 'int' })
-  animalCount: number;
+  animalCount!: number;
 
   @Column({ type: 'int', default: 0 })
-  crowCount: number;
+  crowCount!: number;
 
   @Column({ type: 'json', nullable: true })
   detectedAnimals?: DetectedAnimal[];
@@ -27,5 +29,5 @@ export class FeederVisit {
   dispenseRequestId?: string;
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 }

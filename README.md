@@ -358,50 +358,13 @@ The system provides comprehensive animal detection and analysis capabilities thr
 - **Access Control**: IAM-based permissions for S3 operations.
 - **Lifecycle Management**: Automatic cleanup of old images.
 
-## Automated Feeder System
+## Feeder recorder
 
-The system provides comprehensive automation for physical crow feeding through Raspberry Pi devices with relay-controlled feeders:
+The feeder host records a fixed 12-second proof from the public dispense request, and records animal visits separately with the motion detector. The relay is not part of this recorder. `FEED_COOLDOWN_HOURS` is the older image-feed cooldown, not the 10-minute public dispense cooldown.
 
-### Feeder Status Flow
-
-Feed events progress through the following automated status transitions:
-
-1. **PENDING**: Initial state when a feed event is created (user clicks feed button or device triggers).
-2. **FEEDING**: Feeder Pi activates relay and dispenses food.
-3. **FEEDING_COMPLETE**: Feeding finished, waiting for verification photo.
-4. **PHOTO_TAKEN**: Camera captures verification photo of the fed area.
-5. **COMPLETE**: Full feeding cycle finished successfully.
-
-### Device Coordination
-
-#### Feeder Pi Device (pi-feeder)
-
-- **Polling Interval**: Checks server every 30 seconds.
-- **Status Monitoring**: `GET /feed/status/latest` - looks for `PENDING` status.
-- **Trigger Feeding**: `PATCH /feed/status/{id}` with `{"status": "FEEDING"}`.
-- **Complete Feeding**: `PATCH /feed/status/{id}` with `{"status": "FEEDING_COMPLETE"}`.
-- **Hardware Control**: Activates relay to dispense crow feed.
-
-#### Camera Pi Device (pi-motion or dedicated camera)
-
-- **Polling Interval**: Checks server every 30 seconds.
-- **Status Monitoring**: `GET /feed/status/latest` - looks for `FEEDING_COMPLETE` status.
-- **Photo Capture**: Takes verification photo of feeding area.
-- **Photo Upload**: Uploads image to S3 and updates status.
-- **Status Update**: `PATCH /feed/status/{id}` with `{"status": "PHOTO_TAKEN", "photoUrl": "..."}`.
-
-### Error Handling & Reliability
-
-- **Network Resilience**: Devices continue polling even if network is temporarily unavailable.
-- **Status Persistence**: All status changes are persisted in the database.
-- **Retry Logic**: Failed operations can be retried by checking latest status.
-- **Cooldown Override**: System supports `x-skip-cooldown: true` header for testing/manual overrides.
-
-### Configuration
-
-- **FEED_COOLDOWN_HOURS**: Configurable cooldown period between feeds (default: 4 hours).
-- **Poll Intervals**: Adjustable polling frequency for different device types.
-- **Authentication**: All status updates require ECDSA authentication for security.
+- **Proof**: `POST /feeder/dispense` creates a request. The host claims `GET /feeder/dispense/pending`, uploads an mp4, then `PATCH /feeder/dispense/{id}` to `ready` or `failed`.
+- **Visits**: `POST /feeder/classify` and `POST /feeder/visits` publish a clip only when a sampled frame contains an animal.
+- **Playback**: `GET /feeder/dispense/{id}` and `GET /feeder/clips` return short-lived playback URLs while the object is still inside the 30-day feeder lifecycle.
 
 ## Commits & Commitizen
 

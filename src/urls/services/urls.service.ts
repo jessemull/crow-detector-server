@@ -19,6 +19,7 @@ import { Repository } from 'typeorm';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { s3ClientOptions } from 'src/common/aws/client-options';
+import { FEEDER_OBJECT_KEY_MAX_LENGTH } from 'src/feeder/services/dispense-request.service';
 import { logger } from 'src/common/logger/logger.config';
 
 @Injectable()
@@ -213,7 +214,13 @@ export class UrlsService {
 
   async createFeederClipSignedUrl(
     createFeederClipUrlDto: CreateFeederClipUrlDto,
-  ) {
+  ): Promise<{
+    signedUrl: string;
+    key: string;
+    expiresAt: string;
+    bucket: string;
+    metadata: { timestamp: number; type: string };
+  }> {
     const { fileName, contentType, contentLength } = createFeederClipUrlDto;
     if (
       !Number.isInteger(contentLength) ||
@@ -226,9 +233,12 @@ export class UrlsService {
       throw new BadRequestException('Feeder clips must be video/mp4');
     }
 
-    const safeName = this.sanitizePorchFileName(fileName);
+    const safeName = this.sanitizeFeederFileName(fileName);
     const timestamp = Date.now();
     const key = `feeder/${timestamp}-${safeName}.mp4`;
+    if (key.length > FEEDER_OBJECT_KEY_MAX_LENGTH || key.includes('..')) {
+      throw new BadRequestException('Invalid feeder clip file name');
+    }
 
     const command = new PutObjectCommand({
       Bucket: this.bucketName,
@@ -243,9 +253,11 @@ export class UrlsService {
     });
 
     try {
-      const signedUrl = await getSignedUrl(this.s3Client, command, {
-        expiresIn: 900,
-      });
+      const signedUrl = await getSignedUrl(
+        this.s3Client,
+        command,
+        presignPutOptions(),
+      );
 
       return {
         signedUrl,
@@ -262,10 +274,19 @@ export class UrlsService {
         { error: error instanceof Error ? error.message : String(error) },
         'Failed to generate feeder clip signed URL',
       );
-      throw new BadRequestException(
+      throw new InternalServerErrorException(
         'Failed to generate feeder clip signed URL',
       );
     }
+  }
+
+  private sanitizeFeederFileName(fileName: string): string {
+    const baseName = fileName.split(/[/\\]/).pop() || 'clip';
+    const withoutExtension = baseName.replace(/\.mp4$/i, '');
+    return this.sanitizeObjectFileName(
+      withoutExtension,
+      'Invalid feeder clip file name',
+    );
   }
 
   private sanitizePorchFileName(fileName: string): string {

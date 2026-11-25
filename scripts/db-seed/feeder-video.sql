@@ -32,3 +32,6 @@ CREATE INDEX IF NOT EXISTS dispense_request_created_at_idx
 
 CREATE INDEX IF NOT EXISTS dispense_request_status_created_idx
   ON dispense_request (status, "createdAt");
+
+CREATE INDEX IF NOT EXISTS feeder_visit_created_at_idx
+  ON feeder_visit ("createdAt");

@@ -10,7 +10,10 @@ import { InMemoryRateLimitGuard } from '../porch/guards/in-memory-rate-limit.gua
 import { DispenseStatus } from './entity/dispense-request.entity';
 import { DispenseRequestService } from './services/dispense-request.service';
 import { FeederPlaybackService } from './services/feeder-playback.service';
-import { FeederVisitService } from './services/feeder-visit.service';
+import {
+  FeederVisitService,
+  feederClipStillStored,
+} from './services/feeder-visit.service';
 
 @Controller('feeder')
 export class FeederController {
@@ -22,7 +25,7 @@ export class FeederController {
 
   @Post('dispense')
   @UseGuards(InMemoryRateLimitGuard)
-  async requestDispense() {
+  async requestDispense(): Promise<{ id: string; status: DispenseStatus }> {
     const request = await this.dispenseRequestService.create();
     return {
       id: request.id,
@@ -32,9 +35,18 @@ export class FeederController {
 
   @Get('dispense/:id')
   @UseGuards(InMemoryRateLimitGuard)
-  async getDispense(@Param('id', ParseUUIDPipe) id: string) {
+  async getDispense(@Param('id', ParseUUIDPipe) id: string): Promise<{
+    id: string;
+    status: DispenseStatus;
+    proofClipUrl?: string;
+    expiresAt?: string;
+  }> {
     const request = await this.dispenseRequestService.findById(id);
-    if (request.status === DispenseStatus.READY && request.proofKey) {
+    if (
+      request.status === DispenseStatus.READY &&
+      request.proofKey &&
+      feederClipStillStored(request.createdAt)
+    ) {
       const playback = await this.feederPlaybackService.signPlayback(
         request.proofKey,
       );
@@ -50,7 +62,16 @@ export class FeederController {
 
   @Get('clips')
   @UseGuards(InMemoryRateLimitGuard)
-  async listClips() {
+  async listClips(): Promise<
+    Array<{
+      id: string;
+      recordedAt: string;
+      animalCount: number;
+      crowCount: number;
+      playbackUrl: string;
+      expiresAt: string;
+    }>
+  > {
     const visits = await this.feederVisitService.listNewest();
     return Promise.all(
       visits.map(async (visit) => {

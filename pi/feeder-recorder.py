@@ -17,6 +17,7 @@ import base64
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -69,9 +70,8 @@ PRIVATE_KEY_PATH = Path(
 
 
 def canonical_json(body: dict) -> str:
-    """Match JSON.stringify: keep non-ASCII characters and escape line separators."""
-    encoded = json.dumps(body, separators=(",", ":"), ensure_ascii=False)
-    return encoded.replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
+    """Match JSON.stringify: keep non-ASCII characters and raw line separators."""
+    return json.dumps(body, separators=(",", ":"), ensure_ascii=False)
 
 
 def sign_request(method: str, path: str, canonical_body: str, timestamp: str) -> str:
@@ -141,6 +141,7 @@ def record_clip(destination: Path, seconds: int) -> None:
         ],
         check=True,
         capture_output=True,
+        timeout=90,
     )
 
 
@@ -159,6 +160,7 @@ def extract_jpeg(video: Path, jpeg: Path, offset_seconds: float = 1.0) -> None:
         ],
         check=True,
         capture_output=True,
+        timeout=30,
     )
 
 
@@ -222,11 +224,10 @@ def record_motion_visit(destination: Path) -> float:
 def classify_clip(clip: Path, duration: float) -> dict | None:
     """Strongest animal sample, or None when samples agree the frame is empty.
 
-    A failed request is ignored when another sample succeeds. If every sample
-    request fails, raise so the clip is kept and not published.
+    A sample that errors does not count as "no animal". If any sample errors
+    and none finds an animal, raise so the clip is kept and not published.
     """
     best: dict | None = None
-    successes = 0
     errors = 0
     for offset in classify_sample_offsets(duration):
         jpeg = clip.with_name(f"{clip.stem}-{int(offset * 10)}.jpg")
@@ -238,12 +239,12 @@ def classify_clip(clip: Path, duration: float) -> dict | None:
                 "/feeder/classify",
                 {"imageBase64": encoded, "mediaType": "image/jpeg"},
             )
-        except Exception:
+        except Exception as error:
             errors += 1
+            print(f"classify sample failed: {type(error).__name__}")
             continue
         finally:
             jpeg.unlink(missing_ok=True)
-        successes += 1
         if not isinstance(analysis, dict) or not analysis.get("hasAnimals"):
             continue
         count = int(analysis.get("animalCount") or 0)
@@ -252,12 +253,26 @@ def classify_clip(clip: Path, duration: float) -> dict | None:
             best = analysis
     if best is not None:
         return best
-    if successes == 0 and errors:
+    if errors:
         raise RuntimeError("classify failed")
     return None
 
 
 def upload_mp4(path: Path) -> str:
+    last_error: Exception | None = None
+    for attempt in range(3):
+        try:
+            return upload_mp4_once(path)
+        except (OSError, urllib.error.URLError, subprocess.CalledProcessError) as error:
+            last_error = error
+            print(f"upload failed: {type(error).__name__}")
+            if attempt < 2:
+                time.sleep(1)
+    assert last_error is not None
+    raise last_error
+
+
+def upload_mp4_once(path: Path) -> str:
     size = path.stat().st_size
     upload = api_json(
         "POST",
@@ -377,6 +392,11 @@ def main() -> None:
         help="Dispense request id to store on a --visit-once upload",
     )
     args = parser.parse_args()
+
+    def stop_for_sigterm(_signum: int, _frame: object) -> None:
+        raise KeyboardInterrupt
+
+    signal.signal(signal.SIGTERM, stop_for_sigterm)
     if not API_BASE_URL:
         raise SystemExit("Set FEEDER_API_BASE_URL")
     if not PRIVATE_KEY_PATH.is_file():

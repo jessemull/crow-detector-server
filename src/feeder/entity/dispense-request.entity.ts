@@ -16,21 +16,21 @@ export enum DispenseStatus {
 @Entity('dispense_request')
 export class DispenseRequest {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @Column({
     enum: DispenseStatus,
     type: 'enum',
     default: DispenseStatus.REQUESTED,
   })
-  status: DispenseStatus;
+  status!: DispenseStatus;
 
   @Column({ nullable: true })
   proofKey?: string;
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 
   @UpdateDateColumn()
-  updatedAt: Date;
+  updatedAt!: Date;
 }
