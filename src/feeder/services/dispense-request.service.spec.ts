@@ -88,21 +88,18 @@ describe('DispenseRequestService', () => {
   it('reports public status while cooling down', async () => {
     const createdAt = new Date(Date.now() - 60_000);
     const readyAt = new Date(Date.now() - 120_000);
-    find
-      .mockResolvedValueOnce([
-        {
-          id: 'newest',
-          status: DispenseStatus.REQUESTED,
-          createdAt,
-        },
-      ])
-      .mockResolvedValueOnce([
-        {
-          id: 'ready-1',
-          status: DispenseStatus.READY,
-          createdAt: readyAt,
-        },
-      ]);
+    find.mockResolvedValueOnce([
+      {
+        id: 'newest',
+        status: DispenseStatus.REQUESTED,
+        createdAt,
+      },
+      {
+        id: 'ready-1',
+        status: DispenseStatus.READY,
+        createdAt: readyAt,
+      },
+    ]);
 
     await expect(service.getPublicStatus()).resolves.toEqual({
       canFeed: false,
@@ -113,7 +110,7 @@ describe('DispenseRequestService', () => {
   });
 
   it('reports canFeed when there are no dispense rows', async () => {
-    find.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    find.mockResolvedValueOnce([]);
 
     await expect(service.getPublicStatus()).resolves.toEqual({
       canFeed: true,
@@ -125,21 +122,13 @@ describe('DispenseRequestService', () => {
 
   it('reports canFeed at the cooldown boundary', async () => {
     const createdAt = new Date(Date.now() - 10 * 60 * 1000);
-    find
-      .mockResolvedValueOnce([
-        {
-          id: 'newest',
-          status: DispenseStatus.READY,
-          createdAt,
-        },
-      ])
-      .mockResolvedValueOnce([
-        {
-          id: 'newest',
-          status: DispenseStatus.READY,
-          createdAt,
-        },
-      ]);
+    find.mockResolvedValueOnce([
+      {
+        id: 'newest',
+        status: DispenseStatus.READY,
+        createdAt,
+      },
+    ]);
 
     await expect(
       service.getPublicStatus(createdAt.getTime() + 10 * 60 * 1000),
@@ -149,6 +138,40 @@ describe('DispenseRequestService', () => {
       lastFeedAt: createdAt.toISOString(),
       lastFeedId: 'newest',
     });
+  });
+
+  it('omits lastFeed when the newest READY is past retention', async () => {
+    const createdAt = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000);
+    find.mockResolvedValueOnce([
+      {
+        id: 'old-ready',
+        status: DispenseStatus.READY,
+        createdAt,
+      },
+    ]);
+
+    await expect(service.getPublicStatus()).resolves.toEqual({
+      canFeed: true,
+      cooldownEndsAt: null,
+      lastFeedAt: null,
+      lastFeedId: null,
+    });
+  });
+
+  it('lists ready feeds inside retention newest-first with a take cap', async () => {
+    find.mockResolvedValueOnce([]);
+
+    await service.listReadyForFeeds(1_700_000_000_000);
+
+    expect(find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: DispenseStatus.READY,
+        }),
+        order: { createdAt: 'DESC' },
+        take: 20,
+      }),
+    );
   });
 
   it('fails closed when the cooldown query throws', async () => {

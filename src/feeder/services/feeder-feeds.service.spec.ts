@@ -73,6 +73,7 @@ describe('FeederFeedsService', () => {
 
     const result = await service.listFeeds();
 
+    expect(listNewest).toHaveBeenCalledWith(expect.any(Number));
     expect(result.feeds).toHaveLength(2);
     expect(result.feeds[0].id).toBe('feed-new');
     expect(result.feeds[0].proof?.playbackUrl).toContain('proof-new');
@@ -82,6 +83,63 @@ describe('FeederFeedsService', () => {
       'v-old-window',
     ]);
     expect(result.ungroupedVisits.map((v) => v.id)).toEqual(['v-ungrouped']);
+  });
+
+  it('leaves visits linked to a missing feed ungrouped instead of time-bucketing', async () => {
+    listReadyForFeeds.mockResolvedValue([
+      {
+        id: 'feed-new',
+        status: DispenseStatus.READY,
+        proofKey: 'feeder/proof-new.mp4',
+        createdAt: new Date('2026-11-22T20:00:00.000Z'),
+      },
+    ]);
+    listNewest.mockResolvedValue([
+      {
+        id: 'v-orphan-link',
+        videoKey: 'feeder/orphan.mp4',
+        animalCount: 1,
+        crowCount: 0,
+        dispenseRequestId: 'feed-missing',
+        createdAt: new Date('2026-11-22T20:10:00.000Z'),
+      },
+    ] as FeederVisit[]);
+
+    const result = await service.listFeeds();
+
+    expect(result.feeds[0].visits).toEqual([]);
+    expect(result.ungroupedVisits.map((v) => v.id)).toEqual(['v-orphan-link']);
+  });
+
+  it('assigns a visit at the next feed fedAt to the newer feed', async () => {
+    listReadyForFeeds.mockResolvedValue([
+      {
+        id: 'feed-new',
+        status: DispenseStatus.READY,
+        proofKey: 'feeder/proof-new.mp4',
+        createdAt: new Date('2026-11-22T20:00:00.000Z'),
+      },
+      {
+        id: 'feed-old',
+        status: DispenseStatus.READY,
+        proofKey: 'feeder/proof-old.mp4',
+        createdAt: new Date('2026-11-22T18:00:00.000Z'),
+      },
+    ]);
+    listNewest.mockResolvedValue([
+      {
+        id: 'v-boundary',
+        videoKey: 'feeder/boundary.mp4',
+        animalCount: 1,
+        crowCount: 0,
+        createdAt: new Date('2026-11-22T20:00:00.000Z'),
+      },
+    ] as FeederVisit[]);
+
+    const result = await service.listFeeds();
+
+    expect(result.feeds[0].visits.map((v) => v.id)).toEqual(['v-boundary']);
+    expect(result.feeds[1].visits).toEqual([]);
   });
 
   it('returns empty feeds with ungrouped visits when nothing is ready', async () => {
@@ -118,5 +176,46 @@ describe('FeederFeedsService', () => {
     expect(result.feeds).toHaveLength(1);
     expect(result.feeds[0].visits).toEqual([]);
     expect(result.feeds[0].proof).not.toBeNull();
+  });
+
+  it('skips a clip that fails to sign without dropping the rest', async () => {
+    listReadyForFeeds.mockResolvedValue([
+      {
+        id: 'feed-1',
+        status: DispenseStatus.READY,
+        proofKey: 'feeder/proof.mp4',
+        createdAt: new Date('2026-11-22T20:00:00.000Z'),
+      },
+    ]);
+    listNewest.mockResolvedValue([
+      {
+        id: 'v-bad',
+        videoKey: 'feeder/bad.mp4',
+        animalCount: 1,
+        crowCount: 0,
+        createdAt: new Date('2026-11-22T20:05:00.000Z'),
+      },
+      {
+        id: 'v-good',
+        videoKey: 'feeder/good.mp4',
+        animalCount: 1,
+        crowCount: 0,
+        createdAt: new Date('2026-11-22T20:06:00.000Z'),
+      },
+    ] as FeederVisit[]);
+    signPlayback.mockImplementation((key: string) => {
+      if (key === 'feeder/bad.mp4') {
+        return Promise.reject(new Error('sign failed'));
+      }
+      return Promise.resolve({
+        playbackUrl: `https://cdn.example.com/${key}`,
+        expiresAt: '2099-01-01T00:00:00.000Z',
+      });
+    });
+
+    const result = await service.listFeeds();
+
+    expect(result.feeds[0].proof).not.toBeNull();
+    expect(result.feeds[0].visits.map((v) => v.id)).toEqual(['v-good']);
   });
 });

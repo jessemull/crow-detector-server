@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { createLogger } from 'src/common/logger/logger.config';
 import { DispenseRequest } from '../entity/dispense-request.entity';
 import { FeederVisit } from '../entity/feeder-visit.entity';
 import { DispenseRequestService } from './dispense-request.service';
@@ -28,6 +29,8 @@ export type FeederFeedsResponse = {
 
 @Injectable()
 export class FeederFeedsService {
+  private readonly logger = createLogger(FeederFeedsService.name);
+
   constructor(
     private readonly dispenseRequestService: DispenseRequestService,
     private readonly feederVisitService: FeederVisitService,
@@ -37,7 +40,7 @@ export class FeederFeedsService {
   async listFeeds(now = Date.now()): Promise<FeederFeedsResponse> {
     const [readyFeeds, visits] = await Promise.all([
       this.dispenseRequestService.listReadyForFeeds(now),
-      this.feederVisitService.listNewest(),
+      this.feederVisitService.listNewest(now),
     ]);
 
     const feedsNewestFirst = [...readyFeeds].sort(
@@ -45,18 +48,22 @@ export class FeederFeedsService {
     );
 
     const assigned = new Set<string>();
+    /** Linked to a feed id that is not on this page — never time-bucket elsewhere. */
+    const linkedOrphans = new Set<string>();
     const feedVisitMap = new Map<string, FeederVisit[]>();
     for (const feed of feedsNewestFirst) {
       feedVisitMap.set(feed.id, []);
     }
 
     for (const visit of visits) {
-      if (
-        visit.dispenseRequestId &&
-        feedVisitMap.has(visit.dispenseRequestId)
-      ) {
+      if (!visit.dispenseRequestId) {
+        continue;
+      }
+      if (feedVisitMap.has(visit.dispenseRequestId)) {
         feedVisitMap.get(visit.dispenseRequestId)!.push(visit);
         assigned.add(visit.id);
+      } else {
+        linkedOrphans.add(visit.id);
       }
     }
 
@@ -69,7 +76,7 @@ export class FeederFeedsService {
           : feedsNewestFirst[index - 1].createdAt.getTime();
 
       for (const visit of visits) {
-        if (assigned.has(visit.id)) {
+        if (assigned.has(visit.id) || linkedOrphans.has(visit.id)) {
           continue;
         }
         const at = visit.createdAt.getTime();
@@ -85,13 +92,14 @@ export class FeederFeedsService {
         const sectionVisits = (feedVisitMap.get(feed.id) ?? []).sort(
           (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
         );
+        const signedVisits = (
+          await Promise.all(sectionVisits.map((visit) => this.toClipDto(visit)))
+        ).filter((clip): clip is FeederClipDto => clip !== null);
         return {
           id: feed.id,
           fedAt: feed.createdAt.toISOString(),
           proof: await this.signProof(feed),
-          visits: await Promise.all(
-            sectionVisits.map((visit) => this.toClipDto(visit)),
-          ),
+          visits: signedVisits,
         };
       }),
     );
@@ -100,11 +108,13 @@ export class FeederFeedsService {
       .filter((visit) => !assigned.has(visit.id))
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
+    const ungroupedVisits = (
+      await Promise.all(ungrouped.map((visit) => this.toClipDto(visit)))
+    ).filter((clip): clip is FeederClipDto => clip !== null);
+
     return {
       feeds,
-      ungroupedVisits: await Promise.all(
-        ungrouped.map((visit) => this.toClipDto(visit)),
-      ),
+      ungroupedVisits,
     };
   }
 
@@ -114,20 +124,34 @@ export class FeederFeedsService {
     if (!feed.proofKey) {
       return null;
     }
-    return this.feederPlaybackService.signPlayback(feed.proofKey);
+    try {
+      return await this.feederPlaybackService.signPlayback(feed.proofKey);
+    } catch (error) {
+      this.logger.warn(
+        `Skipping feeder proof sign for ${feed.id}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return null;
+    }
   }
 
-  private async toClipDto(visit: FeederVisit): Promise<FeederClipDto> {
-    const playback = await this.feederPlaybackService.signPlayback(
-      visit.videoKey,
-    );
-    return {
-      id: visit.id,
-      recordedAt: visit.createdAt.toISOString(),
-      animalCount: visit.animalCount,
-      crowCount: visit.crowCount,
-      playbackUrl: playback.playbackUrl,
-      expiresAt: playback.expiresAt,
-    };
+  private async toClipDto(visit: FeederVisit): Promise<FeederClipDto | null> {
+    try {
+      const playback = await this.feederPlaybackService.signPlayback(
+        visit.videoKey,
+      );
+      return {
+        id: visit.id,
+        recordedAt: visit.createdAt.toISOString(),
+        animalCount: visit.animalCount,
+        crowCount: visit.crowCount,
+        playbackUrl: playback.playbackUrl,
+        expiresAt: playback.expiresAt,
+      };
+    } catch (error) {
+      this.logger.warn(
+        `Skipping feeder visit sign for ${visit.id}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return null;
+    }
   }
 }

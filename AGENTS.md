@@ -30,7 +30,7 @@ crow-detector-server/
 │   ├── common/                 # Logger, shared types
 │   ├── config/                 # Typed Nest config (env schema)
 │   ├── detection/              # ClaudeService for feeder classify
-│   ├── feeder/                 # Public dispense + feeder visits/clips
+│   ├── feeder/                 # Public status/feeds/dispense + visits/clips
 │   ├── health/                 # Health checks
 │   ├── porch/                  # Public porch clip list
 │   ├── urls/                   # Presigned S3 URL issuance (porch/feeder)
@@ -236,7 +236,7 @@ The still-photo S3 → SQS → Lambda → `/feed` / `/detection` path is gone. D
 
 Types: `feat`, `fix`, `refactor`, `test`, `docs`, `style`, `perf`, `chore`, `build`, `ci`, `revert`
 
-Scopes (commitlint enum): `auth`, `feed`, `detection`, `feeder`, `porch`, `urls`, `health`, `common`, `config`, `ci`, `docs`, `deps`, `infra`, `docker`
+Scopes (commitlint enum): `auth`, `feed`, `detection`, `feeder`, `porch`, `urls`, `health`, `common`, `config`, `lambda`, `ci`, `docs`, `deps`, `infra`, `docker`
 
 Prefer `make commit` (Commitizen).
 

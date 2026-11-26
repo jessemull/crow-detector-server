@@ -104,15 +104,20 @@ export class DispenseRequestService {
   }
 
   async getPublicStatus(now = Date.now()): Promise<FeederPublicStatus> {
-    const [newest] = await this.dispenseRepository.find({
+    // One ordered page so canFeed and lastFeed* come from the same snapshot.
+    const recent = await this.dispenseRepository.find({
       order: { createdAt: 'DESC' },
-      take: 1,
+      take: 100,
     });
-    const [lastReady] = await this.dispenseRepository.find({
-      where: { status: DispenseStatus.READY },
-      order: { createdAt: 'DESC' },
-      take: 1,
-    });
+    const newest = recent[0];
+    let lastReady = recent.find((row) => row.status === DispenseStatus.READY);
+    if (newest && !lastReady) {
+      [lastReady] = await this.dispenseRepository.find({
+        where: { status: DispenseStatus.READY },
+        order: { createdAt: 'DESC' },
+        take: 1,
+      });
+    }
 
     const lastFeedAt =
       lastReady && feederClipStillStored(lastReady.createdAt, now)

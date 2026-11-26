@@ -44,8 +44,8 @@ export class FeederVisitService {
     return this.visitRepository.save(visit);
   }
 
-  async listNewest(): Promise<FeederVisit[]> {
-    const cutoff = new Date(Date.now() - FEEDER_CLIP_RETENTION_MS);
+  async listNewest(now = Date.now()): Promise<FeederVisit[]> {
+    const cutoff = new Date(now - FEEDER_CLIP_RETENTION_MS);
     return this.visitRepository.find({
       where: { createdAt: MoreThan(cutoff) },
       order: { createdAt: 'DESC' },

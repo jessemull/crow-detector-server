@@ -82,6 +82,7 @@ The feeder camera is a second RTSP source. Do not point it at `PORCH_RTSP_URL` o
    `DEPLOY_HOST=juzu-inui FEEDER_GIT_REF=feat/feeder-video ./scripts/deploy-feeder-visits-host.sh`  
    Each pulls the same clone and restarts its own unit.
 7. Local clips stay in `~/feeder-staging` until the database write succeeds, then a 45-minute sweeper removes anything left behind.
+8. Feeder Cam clients poll `GET /feeder/status` for the 10-minute cooldown and `GET /feeder/feeds` for proof-first feed sections (visits grouped by time window or `dispenseRequestId`). `GET /feeder/clips` remains a flat visit list.
 
 Public `POST /feeder/dispense` and the `feeder/` lifecycle rule in `cloudformation/crow-detector-s3.yaml` need human review before production (`docs/GOVERNANCE.md`). The relay is still out of this recorder.
 
