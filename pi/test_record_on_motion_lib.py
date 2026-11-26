@@ -246,6 +246,18 @@ class SubstreamUrlTests(unittest.TestCase):
             "rtsp://u:p@host:554/stream2",
         )
 
+    def test_stream1_in_the_password_stays(self) -> None:
+        self.assertEqual(
+            rtsp_substream_url("rtsp://user:stream1pass@host:554/stream1"),
+            "rtsp://user:stream1pass@host:554/stream2",
+        )
+
+    def test_stream2_path_is_unchanged_when_the_password_contains_stream1(self) -> None:
+        self.assertEqual(
+            rtsp_substream_url("rtsp://user:stream1@host:554/stream2"),
+            "rtsp://user:stream1@host:554/stream2",
+        )
+
 
 class RetainWindowTests(unittest.TestCase):
     def test_overlap_selection(self) -> None:

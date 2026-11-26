@@ -7,19 +7,19 @@
 
 ## Repository Overview
 
-| Field            | Value                                           |
-| ---------------- | ----------------------------------------------- |
-| **Project**      | Crow Detector — interactive crow feeder backend |
-| **Architecture** | NestJS modular monolith (ECS Fargate)           |
-| **Language**     | TypeScript (strict) on Node.js 26               |
-| **Storage**      | PostgreSQL (TypeORM) + S3                       |
-| **Vision / AI**  | Anthropic Claude (feeder classify)              |
-| **Auth**         | ECDSA device authentication                     |
-| **IaC**          | CloudFormation                                  |
-| **Testing**      | Jest with 80% global coverage thresholds        |
-| **Analysis**     | ESLint + Prettier                               |
-| **CI/CD**        | GitHub Actions                                  |
-| **Git Hooks**    | Husky + lint-staged + Conventional Commits      |
+| Field            | Value                                                                                            |
+| ---------------- | ------------------------------------------------------------------------------------------------ |
+| **Project**      | Crow Detector — interactive crow feeder backend                                                  |
+| **Architecture** | NestJS modular monolith (ECS Fargate)                                                            |
+| **Language**     | TypeScript on Node.js 26. Root tsconfig leaves `"strict": true` off; individual strict flags on. |
+| **Storage**      | PostgreSQL (TypeORM) + S3                                                                        |
+| **Vision / AI**  | Anthropic Claude (feeder classify)                                                               |
+| **Auth**         | ECDSA device authentication                                                                      |
+| **IaC**          | CloudFormation                                                                                   |
+| **Testing**      | Jest with 80% global coverage thresholds                                                         |
+| **Analysis**     | ESLint + Prettier                                                                                |
+| **CI/CD**        | GitHub Actions                                                                                   |
+| **Git Hooks**    | Husky + lint-staged + Conventional Commits                                                       |
 
 ### Repository Structure
 
@@ -78,17 +78,17 @@ Prefer `make` targets. Run **`make`** or **`make help`** for a compact list.
 
 ### Local API / DB
 
-| Command                                               | Description                                                                                                                      |
-| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run start:dev`                                   | Nest watch + SSH tunnel to RDS                                                                                                   |
-| `npm run db:seed`                                     | Seed database                                                                                                                    |
-| `npm run db:reset`                                    | Reset + seed                                                                                                                     |
-| `npm run auth:token`                                  | Generate ECDSA auth token helper                                                                                                 |
-| `./scripts/deploy-porch-host.sh`                      | LAN host: SSH `git pull` + restart `porch-recorder` (`DEPLOY_HOST=juzu-inui`; repo default `~/Development/crow-detector-server`) |
-| `./scripts/deploy-feeder-host.sh`                     | LAN host: SSH `git pull` + restart `feeder-recorder` (same clone; `FEEDER_GIT_REF` defaults to the current branch)               |
-| `./scripts/deploy-feeder-visits-host.sh`              | LAN host: SSH `git pull` + restart `feeder-visits` (`pi/feeder-recorder.py --visits`)                                            |
-| `python3 pi/record-on-motion.py --once`               | One RTSP clip + upload (host bring-up)                                                                                           |
-| `python3 -m unittest pi/test_record_on_motion_lib.py` | Porch recorder helper unit tests                                                                                                 |
+| Command                                             | Description                                                                                                                      |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run start:dev`                                 | Nest watch + SSH tunnel to RDS                                                                                                   |
+| `npm run db:seed`                                   | Seed database                                                                                                                    |
+| `npm run db:reset`                                  | Reset + seed                                                                                                                     |
+| `npm run auth:token`                                | Generate ECDSA auth token helper                                                                                                 |
+| `./scripts/deploy-porch-host.sh`                    | LAN host: SSH `git pull` + restart `porch-recorder` (`DEPLOY_HOST=juzu-inui`; repo default `~/Development/crow-detector-server`) |
+| `./scripts/deploy-feeder-host.sh`                   | LAN host: SSH `git pull` + restart `feeder-recorder` (same clone; `FEEDER_GIT_REF` defaults to the current branch)               |
+| `./scripts/deploy-feeder-visits-host.sh`            | LAN host: SSH `git pull` + restart `feeder-visits` (`pi/feeder-recorder.py --visits`)                                            |
+| `python3 pi/record-on-motion.py --once`             | One RTSP clip + upload (host bring-up)                                                                                           |
+| `python3 -m unittest discover -s pi -p 'test_*.py'` | Porch/feeder recorder helper unit tests                                                                                          |
 
 ---
 
