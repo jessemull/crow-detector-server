@@ -14,17 +14,22 @@ from unittest import mock
 
 from record_on_motion_lib import (
     ContinuousRetainPipeline,
-    activity_still_present,
+    MotionTracker,
+    VisitClock,
+    classify_sample_offsets,
     drop_incomplete_newest_segment,
     env_float,
+    follow_visit,
     load_env_file,
-    mean_abs_diff_ratio,
-    motion_detected,
+    motion_tracker_from_env,
     parse_env_line,
     prune_segments_older_than,
     rtsp_substream_url,
     select_segments_overlapping_window,
     signed_payload,
+    visit_keep_after_epoch,
+    visit_limits_from_env,
+    visit_retain_window,
     wait_for_motion,
     write_concat_list,
 )
@@ -74,21 +79,152 @@ class LoadEnvFileTests(unittest.TestCase):
         self.assertEqual(load_env_file(Path("/nonexistent/porch.env"), environ), {})
 
 
+def _frame(width: int, height: int, value: int, rect: tuple[int, int, int, int, int] | None = None) -> bytes:
+    buf = bytearray([value]) * (width * height)
+    if rect is not None:
+        x0, y0, x1, y1, paint = rect
+        for y in range(y0, y1):
+            for x in range(x0, x1):
+                buf[y * width + x] = paint
+    return bytes(buf)
+
+
 class MotionScoreTests(unittest.TestCase):
-    def test_identical_frames_are_zero(self) -> None:
-        frame = bytes([10, 20, 30, 40])
-        self.assertEqual(mean_abs_diff_ratio(frame, frame), 0.0)
+    def tracker(self, **overrides: object) -> MotionTracker:
+        values: dict[str, object] = {
+            "width": 8,
+            "height": 8,
+            "pixel_delta": 30,
+            "min_changed_ratio": 0.004,
+            "max_changed_ratio": 0.45,
+            "min_blob_fill": 0.35,
+            "consecutive_frames": 3,
+            "reference_alpha": 0.02,
+        }
+        values.update(overrides)
+        return MotionTracker(**values)  # type: ignore[arg-type]
 
-    def test_max_diff_is_one(self) -> None:
-        self.assertAlmostEqual(mean_abs_diff_ratio(bytes([0, 0]), bytes([255, 255])), 1.0)
+    def test_first_frame_seeds_the_reference(self) -> None:
+        sample = self.tracker().observe(_frame(8, 8, 0))
+        self.assertEqual(sample.kind, "seed")
+        self.assertFalse(sample.confirmed)
 
-    def test_mismatched_lengths_are_zero(self) -> None:
-        self.assertEqual(mean_abs_diff_ratio(b"abc", b"ab"), 0.0)
+    def test_full_frame_flash_is_a_light(self) -> None:
+        tracker = self.tracker()
+        tracker.observe(_frame(8, 8, 0))
+        sample = tracker.observe(_frame(8, 8, 255))
+        self.assertEqual(sample.kind, "light")
+        self.assertFalse(sample.confirmed)
 
-    def test_motion_threshold(self) -> None:
-        self.assertTrue(motion_detected(0.05, 0.035))
-        self.assertTrue(motion_detected(0.035, 0.035))
-        self.assertFalse(motion_detected(0.01, 0.035))
+    def test_blast_stays_disarmed_until_the_picture_is_quiet(self) -> None:
+        tracker = self.tracker()
+        tracker.observe(_frame(8, 8, 0))
+        tracker.observe(_frame(8, 8, 255))
+        blob = _frame(8, 8, 0, (1, 1, 4, 4, 255))
+        leftover = tracker.observe(blob)
+        self.assertEqual(leftover.kind, "settle")
+        self.assertFalse(leftover.confirmed)
+        quiet = tracker.observe(_frame(8, 8, 0))
+        self.assertEqual(quiet.kind, "quiet")
+        self.assertFalse(tracker.observe(blob).confirmed)
+        self.assertFalse(tracker.observe(blob).confirmed)
+        self.assertTrue(tracker.observe(blob).confirmed)
+
+    def test_smaller_light_does_not_disarm(self) -> None:
+        tracker = self.tracker()
+        tracker.observe(_frame(8, 8, 0))
+        half = _frame(8, 8, 0, (0, 0, 8, 4, 255))
+        sample = tracker.observe(half)
+        self.assertEqual(sample.kind, "light")
+        blob = _frame(8, 8, 0, (1, 1, 4, 4, 255))
+        self.assertFalse(tracker.observe(blob).confirmed)
+        self.assertFalse(tracker.observe(blob).confirmed)
+        self.assertTrue(tracker.observe(blob).confirmed)
+
+    def test_compact_patch_confirms_on_the_third_frame(self) -> None:
+        tracker = self.tracker()
+        tracker.observe(_frame(8, 8, 0))
+        blob = _frame(8, 8, 0, (1, 1, 4, 4, 255))
+        first = tracker.observe(blob)
+        second = tracker.observe(blob)
+        third = tracker.observe(blob)
+        self.assertEqual(first.kind, "motion")
+        self.assertFalse(first.confirmed)
+        self.assertFalse(second.confirmed)
+        self.assertTrue(third.confirmed)
+
+    def test_speckle_does_not_count(self) -> None:
+        tracker = self.tracker()
+        base = bytearray(_frame(8, 8, 0))
+        tracker.observe(bytes(base))
+        noisy = bytearray(base)
+        for index in (0, 10, 20, 30, 40, 50, 60):
+            noisy[index] = 255
+        sample = tracker.observe(bytes(noisy))
+        self.assertEqual(sample.kind, "speckle")
+        self.assertFalse(sample.confirmed)
+
+    def test_a_quiet_frame_resets_the_streak(self) -> None:
+        tracker = self.tracker()
+        tracker.observe(_frame(8, 8, 0))
+        blob = _frame(8, 8, 0, (1, 1, 4, 4, 255))
+        tracker.observe(blob)
+        tracker.observe(blob)
+        quiet = tracker.observe(_frame(8, 8, 0))
+        again = tracker.observe(blob)
+        self.assertEqual(quiet.kind, "quiet")
+        self.assertFalse(again.confirmed)
+
+    def test_slow_ramp_stays_quiet(self) -> None:
+        tracker = self.tracker(reference_alpha=1.0)
+        tracker.observe(_frame(8, 8, 0))
+        sample = tracker.observe(_frame(8, 8, 10))
+        self.assertEqual(sample.kind, "quiet")
+
+    def test_visit_gap_and_cap(self) -> None:
+        clock = VisitClock(gap_seconds=120, cap_seconds=600)
+        self.assertIsNone(clock.close_reason(50))
+        clock.note_motion(0)
+        clock.note_motion(100)
+        self.assertIsNone(clock.close_reason(219))
+        self.assertEqual(clock.close_reason(220), "gap")
+        capped = VisitClock(gap_seconds=120, cap_seconds=600)
+        capped.note_motion(0)
+        self.assertEqual(capped.close_reason(600), "cap")
+
+    def test_visit_window_keeps_the_middle_and_drops_the_trailing_gap(self) -> None:
+        start, end = visit_retain_window(
+            1_000,
+            1_200,
+            pre_roll_seconds=4,
+            post_roll_seconds=20,
+        )
+        self.assertEqual((start, end), (996, 1_220))
+        self.assertEqual(
+            visit_keep_after_epoch(1_000, pre_roll_seconds=4, segment_seconds=2),
+            994,
+        )
+
+    def test_classify_samples_are_spread_through_the_visit(self) -> None:
+        offsets = classify_sample_offsets(80)
+        self.assertGreaterEqual(len(offsets), 3)
+        self.assertLess(max(offsets), 80)
+        self.assertEqual(classify_sample_offsets(0), [0.5])
+
+    def test_env_builds_the_same_detector_for_both_cameras(self) -> None:
+        porch = motion_tracker_from_env("PORCH", width=4, height=4, environ={})
+        feeder = motion_tracker_from_env(
+            "FEEDER",
+            width=4,
+            height=4,
+            environ={"FEEDER_PIXEL_DELTA": "40", "FEEDER_MOTION_FRAMES": "2"},
+        )
+        self.assertEqual(porch.pixel_delta, 30)
+        self.assertEqual(porch.consecutive_frames, 3)
+        self.assertEqual(porch.min_blob_fill, 0.25)
+        self.assertEqual(feeder.pixel_delta, 40)
+        self.assertEqual(feeder.consecutive_frames, 2)
+        self.assertEqual(visit_limits_from_env("PORCH", {}), (120.0, 600.0))
 
 
 class EnvFloatTests(unittest.TestCase):
@@ -428,100 +564,132 @@ class PipelineTests(unittest.TestCase):
             os.close(write_fd)
 
 
+class _Frames:
+    def __init__(self, frames: list[bytes]) -> None:
+        self.frames = frames
+        self.reconnects = 0
+
+    def read_frame(self) -> bytes:
+        return self.frames.pop(0)
+
+
 class MotionLoopTests(unittest.TestCase):
+    def tracker(self) -> MotionTracker:
+        return MotionTracker(
+            width=8,
+            height=8,
+            consecutive_frames=3,
+            max_changed_ratio=0.45,
+            min_blob_fill=0.35,
+        )
+
     def test_wait_for_motion(self) -> None:
-        class Stub:
-            def __init__(self) -> None:
-                self.frames = [bytes([0, 0]), bytes([255, 255])]
-
-            def read_frame(self) -> bytes:
-                return self.frames.pop(0)
-
-        scores: list[float] = []
-        wait_for_motion(Stub(), threshold=0.5, on_motion=scores.append)  # type: ignore[arg-type]
-        self.assertEqual(len(scores), 1)
+        blob = _frame(8, 8, 0, (1, 1, 4, 4, 255))
+        pipeline = _Frames([_frame(8, 8, 0), blob, blob, blob])
+        seen: list[str] = []
+        sample = wait_for_motion(
+            pipeline,
+            self.tracker(),
+            on_motion=lambda item: seen.append(item.kind),
+        )
+        self.assertTrue(sample.confirmed)
+        self.assertEqual(seen, ["motion"])
 
     def test_wait_for_motion_ticks_while_idle(self) -> None:
-        class Stub:
-            def __init__(self) -> None:
-                self.frames = [bytes([0, 0]), bytes([0, 0]), bytes([255, 255])]
-
-            def read_frame(self) -> bytes:
-                return self.frames.pop(0)
-
+        blob = _frame(8, 8, 0, (1, 1, 4, 4, 255))
+        pipeline = _Frames([_frame(8, 8, 0), _frame(8, 8, 0), blob, blob, blob])
         ticks: list[int] = []
-        wait_for_motion(  # type: ignore[arg-type]
-            Stub(),
-            threshold=0.5,
+        wait_for_motion(
+            pipeline,
+            self.tracker(),
             on_tick=lambda: ticks.append(1),
             tick_seconds=0,
         )
         self.assertGreaterEqual(len(ticks), 1)
 
     def test_reconnect_does_not_count_as_motion(self) -> None:
-        class Stub:
+        blob = _frame(8, 8, 0, (1, 1, 4, 4, 255))
+
+        class Stub(_Frames):
             def __init__(self) -> None:
-                self.frames = [
-                    bytes([0, 0]),
-                    bytes([255, 255]),
-                    bytes([255, 255]),
-                    bytes([0, 0]),
-                ]
-                self.reconnects = 0
+                super().__init__(
+                    [
+                        _frame(8, 8, 0),
+                        _frame(8, 8, 0),
+                        _frame(8, 8, 0),
+                        blob,
+                        blob,
+                        blob,
+                    ]
+                )
                 self.reads = 0
 
             def read_frame(self) -> bytes:
                 self.reads += 1
                 if self.reads == 2:
-                    self.reconnects += 1
+                    self.reconnects = 1
                 return self.frames.pop(0)
 
-        scores: list[float] = []
-        wait_for_motion(Stub(), threshold=0.5, on_motion=scores.append)  # type: ignore[arg-type]
-        self.assertEqual(len(scores), 1)
+        seen: list[str] = []
+        sample = wait_for_motion(Stub(), self.tracker(), on_motion=lambda item: seen.append(item.kind))
+        self.assertTrue(sample.confirmed)
+        self.assertEqual(seen, ["motion"])
 
-    def test_reconnect_does_not_extend_activity(self) -> None:
-        class Stub:
-            def __init__(self) -> None:
-                self.frames = [
-                    bytes([0, 0]),
-                    bytes([255, 255]),
-                    bytes([255, 255]),
-                ]
-                self.reconnects = 0
-                self.reads = 0
-
-            def read_frame(self) -> bytes:
-                self.reads += 1
-                if self.reads == 2:
-                    self.reconnects += 1
-                return self.frames.pop(0)
-
-        times = iter([0.0, 0.0, 0.5, 1.0])
+    def test_follow_visit_closes_on_the_gap(self) -> None:
+        quiet = _frame(8, 8, 0)
+        pipeline = _Frames([quiet, quiet, quiet, quiet])
+        tracker = self.tracker()
+        tracker.observe(quiet)
+        clock = {"t": 0.0}
 
         def monotonic() -> float:
-            return next(times)
+            clock["t"] += 50.0
+            return clock["t"]
 
-        self.assertFalse(
-            activity_still_present(  # type: ignore[arg-type]
-                Stub(),
-                threshold=0.5,
-                window_seconds=1.0,
-                monotonic=monotonic,
-            )
+        start, end, reason = follow_visit(
+            pipeline,
+            tracker,
+            gap_seconds=120,
+            cap_seconds=600,
+            pre_roll_seconds=4,
+            post_roll_seconds=20,
+            segment_seconds=2,
+            monotonic=monotonic,
+            epoch=lambda: 1_000.0,
         )
+        self.assertEqual(reason, "gap")
+        self.assertEqual(start, 996.0)
+        self.assertEqual(end, 1_020.0)
 
-    def test_activity(self) -> None:
-        class Moving:
-            def __init__(self) -> None:
-                self.frames = [bytes([0, 0]), bytes([255, 255])]
+    def test_follow_visit_closes_on_the_cap(self) -> None:
+        blob = _frame(8, 8, 0, (1, 1, 4, 4, 255))
+        pipeline = _Frames([blob] * 30)
+        tracker = self.tracker()
+        tracker.observe(_frame(8, 8, 0))
+        clock = {"t": 0.0}
+        epochs = {"t": 5_000.0}
 
-            def read_frame(self) -> bytes:
-                return self.frames.pop(0)
+        def monotonic() -> float:
+            clock["t"] += 3.0
+            return clock["t"]
 
-        self.assertTrue(
-            activity_still_present(Moving(), threshold=0.5, window_seconds=1.0)  # type: ignore[arg-type]
+        def epoch() -> float:
+            epochs["t"] += 3.0
+            return epochs["t"]
+
+        _start, end, reason = follow_visit(
+            pipeline,
+            tracker,
+            gap_seconds=120,
+            cap_seconds=5,
+            pre_roll_seconds=4,
+            post_roll_seconds=1,
+            segment_seconds=1,
+            monotonic=monotonic,
+            epoch=epoch,
         )
+        self.assertEqual(reason, "cap")
+        self.assertGreater(end, 5_000.0)
 
 
 class UploadRetryTests(unittest.TestCase):

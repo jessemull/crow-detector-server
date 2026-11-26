@@ -35,10 +35,10 @@ AI agents and contributors **must** start with the governance chain:
 | Doc                                                     | Purpose                                                  |
 | ------------------------------------------------------- | -------------------------------------------------------- |
 | [`CONTEXT.md`](./CONTEXT.md)                            | Primary entry — loading order, precedence, quality gates |
-| [`AGENTS.md`](./AGENTS.md)                              | Full development rules for Nest + Lambda                 |
+| [`AGENTS.md`](./AGENTS.md)                              | Full development rules for Nest + LAN recorders          |
 | [`CLAUDE.md`](./CLAUDE.md) / [`GEMINI.md`](./GEMINI.md) | Thin redirects to CONTEXT/AGENTS                         |
 | [`docs/GOVERNANCE.md`](./docs/GOVERNANCE.md)            | Authority, escalation, enforcement                       |
-| [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)        | Nest modules, Lambda, CloudFormation                     |
+| [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)        | Nest modules, feeder/porch flow, CloudFormation          |
 | [`docs/TESTING.md`](./docs/TESTING.md)                  | Jest strategy and 80% coverage                           |
 | [`docs/SECURITY.md`](./docs/SECURITY.md)                | ECDSA, secrets, IAM, logging                             |
 | [`docs/ENVIRONMENT.md`](./docs/ENVIRONMENT.md)          | Environment variable reference                           |
@@ -70,13 +70,12 @@ The **Crow Detector** is an interactive system that allows users to feed crows t
 - **Image Gallery**: Displays user images alongside detection images.
 - **Cooldown System**: Prevents spam feeding with configurable cooldown periods.
 
-### Image Processing Pipeline
+### Video and classify pipeline
 
-- **Content Moderation**: AWS Rekognition filters inappropriate content.
-- **Face Detection**: AWS Rekognition detects faces and provides bounding box coordinates.
-- **Image Cropping**: Sharp library crops images to focus on detected faces with padding.
-- **Image Storage**: Organized S3 storage with separate directories for original and processed images.
-- **Animal Detection**: Claude Haiku looks at the photo, names the animals, and counts them.
+- **Porch clips**: LAN host records RTSP visits and uploads mp4 objects under `porch/`.
+- **Feeder proofs / visits**: LAN host records dispense proofs and motion visits under `feeder/`.
+- **Animal classify**: Claude Haiku classifies sampled feeder frames via `POST /feeder/classify`.
+- **Still-photo path removed**: No Rekognition / Sharp / S3→SQS Lambda pipeline.
 - **Processing Workflow**: Comprehensive status tracking from upload to completion.
 
 ## System Architecture
@@ -143,7 +142,7 @@ The **Crow Detector Server** is built using modern technologies to ensure reliab
 - **AWS ECS**: Container orchestration for server deployment.
 - **AWS CloudFormation**: Infrastructure as Code for resource management.
 - **AWS IAM**: Identity and access management for secure resource access.
-- **AWS Rekognition**: Content moderation and face detection for feed photos. Animal identification uses Claude.
+- **Anthropic Claude**: Feeder frame classify (Haiku) for animal visits when enabled.
 
 ### Development Tools
 
@@ -206,11 +205,9 @@ To clone the repository, install dependencies, and run the project locally follo
    CLAUDE_MODEL=claude-haiku-5-5
 
    # Feed Configuration
-   FEED_COOLDOWN_HOURS=4
 
    # Private Key Paths (for token generation)
    PI_USER_PRIVATE_KEY_PATH=/path/to/pi-user-private.pem
-   PI_MOTION_PRIVATE_KEY_PATH=/path/to/pi-motion-private.pem
    PI_FEEDER_PRIVATE_KEY_PATH=/path/to/pi-feeder-private.pem
    ```
 
@@ -260,9 +257,8 @@ The system uses ECDSA (Elliptic Curve Digital Signature Algorithm) for device au
 ### Device Types
 
 - **pi-user**: User interaction device (camera, LCD, feed button).
-- **pi-motion**: Motion detection device (PIR sensor, night vision camera).
 - **pi-porch**: Porch camera device (motion clips under `porch/`).
-- **pi-feeder**: Automated feeder device (relay control, feed dispensing).
+- **pi-feeder**: Feeder host. Signs dispense proofs and animal-visit uploads. The relay is separate hardware and is not driven by the recorder.
 
 ### Authentication Flow
 
@@ -277,10 +273,10 @@ Use the included authentication token generator:
 
 ```bash
 # Generate token for feed URL endpoint
-npm run auth:token POST /urls/feed '{"fileName":"test","format":"jpg","source":"motion","contentLength":1024}'
+npm run auth:token POST /urls/porch '{"fileName":"clip-1","contentLength":1200}' pi-porch
 
 # Generate token for detection URL endpoint
-npm run auth:token POST /urls/detection '{"fileName":"detection","format":"jpg","contentLength":1024}' pi-motion
+npm run auth:token POST /urls/feeder '{"fileName":"proof-1","contentLength":4096,"contentType":"video/mp4"}' pi-feeder
 ```
 
 ## Image Upload System
@@ -289,115 +285,37 @@ The system provides secure image upload capabilities through pre-signed S3 URLs:
 
 ### Upload Endpoints
 
-- **`POST /urls/feed`**: Generate signed URL for user interaction images.
-- **`POST /urls/detection`**: Generate signed URL for motion detection images.
 - **`POST /urls/porch`**: Generate signed URL for porch-camera mp4 uploads.
+- **`POST /urls/feeder`**: Generate a size-capped signed URL for feeder mp4 uploads (`pi-feeder`).
 - **`GET /porch/clips`**: Public list of porch clips with short-lived playback URLs.
+- **`POST /feeder/dispense`**, **`GET /feeder/dispense/{id}`**, **`GET /feeder/clips`**: Public dispense and visit playback.
+- **`GET /feeder/dispense/pending`**, **`PATCH /feeder/dispense/{id}`**, **`POST /feeder/classify`**, **`POST /feeder/visits`**: Feeder host routes.
 
 ### S3 Organization
 
-- **Feed Images**: `feed/{timestamp}-{filename}.{format}` (triggers processing)
-- **Detection Images**: `detection/{feedEventId}/{timestamp}-{filename}.{format}` (triggers processing)
-- **Processed Images**: `processed/{filename}_cropped.{format}` (safe from reprocessing)
+- **Porch clips**: `porch/{timestamp}-{name}.mp4` (30-day lifecycle prefix rule)
+- **Feeder clips**: `feeder/{timestamp}-{name}.mp4` (30-day lifecycle prefix rule)
 
-### Image Processing Flow
+### Clip flow
 
-1. **Upload**: Image uploaded to `feed/` or `detection/` directory.
-2. **Processing**: Lambda function triggers image processing pipeline.
-3. **Storage**: Processed images stored in separate `processed/` directory.
-4. **Safety**: Processed images don't trigger reprocessing (prevents infinite loops).
-
-#### Detection Event Processing Workflow
-
-1. **Initial Status**: Detection events start with `PENDING` status.
-2. **Processing Phase**: Status changes to `PROCESSING` during analysis.
-3. **AI Analysis**: Claude Haiku looks at the photo and names the animals.
-4. **Completion**: Status updates to `COMPLETED` with results or `FAILED` with errors.
-5. **Metadata Storage**: Processing duration, error details, and analysis results saved.
-
-### Image Metadata
-
-- **Timestamp**: When the image was captured.
-- **Source**: Device type and location information.
-- **Feed Event ID**: Links detection images to feeding events.
-- **Content Type**: Image format and encoding information.
-- **Processing Status**: Current state of image processing pipeline.
-
-## Detection Event Processing
-
-The system provides comprehensive animal detection and analysis capabilities through a multi-stage processing pipeline:
-
-### Processing Stages
-
-- **PENDING**: Initial state when detection event is created.
-- **PROCESSING**: Active analysis phase using AWS services.
-- **COMPLETED**: Successful processing with results stored.
-- **FAILED**: Processing error with detailed error information.
-
-### Analysis Components
-
-- **Claude Haiku**: Looks at the animal photo and returns the names and counts. A missing API key fails the detection.
-- **Error Handling**: Comprehensive error tracking and retry mechanisms.
-
-### Data Captured
-
-- **Animal Counts**: Total animals and specific crow counts.
-- **Species Detection**: Identified animal types and classifications.
-- **Processing Metrics**: Duration, file sizes, and performance data.
-- **Error Details**: Specific failure reasons for debugging.
-- **Temporal Data**: Timestamps for processing and completion.
+1. **Upload**: ECDSA device requests a presigned PUT (`/urls/porch` or `/urls/feeder`), then PUTs the mp4.
+2. **Classify (feeder visits)**: Optional Claude frame classify when `FEEDER_REQUIRE_ANIMAL=true` on the host.
+3. **List / playback**: Public list routes return short-lived signed GET URLs.
 
 ### Security Features
 
-- **Pre-signed URLs**: Time-limited upload permissions.
-- **Encryption**: Server-side encryption (AES256).
-- **Access Control**: IAM-based permissions for S3 operations.
-- **Lifecycle Management**: Automatic cleanup of old images.
+- **Pre-signed URLs**: Time-limited upload and playback permissions.
+- **Encryption**: Server-side encryption (AES256) on uploads.
+- **Access Control**: IAM-based permissions for S3 operations; device ECDSA on host routes.
+- **Lifecycle Management**: Automatic cleanup of old porch/ and feeder/ objects.
 
-## Automated Feeder System
+## Feeder recorder
 
-The system provides comprehensive automation for physical crow feeding through Raspberry Pi devices with relay-controlled feeders:
+The feeder host records a fixed 12-second proof from the public dispense request, and records motion visits separately. The relay is not part of this recorder. Public dispense cooldown is 10 minutes (fail closed). `POST /feeder/dispense` is a public unauthenticated write (rate-limited) and stays under human review for prod exposure.
 
-### Feeder Status Flow
-
-Feed events progress through the following automated status transitions:
-
-1. **PENDING**: Initial state when a feed event is created (user clicks feed button or device triggers).
-2. **FEEDING**: Feeder Pi activates relay and dispenses food.
-3. **FEEDING_COMPLETE**: Feeding finished, waiting for verification photo.
-4. **PHOTO_TAKEN**: Camera captures verification photo of the fed area.
-5. **COMPLETE**: Full feeding cycle finished successfully.
-
-### Device Coordination
-
-#### Feeder Pi Device (pi-feeder)
-
-- **Polling Interval**: Checks server every 30 seconds.
-- **Status Monitoring**: `GET /feed/status/latest` - looks for `PENDING` status.
-- **Trigger Feeding**: `PATCH /feed/status/{id}` with `{"status": "FEEDING"}`.
-- **Complete Feeding**: `PATCH /feed/status/{id}` with `{"status": "FEEDING_COMPLETE"}`.
-- **Hardware Control**: Activates relay to dispense crow feed.
-
-#### Camera Pi Device (pi-motion or dedicated camera)
-
-- **Polling Interval**: Checks server every 30 seconds.
-- **Status Monitoring**: `GET /feed/status/latest` - looks for `FEEDING_COMPLETE` status.
-- **Photo Capture**: Takes verification photo of feeding area.
-- **Photo Upload**: Uploads image to S3 and updates status.
-- **Status Update**: `PATCH /feed/status/{id}` with `{"status": "PHOTO_TAKEN", "photoUrl": "..."}`.
-
-### Error Handling & Reliability
-
-- **Network Resilience**: Devices continue polling even if network is temporarily unavailable.
-- **Status Persistence**: All status changes are persisted in the database.
-- **Retry Logic**: Failed operations can be retried by checking latest status.
-- **Cooldown Override**: System supports `x-skip-cooldown: true` header for testing/manual overrides.
-
-### Configuration
-
-- **FEED_COOLDOWN_HOURS**: Configurable cooldown period between feeds (default: 4 hours).
-- **Poll Intervals**: Adjustable polling frequency for different device types.
-- **Authentication**: All status updates require ECDSA authentication for security.
+- **Proof**: `POST /feeder/dispense` creates a request. The host claims `GET /feeder/dispense/pending`, uploads an mp4, then `PATCH /feeder/dispense/{id}` to `ready` or `failed`.
+- **Visits**: Default host config publishes each motion visit (`FEEDER_REQUIRE_ANIMAL=false`). Set `FEEDER_REQUIRE_ANIMAL=true` to classify via `POST /feeder/classify` and drop empty frames before `POST /feeder/visits`.
+- **Playback**: `GET /feeder/dispense/{id}` and `GET /feeder/clips` return short-lived playback URLs while the object is still inside the 30-day feeder lifecycle.
 
 ## Commits & Commitizen
 
@@ -565,12 +483,8 @@ The following secrets must be configured in AWS Secrets Manager:
 
 - **`crow-detector-keys`**: Contains device public keys for authentication
   - `pi-user-public-key`
-  - `pi-motion-public-key`
   - `pi-feeder-public-key`
   - `pi-porch-public-key`
-  - `lambda-s3-public-key`
-- **`crow-detector-keys-{environment}`**: Lambda signing key for that environment (`dev` or `prod`)
-  - `lambda-s3-private-key`
 - **`crow-detector-db-{environment}`**: Database credentials
   - `username`
   - `password`
@@ -596,11 +510,11 @@ The S3 bucket is configured with:
 - **Lifecycle Rules**: Automatic cleanup of old images and versions.
 - **CORS Configuration**: Cross-origin resource sharing for web interface.
 - **Bucket Policies**: Enforces encryption and access controls.
-- **Event Notifications**: Smart triggers only on `feed/` and `detection/` directories.
+- **Event Notifications**: Removed with the still-photo pipeline. Porch and feeder videos do not enqueue SQS.
 - **Directory Structure**:
-  - `feed/` - User interaction images (triggers processing)
   - `detection/` - Motion detection images (triggers processing)
   - `porch/` - Porch camera clips (no notification; deleted after about 30 days via the S3 stack lifecycle rule — deploy `crow-detector-s3.yaml` when that rule changes; merge.yml does not update the S3 stack)
+  - `feeder/` - Feeder proof and visit clips (no notification; same 30-day lifecycle rule; review the rule and the public dispense route before production)
   - `processed/` - Cropped/processed images (safe from reprocessing)
 
 ## License

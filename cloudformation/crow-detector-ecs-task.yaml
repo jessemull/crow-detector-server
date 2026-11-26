@@ -67,22 +67,16 @@ Resources:
                 Fn::ImportValue: !Sub 'crow-detector-db-${Environment}-name'
             - Name: PI_USER_PUBLIC_KEY
               Value: '{{resolve:secretsmanager:crow-detector-keys:SecretString:pi-user-public-key}}'
-            - Name: PI_MOTION_PUBLIC_KEY
-              Value: '{{resolve:secretsmanager:crow-detector-keys:SecretString:pi-motion-public-key}}'
             - Name: PI_FEEDER_PUBLIC_KEY
               Value: '{{resolve:secretsmanager:crow-detector-keys:SecretString:pi-feeder-public-key}}'
             - Name: PI_PORCH_PUBLIC_KEY
               Value: '{{resolve:secretsmanager:crow-detector-keys:SecretString:pi-porch-public-key}}'
-            - Name: LAMBDA_S3_PUBLIC_KEY
-              Value: '{{resolve:secretsmanager:crow-detector-keys:SecretString:lambda-s3-public-key}}'
             - Name: S3_BUCKET_NAME
               Value: !Sub 'crow-detector-images-${Environment}'
             - Name: AWS_REGION
               Value: !Ref AWS::Region
             - Name: CLAUDE_MODEL
               Value: 'claude-haiku-5-5'
-            - Name: FEED_COOLDOWN_HOURS
-              Value: '4'
           Secrets:
             - Name: RDS_USERNAME
               ValueFrom: !Sub 'arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:crow-detector-db-${Environment}:username::'

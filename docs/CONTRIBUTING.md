@@ -11,10 +11,10 @@
 ### Prerequisites
 
 - Node.js 26+ (see `.nvmrc`) for the Nest API
-- Node.js 24 Lambda runtime target under `lambda/` (AWS managed max)
 - npm
 - AWS credentials (for deploy / tunnel workflows)
 - Docker (optional, for API image builds)
+- Python 3 on the LAN host for porch/feeder recorders
 
 ### Bootstrap
 
@@ -22,7 +22,6 @@
 git clone https://github.com/jessemull/crow-detector-server.git
 cd crow-detector-server
 npm install
-cd lambda && npm install && cd ..
 cp .env.example .env   # fill in values; never commit .env
 ```
 
@@ -99,15 +98,15 @@ Enforced by commitlint: `auth`, `feed`, `detection`, `porch`, `urls`, `health`, 
 
 ## Docs index
 
-| Doc                    | Purpose                        |
-| ---------------------- | ------------------------------ |
-| `CONTEXT.md`           | AI entry + quality gates       |
-| `AGENTS.md`            | Full contributor/agent rules   |
-| `docs/GOVERNANCE.md`   | Authority & escalation         |
-| `docs/ARCHITECTURE.md` | System design                  |
-| `docs/TESTING.md`      | Test strategy                  |
-| `docs/SECURITY.md`     | Security policy                |
-| `docs/COMMENTS.md`     | Comment policy                 |
-| `docs/ENVIRONMENT.md`  | Env var reference              |
-| `docs/REVIEW.md`       | Review severity                |
-| `docs/CONTRIBUTING.md` | This file                      |
+| Doc                    | Purpose                      |
+| ---------------------- | ---------------------------- |
+| `CONTEXT.md`           | AI entry + quality gates     |
+| `AGENTS.md`            | Full contributor/agent rules |
+| `docs/GOVERNANCE.md`   | Authority & escalation       |
+| `docs/ARCHITECTURE.md` | System design                |
+| `docs/TESTING.md`      | Test strategy                |
+| `docs/SECURITY.md`     | Security policy              |
+| `docs/COMMENTS.md`     | Comment policy               |
+| `docs/ENVIRONMENT.md`  | Env var reference            |
+| `docs/REVIEW.md`       | Review severity              |
+| `docs/CONTRIBUTING.md` | This file                    |

@@ -6,7 +6,7 @@
 
 ## How to review
 
-`tsconfig.json` enables `noImplicitAny`, `strictBindCallApply`, `strictPropertyInitialization`, and `noFallthroughCasesInSwitch`. Production builds use `tsconfig.build.json`, which excludes tests. Tests are typechecked separately with `tsconfig.spec.json` and `lambda/tsconfig.spec.json`. ESLint errors on `any` in production code and on floating promises. A definite-assignment assertion (`!`) on a TypeORM column or a DTO field is expected, because those values are assigned by the framework. Review every other cast.
+`tsconfig.json` enables `noImplicitAny`, `strictBindCallApply`, `strictPropertyInitialization`, and `noFallthroughCasesInSwitch`. Production builds use `tsconfig.build.json`, which excludes tests. Tests are typechecked separately with `tsconfig.spec.json`. ESLint errors on `any` in production code and on floating promises. A definite-assignment assertion (`!`) on a TypeORM column or a DTO field is expected, because those values are assigned by the framework. Review every other cast.
 
 ## Criteria
 
@@ -18,7 +18,7 @@
 - **TS-06** (SHOULD) Unions and enums are handled exhaustively, with a `never` check or an explicit default. Verify: read each `switch`.
 - **TS-07** (MUST) Compiler options are not weakened, and `strict` flags already off are not relied on to excuse an unsafe pattern. Verify: read the `tsconfig` diff.
 - **TS-08** (SHOULD) Entity nullability matches how the code reads the column. A column declared nullable is checked before use. Verify: compare the entity with the readers.
-- **TS-09** (SHOULD) Shared types live in the owning module. Duplicating a type across `src/` and `lambda/` is a contract to keep in sync, and it is called out. Verify: search the type name in both trees.
+- **TS-09** (SHOULD) Shared types live in the owning module. Duplicating a type across modules is a contract to keep in sync, and it is called out. Verify: search the type name across `src/`.
 - **TS-10** (NICE) Types are readable: names describe the value, and generics are used when they earn their cost. Verify: read the declarations.
 
 ## Automatic-fail signals

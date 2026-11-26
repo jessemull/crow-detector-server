@@ -7,19 +7,19 @@
 
 ## Repository Overview
 
-| Field            | Value                                                                                                                                    |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| **Project**      | Crow Detector — interactive crow feeder backend                                                                                          |
-| **Architecture** | NestJS modular monolith (ECS Fargate) + nested `lambda/` package                                                                         |
-| **Language**     | TypeScript on Node.js 26 (API); Lambda runtime Node.js 24. Root tsconfig leaves `"strict": true` off. `lambda/tsconfig.json` enables it. |
-| **Storage**      | PostgreSQL (TypeORM) + S3                                                                                                                |
-| **Vision / AI**  | AWS Rekognition + Anthropic Claude                                                                                                       |
-| **Auth**         | ECDSA device authentication                                                                                                              |
-| **IaC**          | CloudFormation                                                                                                                           |
-| **Testing**      | Jest with 80% global coverage thresholds                                                                                                 |
-| **Analysis**     | ESLint + Prettier                                                                                                                        |
-| **CI/CD**        | GitHub Actions                                                                                                                           |
-| **Git Hooks**    | Husky + lint-staged + Conventional Commits                                                                                               |
+| Field            | Value                                                                                            |
+| ---------------- | ------------------------------------------------------------------------------------------------ |
+| **Project**      | Crow Detector — interactive crow feeder backend                                                  |
+| **Architecture** | NestJS modular monolith (ECS Fargate)                                                            |
+| **Language**     | TypeScript on Node.js 26. Root tsconfig leaves `"strict": true` off; individual strict flags on. |
+| **Storage**      | PostgreSQL (TypeORM) + S3                                                                        |
+| **Vision / AI**  | Anthropic Claude (feeder classify)                                                               |
+| **Auth**         | ECDSA device authentication                                                                      |
+| **IaC**          | CloudFormation                                                                                   |
+| **Testing**      | Jest with 80% global coverage thresholds                                                         |
+| **Analysis**     | ESLint + Prettier                                                                                |
+| **CI/CD**        | GitHub Actions                                                                                   |
+| **Git Hooks**    | Husky + lint-staged + Conventional Commits                                                       |
 
 ### Repository Structure
 
@@ -29,21 +29,16 @@ crow-detector-server/
 │   ├── auth/                   # ECDSA guard
 │   ├── common/                 # Logger, shared types
 │   ├── config/                 # Typed Nest config (env schema)
-│   ├── detection/              # Detection events, Claude, image processing
-│   ├── feed/                   # Feed events, image processing, S3 metadata
+│   ├── detection/              # ClaudeService for feeder classify
+│   ├── feeder/                 # Public dispense + feeder visits/clips
 │   ├── health/                 # Health checks
 │   ├── porch/                  # Public porch clip list
-│   ├── urls/                   # Presigned S3 URL issuance
+│   ├── urls/                   # Presigned S3 URL issuance (porch/feeder)
 │   ├── app.module.ts
 │   └── main.ts
-├── pi/                         # Porch recorder. The LAN host runs the git checkout; pi-sync is the legacy copy path.
-├── lambda/                     # Nested package: S3 → SQS → API glue
-│   ├── src/
-│   ├── cloudformation/
-│   ├── webpack.config.js
-│   └── package.json
+├── pi/                         # Porch + feeder recorders on the LAN host
 ├── cloudformation/             # ECS, RDS, ALB, S3, IAM
-├── scripts/                    # Tunnel, DB seed, auth token helpers
+├── scripts/                    # Tunnel, DB seed, auth token, host deploy helpers
 ├── test/                       # e2e + Jest setup
 ├── docs/                       # Governance + domain documentation
 ├── .cursor/                    # Cursor rules, skills, commands
@@ -73,11 +68,8 @@ Prefer `make` targets. Run **`make`** or **`make help`** for a compact list.
 | `make test`                 | Root Jest suite                             |
 | `make test-cov`             | Root Jest with coverage                     |
 | `make build`                | Nest production build                       |
-| `make lambda-lint`          | Lambda ESLint                               |
-| `make lambda-format-check`  | Lambda Prettier check                       |
-| `make lambda-test`          | Lambda Jest                                 |
-| `make lambda-build`         | Lambda webpack build + zip package          |
-| `make preflight`            | Root + lambda lint/format/test/build        |
+| `make porch-test`           | Porch recorder Python helper unit tests     |
+| `make preflight`            | Lint, format-check, typecheck, test, build  |
 | `make ci`                   | Alias for `preflight`                       |
 | `make commit`               | Interactive Commitizen commit               |
 | `make review-inventory`     | Review file inventory (`KIND=pr` or `repo`) |
@@ -90,14 +82,13 @@ Prefer `make` targets. Run **`make`** or **`make help`** for a compact list.
 | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | `npm run start:dev`                                 | Nest watch + SSH tunnel to RDS                                                                                                   |
 | `npm run db:seed`                                   | Seed database                                                                                                                    |
-| `npm run db:reset`                                  | Clear feed and detection rows. Does not reseed.                                                                                  |
+| `npm run db:reset`                                  | Reset + seed                                                                                                                     |
 | `npm run auth:token`                                | Generate ECDSA auth token helper                                                                                                 |
-| `npm run pi:sync`                                   | Legacy: copy recorder + `porch.env` over SSH, then restart                                                                       |
-| `npm run pi:start`                                  | Legacy: restart the porch recorder over SSH (no copy)                                                                            |
-| `npm run pi:stop`                                   | Legacy: stop the porch recorder over SSH                                                                                         |
 | `./scripts/deploy-porch-host.sh`                    | LAN host: SSH `git pull` + restart `porch-recorder` (`DEPLOY_HOST=juzu-inui`; repo default `~/Development/crow-detector-server`) |
+| `./scripts/deploy-feeder-host.sh`                   | LAN host: SSH `git pull` + restart `feeder-recorder` (same clone; `FEEDER_GIT_REF` defaults to the current branch)               |
+| `./scripts/deploy-feeder-visits-host.sh`            | LAN host: SSH `git pull` + restart `feeder-visits` (`pi/feeder-recorder.py --visits`)                                            |
 | `python3 pi/record-on-motion.py --once`             | One RTSP clip + upload (host bring-up)                                                                                           |
-| `python3 -m unittest discover -s pi -p 'test_*.py'` | Porch recorder helper unit tests                                                                                                 |
+| `python3 -m unittest discover -s pi -p 'test_*.py'` | Porch/feeder recorder helper unit tests                                                                                          |
 
 ---
 
@@ -125,12 +116,11 @@ Prefer `make` targets. Run **`make`** or **`make help`** for a compact list.
 | Element               | Convention         | Example                   |
 | --------------------- | ------------------ | ------------------------- |
 | Files                 | `kebab-case.ts`    | `ecdsa-auth.guard.ts`     |
-| Classes               | `PascalCase`       | `FeedEventService`        |
-| Functions / variables | `camelCase`        | `createFeedEvent`         |
-| Constants             | `UPPER_SNAKE_CASE` | `FEED_COOLDOWN_HOURS`     |
+| Classes               | `PascalCase`       | `FeederVisitService`      |
+| Functions / variables | `camelCase`        | `createFeederClip`        |
+| Constants             | `UPPER_SNAKE_CASE` | `FEEDER_CLIP_MAX_BYTES`   |
 | Types / Interfaces    | `PascalCase`       | `AnimalAnalysisResult`    |
-| Nest tests            | `<module>.spec.ts` | `feed.controller.spec.ts` |
-| Lambda tests          | `<module>.test.ts` | `processor.test.ts`       |
+| Nest tests            | `<module>.spec.ts` | `urls.controller.spec.ts` |
 
 ### Error Handling
 
@@ -163,12 +153,9 @@ controller → service → TypeORM repository / AWS SDK / Claude SDK
 | Guard      | ECDSA (and future) authentication                          |
 | Config     | Typed env loading; no ad-hoc `process.env` in feature code |
 
-### Lambda package
+### Photo pipeline (removed)
 
-- Lives under `lambda/` with its own `package.json`, Jest, ESLint, webpack.
-- Responsibility: consume S3/SQS events, sign ECDSA requests, call Nest API.
-- Keep runtime Node **24** (AWS Lambda max managed runtime; Node 26 not offered yet). API / ECS uses Node **26**.
-- Do not import Nest source from Lambda (or vice versa).
+The still-photo S3 → SQS → Lambda → `/feed` / `/detection` path is gone. Do not reintroduce `feed/` or `detection/` object prefixes, Rekognition, or a nested `lambda/` package without a product decision. Feeder animal frames still use `ClaudeService` via `POST /feeder/classify`. Drop leftover tables with `scripts/db-seed/drop-photo-pipeline.sql` (hand-applied).
 
 ### CloudFormation
 
@@ -186,8 +173,7 @@ controller → service → TypeORM repository / AWS SDK / Claude SDK
 ## Performance Rules
 
 - Avoid N+1 TypeORM queries; use relations/joins when fetching related entities.
-- Prefer streaming / bounded buffers for large images; Sharp operations should be explicit about size.
-- Keep CloudWatch log volume meaningful — not full S3/SQS payloads at `info`.
+- Keep CloudWatch log volume meaningful — not full S3 payloads at `info`.
 - Presigned URL TTLs should stay short and intentional.
 
 ---
@@ -195,7 +181,6 @@ controller → service → TypeORM repository / AWS SDK / Claude SDK
 ## Logging Rules
 
 - Nest: use bunyan via `src/common/logger` — never `console.log` in production paths.
-- Lambda: use structured logging helpers; never dump full SQS/S3/API payloads.
 - **NEVER** log secrets, tokens, API key prefixes, AWS credentials, or private keys.
 - Include enough context to diagnose failures (module, event id, operation).
 - Use appropriate levels: `debug` for verbose, `info` for lifecycle, `warn`/`error` for failures.
@@ -221,21 +206,20 @@ controller → service → TypeORM repository / AWS SDK / Claude SDK
 
 - Follow least-privilege IAM in CloudFormation.
 - Do not broaden security group or IAM permissions without human review.
-- Rekognition `Resource: '*'` may be required by AWS — do not invent a finding if AWS mandates it.
 - Prefer proper Postgres TLS CA verification. Production/prod always verifies; `SSL_REJECT_UNAUTHORIZED=false` is a non-prod temporary opt-out only (see `docs/SECURITY.md`).
 
 ### Dependencies
 
 - New dependencies require human approval.
 - Do not upgrade TypeORM to 1.x without explicit approval.
-- Keep root and `lambda/` lockfiles intentional.
+- Keep the root lockfile intentional.
 
 ---
 
 ## Testing Rules
 
 - Maintain **80%** coverage thresholds (statements, branches, functions, lines).
-- Nest: co-locate `*.spec.ts`; Lambda: co-locate `*.test.ts`.
+- Nest: co-locate `*.spec.ts`.
 - Mock AWS SDK, Anthropic, and network I/O in unit tests.
 - Do not overtest Nest boilerplate (empty modules); test behavior.
 - Add tests for new shared helpers and security-sensitive paths (auth, config fail-fast).
@@ -252,7 +236,7 @@ controller → service → TypeORM repository / AWS SDK / Claude SDK
 
 Types: `feat`, `fix`, `refactor`, `test`, `docs`, `style`, `perf`, `chore`, `build`, `ci`, `revert`
 
-Scopes (commitlint enum): `auth`, `feed`, `detection`, `porch`, `urls`, `health`, `common`, `config`, `lambda`, `ci`, `docs`, `deps`, `infra`, `docker`
+Scopes (commitlint enum): `auth`, `feed`, `detection`, `feeder`, `porch`, `urls`, `health`, `common`, `config`, `ci`, `docs`, `deps`, `infra`, `docker`
 
 Prefer `make commit` (Commitizen).
 
@@ -273,7 +257,6 @@ See `docs/CONTRIBUTING.md` for naming prefixes (`feat/`, `fix/`, `chore/`, etc.)
 
 - Hardcoded secrets or dummy production API keys
 - Logging Claude API key material (including prefixes)
-- `console.log` of full SQS/S3 payloads in Lambda
 - Re-providing the same service in multiple Nest modules instead of exporting
 - Importing TypeORM entities into shared type barrels in ways that create cycles
 - Hardcoding `aws-infra` subnet/SG IDs (use `ImportValue`)
@@ -288,7 +271,7 @@ See `docs/CONTRIBUTING.md` for naming prefixes (`feat/`, `fix/`, `chore/`, etc.)
 Before finishing work:
 
 - [ ] Read CONTEXT + AGENTS + mandatory docs
-- [ ] Changes match Nest / Lambda boundaries
+- [ ] Changes match Nest module boundaries; do not revive the photo Lambda path
 - [ ] Env vars documented if added
 - [ ] Tests updated; coverage still ≥ 80%
 - [ ] No secrets in logs or source

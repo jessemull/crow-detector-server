@@ -23,10 +23,8 @@ export class EcdsaAuthGuard implements CanActivate {
     const config = loadAppConfig();
     this.devicePublicKeys = {
       'pi-user': this.decodePublicKey(config.devicePublicKeys.piUser),
-      'pi-motion': this.decodePublicKey(config.devicePublicKeys.piMotion),
       'pi-feeder': this.decodePublicKey(config.devicePublicKeys.piFeeder),
       'pi-porch': this.decodePublicKey(config.devicePublicKeys.piPorch),
-      'lambda-s3': this.decodePublicKey(config.devicePublicKeys.lambdaS3),
     };
   }
 
@@ -80,7 +78,10 @@ export class EcdsaAuthGuard implements CanActivate {
     const currentTime = Date.now();
     const timeWindow = 5 * 60 * 1000; // 5 minutes
 
-    if (Math.abs(currentTime - requestTime) > timeWindow) {
+    if (
+      !Number.isFinite(requestTime) ||
+      Math.abs(currentTime - requestTime) > timeWindow
+    ) {
       throw new UnauthorizedException('Request timestamp expired');
     }
 

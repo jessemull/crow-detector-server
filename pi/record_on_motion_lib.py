@@ -11,6 +11,7 @@ import sys
 import threading
 import time
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import IO, Any
 from urllib.parse import urlsplit, urlunsplit
@@ -18,7 +19,12 @@ from urllib.parse import urlsplit, urlunsplit
 
 def signed_payload(method: str, path: str, body: dict, timestamp: str) -> str:
     """Bytes the API guard verifies: method + path + compact JSON + timestamp."""
-    return f"{method}{path}{json.dumps(body, separators=(',', ':'))}{timestamp}"
+    # Match JSON.stringify / feeder canonical_json: keep non-ASCII as-is.
+    return (
+        f"{method}{path}"
+        f"{json.dumps(body, separators=(',', ':'), ensure_ascii=False)}"
+        f"{timestamp}"
+    )
 
 
 def parse_env_line(line: str) -> tuple[str, str] | None:
@@ -55,26 +61,6 @@ def load_env_file(path: Path, environ: dict[str, str] | None = None) -> dict[str
     return written
 
 
-def mean_abs_diff_ratio(previous: bytes, current: bytes) -> float:
-    """
-    Mean absolute difference of two equal-length byte buffers, scaled 0..1.
-
-    Used as a cheap motion score between grayscale frames.
-    """
-    if not previous or not current or len(previous) != len(current):
-        return 0.0
-    total = 0
-    length = len(previous)
-    for left, right in zip(previous, current, strict=True):
-        total += abs(left - right)
-    return total / (255.0 * length)
-
-
-def motion_detected(score: float, threshold: float) -> bool:
-    """True when the frame-diff score clears the configured threshold."""
-    return score >= threshold
-
-
 def env_float(
     name: str,
     default: float,
@@ -95,6 +81,207 @@ def env_float(
         raise SystemExit(
             f"Invalid {name}={raw!r}; expected a number (e.g. {default})"
         ) from error
+
+
+@dataclass(frozen=True)
+class MotionSample:
+    """One gray frame scored against the slow background reference."""
+
+    changed_ratio: float
+    blob_fill: float
+    confirmed: bool
+    kind: str
+
+
+class MotionTracker:
+    """
+    Accept a compact patch of changed pixels that repeats for a few frames.
+
+    A change that covers too much of the picture is a light, not an animal.
+    That frame still updates the reference, so a sunrise or an IR switch is
+    absorbed instead of staying in the foreground forever. A blast that covers
+    most of the frame also disarms detection until the picture is quiet again,
+    so the shrinking leftover of that blast cannot open a visit.
+    """
+
+    def __init__(
+        self,
+        *,
+        width: int,
+        height: int,
+        pixel_delta: int = 30,
+        min_changed_ratio: float = 0.004,
+        max_changed_ratio: float = 0.45,
+        light_disarm_ratio: float = 0.80,
+        min_blob_fill: float = 0.25,
+        consecutive_frames: int = 3,
+        reference_alpha: float = 0.02,
+    ) -> None:
+        if width <= 0 or height <= 0:
+            raise ValueError("width and height must be positive")
+        if not 1 <= pixel_delta <= 255:
+            raise ValueError("pixel_delta must be from 1 to 255")
+        if not 0 < min_changed_ratio < max_changed_ratio < light_disarm_ratio <= 1:
+            raise ValueError(
+                "changed-pixel ratios must be 0 < min < max < light disarm <= 1"
+            )
+        if not 0 < min_blob_fill <= 1:
+            raise ValueError("min_blob_fill must be in (0, 1]")
+        if consecutive_frames < 1:
+            raise ValueError("consecutive_frames must be at least 1")
+        if not 0 < reference_alpha <= 1:
+            raise ValueError("reference_alpha must be in (0, 1]")
+        self.width = width
+        self.height = height
+        self.frame_size = width * height
+        self.pixel_delta = pixel_delta
+        self.min_changed_ratio = min_changed_ratio
+        self.max_changed_ratio = max_changed_ratio
+        self.light_disarm_ratio = light_disarm_ratio
+        self.min_blob_fill = min_blob_fill
+        self._disarmed = False
+        self.consecutive_frames = consecutive_frames
+        self.reference_alpha = reference_alpha
+        self.generation = 0
+        self.streak = 0
+        self._reference: list[float] | None = None
+
+    def reset(self, generation: int) -> None:
+        """Drop the reference after the gray stream reconnects."""
+        self.generation = generation
+        self.streak = 0
+        self._disarmed = False
+        self._reference = None
+
+    def observe(self, frame: bytes) -> MotionSample:
+        if len(frame) != self.frame_size:
+            self.streak = 0
+            self._disarmed = False
+            self._reference = None
+            return MotionSample(0.0, 0.0, False, "seed")
+        if self._reference is None:
+            self._reference = [float(pixel) for pixel in frame]
+            self.streak = 0
+            self._disarmed = False
+            return MotionSample(0.0, 0.0, False, "seed")
+        changed, min_x, min_y, max_x, max_y = self._measure(frame)
+        self._blend(frame)
+        ratio = changed / self.frame_size
+        if changed == 0 or ratio < self.min_changed_ratio:
+            self.streak = 0
+            self._disarmed = False
+            return MotionSample(ratio, 0.0, False, "quiet")
+        if ratio >= self.light_disarm_ratio:
+            self._disarmed = True
+            self.streak = 0
+            return MotionSample(ratio, 0.0, False, "light")
+        if self._disarmed:
+            self.streak = 0
+            return MotionSample(ratio, 0.0, False, "settle")
+        if ratio > self.max_changed_ratio:
+            self.streak = 0
+            return MotionSample(ratio, 0.0, False, "light")
+        bbox = (max_x - min_x + 1) * (max_y - min_y + 1)
+        fill = changed / bbox
+        if fill < self.min_blob_fill:
+            self.streak = 0
+            return MotionSample(ratio, fill, False, "speckle")
+        self.streak += 1
+        confirmed = self.streak >= self.consecutive_frames
+        return MotionSample(ratio, fill, confirmed, "motion")
+
+    def _measure(self, frame: bytes) -> tuple[int, int, int, int, int]:
+        reference = self._reference
+        assert reference is not None
+        delta = self.pixel_delta
+        width = self.width
+        changed = 0
+        min_x = width
+        min_y = self.height
+        max_x = -1
+        max_y = -1
+        for index, pixel in enumerate(frame):
+            if abs(pixel - reference[index]) < delta:
+                continue
+            changed += 1
+            x = index % width
+            y = index // width
+            if x < min_x:
+                min_x = x
+            if y < min_y:
+                min_y = y
+            if x > max_x:
+                max_x = x
+            if y > max_y:
+                max_y = y
+        return changed, min_x, min_y, max_x, max_y
+
+    def _blend(self, frame: bytes) -> None:
+        reference = self._reference
+        assert reference is not None
+        alpha = self.reference_alpha
+        keep = 1.0 - alpha
+        for index, pixel in enumerate(frame):
+            reference[index] = keep * reference[index] + alpha * pixel
+
+
+@dataclass
+class VisitClock:
+    """Close one visit after a quiet gap, or at the hard cap."""
+
+    gap_seconds: float
+    cap_seconds: float
+    started_at: float | None = None
+    last_motion_at: float | None = None
+
+    def __post_init__(self) -> None:
+        if self.gap_seconds <= 0:
+            raise ValueError("gap_seconds must be positive")
+        if self.cap_seconds <= 0:
+            raise ValueError("cap_seconds must be positive")
+
+    def note_motion(self, now: float) -> None:
+        if self.started_at is None:
+            self.started_at = now
+        self.last_motion_at = now
+
+    def close_reason(self, now: float) -> str | None:
+        if self.started_at is None or self.last_motion_at is None:
+            return None
+        if now - self.started_at >= self.cap_seconds:
+            return "cap"
+        if now - self.last_motion_at >= self.gap_seconds:
+            return "gap"
+        return None
+
+
+def visit_retain_window(
+    start_epoch: float,
+    last_motion_epoch: float,
+    *,
+    pre_roll_seconds: float,
+    post_roll_seconds: float,
+) -> tuple[float, float]:
+    """
+    Span of segments to keep for one visit.
+
+    The quiet stretch between two bursts that arrived inside the gap is
+    inside this span. The trailing wait that closed the visit is not.
+    """
+    return (
+        start_epoch - pre_roll_seconds,
+        last_motion_epoch + post_roll_seconds,
+    )
+
+
+def visit_keep_after_epoch(
+    start_epoch: float,
+    *,
+    pre_roll_seconds: float,
+    segment_seconds: float,
+) -> float:
+    """Oldest segment start the open visit still needs on disk."""
+    return start_epoch - pre_roll_seconds - segment_seconds
 
 
 def rtsp_substream_url(rtsp_url: str) -> str:
@@ -476,60 +663,223 @@ def _stream_generation(pipeline: object) -> int:
     return value if isinstance(value, int) else 0
 
 
+def poll_motion(pipeline: object, tracker: MotionTracker) -> MotionSample | None:
+    """
+    Score one frame.
+
+    A reconnect seeds a new reference and returns None so the jump between
+    streams is not motion.
+    """
+    read_frame = getattr(pipeline, "read_frame")
+    frame = read_frame()
+    if not isinstance(frame, (bytes, bytearray)):
+        raise TypeError("read_frame must return bytes")
+    generation = _stream_generation(pipeline)
+    if generation != tracker.generation:
+        tracker.reset(generation)
+        tracker.observe(bytes(frame))
+        return None
+    return tracker.observe(bytes(frame))
+
+
 def wait_for_motion(
-    pipeline: ContinuousRetainPipeline,
+    pipeline: object,
+    tracker: MotionTracker,
     *,
-    threshold: float,
-    on_motion: Callable[[float], None] | None = None,
+    on_motion: Callable[[MotionSample], None] | None = None,
     on_tick: Callable[[], None] | None = None,
     tick_seconds: float = 30.0,
     monotonic: Callable[[], float] = time.monotonic,
-) -> None:
-    """Block until motion. on_tick runs about every tick_seconds while idle."""
-    previous = pipeline.read_frame()
-    generation = _stream_generation(pipeline)
+) -> MotionSample:
+    """Block until a compact change repeats. on_tick runs while idle."""
     next_tick = monotonic() + max(0.0, tick_seconds)
     while True:
-        current = pipeline.read_frame()
+        sample = poll_motion(pipeline, tracker)
         now = monotonic()
         if on_tick is not None and now >= next_tick:
             on_tick()
             next_tick = now + max(0.0, tick_seconds)
-        current_generation = _stream_generation(pipeline)
-        if current_generation != generation:
-            previous = current
-            generation = current_generation
-            continue
-        score = mean_abs_diff_ratio(previous, current)
-        previous = current
-        if motion_detected(score, threshold):
+        if sample is not None and sample.confirmed:
             if on_motion is not None:
-                on_motion(score)
-            return
+                on_motion(sample)
+            return sample
 
 
-def activity_still_present(
-    pipeline: ContinuousRetainPipeline,
+def follow_visit(
+    pipeline: object,
+    tracker: MotionTracker,
     *,
-    threshold: float,
-    window_seconds: float,
+    gap_seconds: float,
+    cap_seconds: float,
+    pre_roll_seconds: float,
+    post_roll_seconds: float,
+    segment_seconds: float,
+    on_open: Callable[[float], None] | None = None,
+    on_motion: Callable[[MotionSample], None] | None = None,
+    on_tick: Callable[[], None] | None = None,
+    tick_seconds: float = 30.0,
     monotonic: Callable[[], float] = time.monotonic,
-) -> bool:
-    previous = pipeline.read_frame()
-    generation = _stream_generation(pipeline)
-    deadline = monotonic() + window_seconds
-    while monotonic() < deadline:
-        current = pipeline.read_frame()
-        current_generation = _stream_generation(pipeline)
-        if current_generation != generation:
-            previous = current
-            generation = current_generation
-            continue
-        score = mean_abs_diff_ratio(previous, current)
-        previous = current
-        if motion_detected(score, threshold):
-            return True
-    return False
+    epoch: Callable[[], float] = time.time,
+) -> tuple[float, float, str]:
+    """
+    Motion is already confirmed. Read until the quiet gap or the cap.
+
+    Returns the segment window and the close reason ("gap" or "cap").
+    The trailing gap itself is not part of the window.
+    """
+    start_mono = monotonic()
+    start_epoch = epoch()
+    if on_open is not None:
+        on_open(start_epoch)
+    clock = VisitClock(gap_seconds=gap_seconds, cap_seconds=cap_seconds)
+    clock.note_motion(start_mono)
+    last_epoch = start_epoch
+    next_tick = start_mono + max(0.0, tick_seconds)
+    reason: str | None = None
+    while reason is None:
+        sample = poll_motion(pipeline, tracker)
+        now_m = monotonic()
+        if on_tick is not None and now_m >= next_tick:
+            on_tick()
+            next_tick = now_m + max(0.0, tick_seconds)
+        if sample is not None and sample.confirmed:
+            clock.note_motion(now_m)
+            last_epoch = epoch()
+            if on_motion is not None:
+                on_motion(sample)
+        reason = clock.close_reason(now_m)
+    if reason == "cap":
+        # The cap closed on motion that is still being written. Keep reading
+        # so the post-roll segments exist, without extending the visit.
+        tail_until = monotonic() + post_roll_seconds + segment_seconds
+        while monotonic() < tail_until:
+            poll_motion(pipeline, tracker)
+        last_epoch = start_epoch + cap_seconds
+    window_start, window_end = visit_retain_window(
+        start_epoch,
+        last_epoch,
+        pre_roll_seconds=pre_roll_seconds,
+        post_roll_seconds=post_roll_seconds,
+    )
+    return window_start, window_end, reason
+
+
+def motion_tracker_from_env(
+    prefix: str,
+    *,
+    width: int,
+    height: int,
+    environ: dict[str, str] | None = None,
+) -> MotionTracker:
+    """Build the shared detector. `prefix` is PORCH or FEEDER."""
+
+    def number(suffix: str, default: float) -> float:
+        return env_float(f"{prefix}_{suffix}", default, environ)
+
+    return MotionTracker(
+        width=width,
+        height=height,
+        pixel_delta=int(number("PIXEL_DELTA", 30)),
+        min_changed_ratio=number("MIN_CHANGED_RATIO", 0.004),
+        max_changed_ratio=number("MAX_CHANGED_RATIO", 0.45),
+        light_disarm_ratio=number("LIGHT_DISARM_RATIO", 0.80),
+        min_blob_fill=number("MIN_BLOB_FILL", 0.25),
+        consecutive_frames=int(number("MOTION_FRAMES", 3)),
+        reference_alpha=number("REFERENCE_ALPHA", 0.02),
+    )
+
+
+def visit_limits_from_env(
+    prefix: str,
+    environ: dict[str, str] | None = None,
+) -> tuple[float, float]:
+    """Quiet gap that joins a visit, then the hard cap, in seconds."""
+    return (
+        env_float(f"{prefix}_VISIT_GAP_SECONDS", 120.0, environ),
+        env_float(f"{prefix}_VISIT_CAP_SECONDS", 600.0, environ),
+    )
+
+
+def classify_sample_offsets(duration_seconds: float) -> list[float]:
+    """A few timestamps spread through a visit. One frame at 1s misses a brief animal."""
+    if duration_seconds <= 0:
+        return [0.5]
+    last = max(0.5, duration_seconds - 0.25)
+    chosen: list[float] = []
+    for value in (
+        1.0,
+        duration_seconds * 0.25,
+        duration_seconds * 0.5,
+        duration_seconds * 0.75,
+    ):
+        offset = min(max(0.5, value), last)
+        if all(abs(offset - seen) > 0.4 for seen in chosen):
+            chosen.append(offset)
+    return chosen or [min(1.0, last)]
+
+
+def segments_covering(
+    pipeline: object,
+    window_start: float,
+    window_end: float,
+    segment_seconds: float,
+) -> list[Path]:
+    """Complete segments that overlap the visit window."""
+    refresh = getattr(pipeline, "refresh_segment_index")
+    index = drop_incomplete_newest_segment(refresh())
+    retained = select_segments_overlapping_window(
+        index,
+        window_start=window_start,
+        window_end=window_end,
+        segment_seconds=segment_seconds,
+    )
+    if not retained:
+        raise RuntimeError("no complete segments overlap the retain window")
+    return retained
+
+
+def concat_segments(
+    segment_paths: list[Path],
+    output_path: Path,
+    ffmpeg_bin: str,
+    *,
+    timeout: float = 900,
+) -> None:
+    """Join retained segments. A visit can run to the cap, so the encode may be long."""
+    if not segment_paths:
+        raise RuntimeError("no retained segments to build a clip")
+    list_path = output_path.with_suffix(".concat.txt")
+    write_concat_list(segment_paths, list_path)
+    try:
+        subprocess.run(
+            [
+                ffmpeg_bin,
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-f",
+                "concat",
+                "-safe",
+                "0",
+                "-i",
+                str(list_path),
+                "-c:v",
+                "libx264",
+                "-preset",
+                "veryfast",
+                "-pix_fmt",
+                "yuv420p",
+                "-an",
+                "-movflags",
+                "+faststart",
+                "-y",
+                str(output_path),
+            ],
+            check=True,
+            timeout=timeout,
+        )
+    finally:
+        list_path.unlink(missing_ok=True)
 
 
 def write_concat_list(segment_paths: list[Path], list_path: Path) -> None:

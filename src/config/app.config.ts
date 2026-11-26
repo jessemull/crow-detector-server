@@ -6,7 +6,6 @@ export interface AppConfig {
   awsRegion: string;
   claudeApiKey?: string;
   claudeModel: string;
-  feedCooldownHours: number;
   logLevel: string;
   nodeEnv: NodeEnvironment;
   port: number;
@@ -21,9 +20,7 @@ export interface AppConfig {
   s3BucketName?: string;
   corsAllowedOrigins: string[];
   devicePublicKeys: {
-    lambdaS3?: string;
     piFeeder?: string;
-    piMotion?: string;
     piPorch?: string;
     piUser?: string;
   };
@@ -53,7 +50,6 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     awsRegion: env.AWS_REGION || 'us-west-2',
     claudeApiKey: env.CLAUDE_API_KEY,
     claudeModel: env.CLAUDE_MODEL || 'claude-haiku-5-5',
-    feedCooldownHours: parseFeedCooldownHours(env.FEED_COOLDOWN_HOURS),
     logLevel: env.LOG_LEVEL || 'info',
     nodeEnv: env.NODE_ENV || '',
     port: parseInt(env.PORT || '3000', 10) || 3000,
@@ -77,21 +73,11 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     s3BucketName: env.S3_BUCKET_NAME,
     corsAllowedOrigins: parseCorsOrigins(env),
     devicePublicKeys: {
-      lambdaS3: env.LAMBDA_S3_PUBLIC_KEY,
       piFeeder: env.PI_FEEDER_PUBLIC_KEY,
-      piMotion: env.PI_MOTION_PUBLIC_KEY,
       piPorch: env.PI_PORCH_PUBLIC_KEY,
       piUser: env.PI_USER_PUBLIC_KEY,
     },
   };
-}
-
-function parseFeedCooldownHours(raw: string | undefined): number {
-  const parsed = Number.parseInt(raw ?? '4', 10);
-  if (!Number.isInteger(parsed) || parsed < 0) {
-    throw new Error('FEED_COOLDOWN_HOURS must be a non-negative integer');
-  }
-  return parsed;
 }
 
 function parseCorsOrigins(env: NodeJS.ProcessEnv): string[] {
@@ -134,10 +120,8 @@ export function validateAppConfig(config: AppConfig): void {
     ['S3_BUCKET_NAME', config.s3BucketName],
     ['CLAUDE_API_KEY', config.claudeApiKey],
     ['PI_USER_PUBLIC_KEY', config.devicePublicKeys.piUser],
-    ['PI_MOTION_PUBLIC_KEY', config.devicePublicKeys.piMotion],
     ['PI_FEEDER_PUBLIC_KEY', config.devicePublicKeys.piFeeder],
     ['PI_PORCH_PUBLIC_KEY', config.devicePublicKeys.piPorch],
-    ['LAMBDA_S3_PUBLIC_KEY', config.devicePublicKeys.lambdaS3],
   ];
 
   const missing = required.filter(([, value]) => !value).map(([name]) => name);

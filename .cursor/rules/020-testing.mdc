@@ -1,18 +1,18 @@
 ---
-description: "Jest testing conventions for Nest (*.spec.ts) and Lambda (*.test.ts)."
+description: "Jest testing conventions for Nest (*.spec.ts) and porch/feeder Python tests."
 globs:
   - "**/*.spec.ts"
   - "**/*.test.ts"
   - "jest.config.js"
-  - "lambda/jest.config.js"
   - "test/**/*"
+  - "pi/test_*.py"
 alwaysApply: false
 ---
 
 # Testing Rules
 
-- Maintain 80% coverage thresholds (root + lambda)
-- Nest: co-locate `*.spec.ts`; Lambda: co-locate `*.test.ts`
+- Maintain 80% coverage thresholds (root Jest)
+- Nest: co-locate `*.spec.ts`; Python helpers: `pi/test_*.py`
 - Mock AWS SDK, Anthropic, TypeORM, and network I/O
 - Test ECDSA guard edges including prod bypass impossibility
 - Do not overtest empty Nest module boilerplate
@@ -23,5 +23,5 @@ alwaysApply: false
 ```bash
 make test
 make test-cov
-make lambda-test
+make porch-test
 ```

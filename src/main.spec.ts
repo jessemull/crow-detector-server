@@ -1,6 +1,10 @@
 import { FastifyAdapter } from '@nestjs/platform-fastify';
 import { NestFactory } from '@nestjs/core';
-import { bootstrap, trustImmediateProxy } from './main';
+import {
+  bootstrap,
+  CLASSIFY_JSON_BODY_LIMIT_BYTES,
+  trustImmediateProxy,
+} from './main';
 
 jest.mock('@nestjs/core');
 jest.mock('@nestjs/platform-fastify');
@@ -38,6 +42,7 @@ describe('bootstrap', () => {
       expect.any(FastifyAdapter),
     );
     expect(FastifyAdapter).toHaveBeenCalledWith({
+      bodyLimit: CLASSIFY_JSON_BODY_LIMIT_BYTES,
       trustProxy: trustImmediateProxy,
     });
     expect(listenMock).toHaveBeenCalledWith(3000, '0.0.0.0');

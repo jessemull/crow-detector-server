@@ -90,21 +90,16 @@ function main() {
     );
     logger.info('Examples:');
     logger.info(
-      '  ts-node generate-auth-token.ts POST /urls/feed \'{"fileName":"test.jpg","format":"jpg","source":"motion","contentType":"image/jpeg"}\'',
+      '  ts-node generate-auth-token.ts POST /urls/porch \'{"fileName":"clip-1","contentLength":1200}\' pi-porch',
     );
     logger.info(
-      '  ts-node generate-auth-token.ts POST /urls/detection \'{"fileName":"detection.jpg","format":"jpg","feedEventId":"123","contentType":"image/jpeg"}\' pi-motion',
+      '  ts-node generate-auth-token.ts POST /urls/feeder \'{"fileName":"proof-1","contentLength":4096,"contentType":"video/mp4"}\' pi-feeder',
     );
     logger.info('  ts-node generate-auth-token.ts GET /health');
-    logger.info(
-      'Available device IDs: pi-user, pi-motion, pi-feeder, pi-porch',
-    );
+    logger.info('Available device IDs: pi-user, pi-feeder, pi-porch');
     logger.info('Required environment variables:');
     logger.info(
       '  PI_USER_PRIVATE_KEY_PATH - Path to pi-user private key file',
-    );
-    logger.info(
-      '  PI_MOTION_PRIVATE_KEY_PATH - Path to pi-motion private key file',
     );
     logger.info(
       '  PI_FEEDER_PRIVATE_KEY_PATH - Path to pi-feeder private key file',

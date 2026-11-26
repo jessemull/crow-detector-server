@@ -1,10 +1,5 @@
 import { ForbiddenException } from '@nestjs/common';
-import {
-  CreateFeedImageUrlDto,
-  CreateDetectionImageUrlDto,
-  CreatePorchClipUrlDto,
-} from './dto';
-import { ImageFormat } from '../common/types';
+import { CreatePorchClipUrlDto, CreateFeederClipUrlDto } from './dto';
 import { Test, TestingModule } from '@nestjs/testing';
 import { UrlsController } from './urls.controller';
 import { UrlsService } from './services/urls.service';
@@ -14,9 +9,8 @@ describe('UrlsController', () => {
   let service: UrlsService;
 
   const mockUrlsService = {
-    createFeedImageSignedUrl: jest.fn(),
-    createDetectionImageSignedUrl: jest.fn(),
     createPorchClipSignedUrl: jest.fn(),
+    createFeederClipSignedUrl: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -38,158 +32,80 @@ describe('UrlsController', () => {
     jest.clearAllMocks();
   });
 
-  describe('createFeedImageSignedUrl', () => {
-    it('should create a feed image signed URL', async () => {
-      const createFeedImageUrlDto: CreateFeedImageUrlDto = {
-        fileName: 'test-image',
-        format: ImageFormat.JPG,
-        source: 'pi-feeder-001',
-        contentLength: 1024,
-      };
-
-      const expectedResult = {
-        signedUrl:
-          'https://test-bucket.s3.amazonaws.com/feed/1234567890-test-image.jpg?signature=...',
-        key: 'feed/1234567890-test-image.jpg',
-        expiresAt: '2024-01-01T12:00:00.000Z',
-        bucket: 'test-bucket',
-        metadata: {
-          timestamp: 1234567890,
-          source: 'pi-feeder-001',
-          type: 'feed',
-        },
-      };
-
-      mockUrlsService.createFeedImageSignedUrl.mockResolvedValue(
-        expectedResult,
-      );
-
-      const result = await controller.createFeedImageSignedUrl(
-        createFeedImageUrlDto,
-      );
-
-      expect(service.createFeedImageSignedUrl).toHaveBeenCalledWith(
-        createFeedImageUrlDto,
-      );
-      expect(result).toEqual(expectedResult);
-    });
-
-    it('should handle service errors gracefully', async () => {
-      const createFeedImageUrlDto: CreateFeedImageUrlDto = {
-        fileName: 'test-image',
-        format: ImageFormat.JPG,
-        source: 'pi-feeder-001',
-        contentLength: 1024,
-      };
-
-      const error = new Error('S3 service error');
-      mockUrlsService.createFeedImageSignedUrl.mockRejectedValue(error);
-
-      await expect(
-        controller.createFeedImageSignedUrl(createFeedImageUrlDto),
-      ).rejects.toThrow(error);
-      expect(service.createFeedImageSignedUrl).toHaveBeenCalledWith(
-        createFeedImageUrlDto,
-      );
-    });
-  });
-
-  describe('createDetectionImageSignedUrl', () => {
-    it('should create a detection image signed URL', async () => {
-      const createDetectionImageUrlDto: CreateDetectionImageUrlDto = {
-        fileName: 'motion-detected',
-        format: ImageFormat.PNG,
-        contentLength: 1024,
-      };
-
-      const expectedResult = {
-        signedUrl:
-          'https://test-bucket.s3.amazonaws.com/detection/feed-123/1234567890-motion-detected.png?signature=...',
-        key: 'detection/feed-123/1234567890-motion-detected.png',
-        expiresAt: '2024-01-01T12:00:00.000Z',
-        bucket: 'test-bucket',
-        metadata: {
-          timestamp: 1234567890,
-          feedEventId: 'feed-123',
-          type: 'detection',
-        },
-      };
-
-      mockUrlsService.createDetectionImageSignedUrl.mockResolvedValue(
-        expectedResult,
-      );
-
-      const result = await controller.createDetectionImageSignedUrl(
-        createDetectionImageUrlDto,
-      );
-
-      expect(service.createDetectionImageSignedUrl).toHaveBeenCalledWith(
-        createDetectionImageUrlDto,
-      );
-      expect(result).toEqual(expectedResult);
-    });
-
-    it('should handle service errors gracefully', async () => {
-      const createDetectionImageUrlDto: CreateDetectionImageUrlDto = {
-        fileName: 'motion-detected',
-        format: ImageFormat.PNG,
-        contentLength: 1024,
-      };
-
-      const error = new Error('S3 service error');
-      mockUrlsService.createDetectionImageSignedUrl.mockRejectedValue(error);
-
-      await expect(
-        controller.createDetectionImageSignedUrl(createDetectionImageUrlDto),
-      ).rejects.toThrow(error);
-      expect(service.createDetectionImageSignedUrl).toHaveBeenCalledWith(
-        createDetectionImageUrlDto,
-      );
-    });
-  });
-
   describe('createPorchClipSignedUrl', () => {
-    it('should create a porch clip signed URL for pi-porch', async () => {
+    it('should create a porch clip signed URL', async () => {
       const createPorchClipUrlDto: CreatePorchClipUrlDto = {
-        fileName: 'clip-20261114-210000',
+        fileName: 'clip-1',
         contentLength: 1200,
       };
-
-      const expectedResult = {
-        signedUrl:
-          'https://test-bucket.s3.amazonaws.com/porch/123-clip.mp4?signature=...',
-        key: 'porch/123-clip-20261114-210000.mp4',
-        expiresAt: '2024-01-01T12:00:00.000Z',
-        bucket: 'test-bucket',
-        metadata: {
-          timestamp: 123,
-          type: 'porch',
-        },
+      const expected = {
+        signedUrl: 'https://test-bucket.s3.amazonaws.com/porch/clip.mp4',
+        key: 'porch/1-clip-1.mp4',
       };
 
-      mockUrlsService.createPorchClipSignedUrl.mockResolvedValue(
-        expectedResult,
-      );
+      mockUrlsService.createPorchClipSignedUrl.mockResolvedValue(expected);
 
       const result = await controller.createPorchClipSignedUrl(
         createPorchClipUrlDto,
-        { deviceId: 'pi-porch' } as any,
+        { deviceId: 'pi-porch' } as never,
       );
 
       expect(service.createPorchClipSignedUrl).toHaveBeenCalledWith(
         createPorchClipUrlDto,
       );
-      expect(result).toEqual(expectedResult);
+      expect(result).toEqual(expected);
     });
 
-    it('should reject other devices', async () => {
+    it('should reject a non-porch device', async () => {
       await expect(
         controller.createPorchClipSignedUrl(
           { fileName: 'clip-1', contentLength: 1200 },
-          { deviceId: 'pi-user' } as any,
+          { deviceId: 'pi-user' } as never,
         ),
-      ).rejects.toThrow(ForbiddenException);
+      ).rejects.toBeInstanceOf(ForbiddenException);
       expect(service.createPorchClipSignedUrl).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('createFeederClipSignedUrl', () => {
+    it('should create a feeder clip signed URL', async () => {
+      const dto: CreateFeederClipUrlDto = {
+        fileName: 'clip-1',
+        contentLength: 128,
+      };
+      mockUrlsService.createFeederClipSignedUrl.mockResolvedValue({
+        key: 'feeder/1-clip-1.mp4',
+      });
+
+      const result = await controller.createFeederClipSignedUrl(dto, {
+        deviceId: 'pi-feeder',
+      } as never);
+
+      expect(service.createFeederClipSignedUrl).toHaveBeenCalledWith(dto);
+      expect(result).toEqual({ key: 'feeder/1-clip-1.mp4' });
+    });
+
+    it('should allow the local development bypass', async () => {
+      mockUrlsService.createFeederClipSignedUrl.mockResolvedValue({
+        key: 'feeder/1-clip-1.mp4',
+      });
+
+      await controller.createFeederClipSignedUrl(
+        { fileName: 'clip-1', contentLength: 128 },
+        { deviceId: 'dev-mode' } as never,
+      );
+
+      expect(service.createFeederClipSignedUrl).toHaveBeenCalled();
+    });
+
+    it('should reject a non-feeder device', async () => {
+      await expect(
+        controller.createFeederClipSignedUrl(
+          { fileName: 'clip-1', contentLength: 128 },
+          { deviceId: 'pi-porch' } as never,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(service.createFeederClipSignedUrl).not.toHaveBeenCalled();
     });
   });
 });

@@ -48,21 +48,21 @@ These constraints apply to **every change** in this repository. No exceptions wi
 
 ### Language & Type Safety
 
-- **TypeScript checks**: `strictNullChecks`, `strictPropertyInitialization`, `noImplicitAny`, `strictBindCallApply`, and `noFallthroughCasesInSwitch` are on. Do not weaken them. The root `tsconfig.json` does not enable `"strict": true`. `lambda/tsconfig.json` does.
+- **TypeScript checks**: `strictNullChecks`, `strictPropertyInitialization`, `noImplicitAny`, `strictBindCallApply`, and `noFallthroughCasesInSwitch` are on. Do not weaken them. The root `tsconfig.json` does not enable `"strict": true`.
 - **No `any` without justification**: avoid unjustified `any` in production code (relaxed in `*.spec.ts` / `*.test.ts`)
 - **Named exports preferred**: follow existing Nest module patterns
 
 ### Architecture
 
 - **NestJS module pattern**: controllers → services → TypeORM entities / AWS SDK clients
-- **Lambda is a nested package**: `lambda/` owns S3→SQS→API glue; do not fold it into Nest modules
+- **Still-photo pipeline removed**: no S3→SQS→Lambda→`/feed`/`/detection` path; keep Claude for `POST /feeder/classify` only
 - **Config from env only**: application config via Nest `ConfigModule` / typed config helpers — no scattered secrets in source
-- **Shared AWS helpers** (e.g. S3 metadata) live in one Nest module and are exported — do not re-provide duplicates
+- **Shared AWS helpers** live in one Nest module and are exported — do not re-provide duplicates
 
 ### Testing
 
 - **80% coverage threshold**: branches, functions, lines, and statements — enforced in CI
-- **Co-located tests**: Nest `*.spec.ts` beside sources; Lambda `*.test.ts` beside sources
+- **Co-located tests**: Nest `*.spec.ts` beside sources
 - **Mock external I/O**: AWS SDK, Anthropic, network, filesystem — never hit real AWS/Claude in unit tests
 
 ### Git & Quality
@@ -78,13 +78,14 @@ These constraints apply to **every change** in this repository. No exceptions wi
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
 │  Nest modules   │ ──► │   Services      │ ──► │ TypeORM / AWS   │
-│  (controllers,  │     │  (feed, detect, │     │  Postgres, S3,  │
-│   guards, DTOs) │     │   urls, Claude) │     │  Rekognition)   │
+│  (controllers,  │     │  (feeder, porch,│     │  Postgres, S3,  │
+│   guards, DTOs) │     │   urls, Claude) │     │  Claude)        │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
 
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│  S3 upload      │ ──► │  SQS + Lambda   │ ──► │  Nest API       │
-│  (Pi / client)  │     │  (ECDSA signed) │     │ /feed|/detection│
+│  LAN recorder   │ ──► │  Presigned PUT  │ ──► │  S3 porch/      │
+│  (ECDSA device) │     │  /urls/porch or │     │  or feeder/     │
+│                 │     │  /urls/feeder   │     │                 │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
 ```
 
@@ -93,20 +94,19 @@ These constraints apply to **every change** in this repository. No exceptions wi
 | Controllers stay thin — business logic in services           | Code review + architecture docs |
 | TypeORM entities own persistence shape                       | Module convention               |
 | ECDSA guard owns device auth                                 | Auth module                     |
-| Lambda package stays isolated under `lambda/`                | Package boundary                |
 | CloudFormation uses `ImportValue` for `aws-infra-*` networks | IaC review                      |
 
 ---
 
 ## Mandatory Quality Gates
 
-| When               | Gate                                                                                                                 | Failure policy |
-| ------------------ | -------------------------------------------------------------------------------------------------------------------- | -------------- |
-| **Commit**         | Husky `pre-commit` — `lint-staged` (ESLint + Prettier on staged files)                                               | Block commit   |
-| **Commit message** | Husky `commit-msg` — commitlint (Conventional Commits + scope enum)                                                  | Block commit   |
-| **Push**           | Husky `pre-push` — `make preflight` (root + lambda quality)                                                          | Block push     |
-| **PR / CI**        | GitHub Actions: lint, format-check, test (Jest 80%), build; lambda workflows; npm audit (high+, blocking once clean) | Block merge    |
-| **Review**         | `pr-review` / `repo-review` skills against `docs/review/`; a ledger must pass `npm run review:check`                 | Block merge    |
+| When               | Gate                                                                                                 | Failure policy |
+| ------------------ | ---------------------------------------------------------------------------------------------------- | -------------- |
+| **Commit**         | Husky `pre-commit` — `lint-staged` (ESLint + Prettier on staged files)                               | Block commit   |
+| **Commit message** | Husky `commit-msg` — commitlint (Conventional Commits + scope enum)                                  | Block commit   |
+| **Push**           | Husky `pre-push` — `make preflight`                                                                  | Block push     |
+| **PR / CI**        | GitHub Actions: lint, format-check, test (Jest 80%), build; npm audit (high+, blocking once clean)   | Block merge    |
+| **Review**         | `pr-review` / `repo-review` skills against `docs/review/`; a ledger must pass `npm run review:check` | Block merge    |
 
 ### When to run what (avoid duplicate work)
 
@@ -120,14 +120,12 @@ These constraints apply to **every change** in this repository. No exceptions wi
 **Do not** run `make preflight` and then `git push` in the same session unless you need an extra local confirmation — push re-runs the same suite.
 
 ```bash
-make lint         # Root ESLint
+make lint         # ESLint
 make format       # Prettier write
-make test         # Root Jest
+make test         # Jest
 make build        # Nest build
-make lambda-lint  # Lambda ESLint
-make lambda-test  # Lambda Jest
-make lambda-build # Lambda webpack + package
-make preflight    # Root + lambda quality gates
+make porch-test   # Porch recorder Python helpers
+make preflight    # Full quality gates
 ```
 
 ---
@@ -136,11 +134,11 @@ make preflight    # Root + lambda quality gates
 
 The following changes **MUST** be reviewed and approved by a human maintainer. AI agents MUST NOT merge these autonomously.
 
-- **New dependencies**: any addition to root or `lambda/package.json`
+- **New dependencies**: any addition to root `package.json`
 - **Security changes**: credentials, IAM policies, ECDSA keys, secret handling, logging of sensitive data
-- **Architecture changes**: new Nest modules, Lambda boundary changes, shared-module export patterns
+- **Architecture changes**: new Nest modules, shared-module export patterns
 - **CI/CD changes**: any modification to `.github/workflows/`
-- **Infrastructure changes**: any modification to `cloudformation/` or `lambda/cloudformation/`
+- **Infrastructure changes**: any modification to `cloudformation/`
 - **Governance document changes**: any edit to `CONTEXT.md`, `AGENTS.md`, or `docs/GOVERNANCE.md`
 - **Coverage threshold changes**: reductions to Jest coverage thresholds
 - **Breaking API / contract changes**: OpenAPI (`api.yaml`), DTO shapes, S3 key layouts consumed by Pi devices
@@ -174,12 +172,12 @@ Before implementing any changes, confirm you have read and understood:
 | Field       | Value                                                                                     |
 | ----------- | ----------------------------------------------------------------------------------------- |
 | Project     | Crow Detector Server                                                                      |
-| Type        | NestJS 11 + Fastify TypeScript API + nested S3 Lambda                                     |
-| Runtime     | Node.js 26 (API / ECS); Node.js 24 (Lambda runtime — AWS max; Node 26 not offered yet)    |
-| Language    | TypeScript. Root tsconfig leaves `"strict": true` off; `lambda/tsconfig.json` enables it. |
-| Compute     | AWS ECS Fargate + Lambda                                                                  |
+| Type        | NestJS 11 + Fastify TypeScript API + LAN RTSP recorders                                   |
+| Runtime     | Node.js 26 (API / ECS)                                                                    |
+| Language    | TypeScript. Root tsconfig leaves `"strict": true` off; individual strict flags remain on. |
+| Compute     | AWS ECS Fargate                                                                           |
 | Storage     | PostgreSQL (TypeORM) + S3                                                                 |
-| AI / Vision | AWS Rekognition + Anthropic Claude                                                        |
+| AI / Vision | Anthropic Claude (feeder classify; still-photo Rekognition path removed)                  |
 | Auth        | ECDSA device signatures                                                                   |
 | IaC         | CloudFormation (`ImportValue` for `aws-infra-*`)                                          |
 | Logging     | Bunyan → CloudWatch                                                                       |

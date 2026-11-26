@@ -26,14 +26,14 @@ Resolve upward, never downward.
 
 ### Language and type safety
 
-- **TypeScript checks are mandatory:** `strictNullChecks`, `strictPropertyInitialization`, `noImplicitAny`, `strictBindCallApply`, and `noFallthroughCasesInSwitch`. The root tsconfig leaves `"strict": true` off. `lambda/tsconfig.json` enables it.
+- **TypeScript checks are mandatory:** `strictNullChecks`, `strictPropertyInitialization`, `noImplicitAny`, `strictBindCallApply`, and `noFallthroughCasesInSwitch`. The root tsconfig leaves `"strict": true` off.
 - **No `any` in production code** without a justification comment. Tests may relax this.
 - Prefer explicit types on public APIs.
 
 ### Architecture
 
 - **Nest module pattern:** controllers → services → TypeORM / AWS / Claude.
-- **Lambda stays nested** under `lambda/` with its own package boundary.
+- **Still-photo Lambda path removed:** do not reintroduce a nested `lambda/` package or S3→SQS photo pipeline without a product decision.
 - **Config from env** via Nest config / typed helpers — document new vars.
 
 ### Testing and quality
@@ -63,12 +63,13 @@ Resolve upward, never downward.
 
 ### Requires human review (PR approval mandatory)
 
-- New npm dependencies (root or `lambda/`)
+- New npm dependencies
 - Changes to any governance doc (`CONTEXT.md`, `AGENTS.md`, this file, architecture/security policy)
 - Changes to CI/CD pipelines (`.github/workflows/`)
 - Changes to CloudFormation / IAM
 - Security-sensitive code (credentials, ECDSA keys, secret handling, logging of sensitive data)
 - Breaking OpenAPI / DTO / S3 layout contracts
+- Public unauthenticated write surfaces (for example `POST /feeder/dispense`) and retention rules that widen prod exposure
 - Removal of tests or reduction of coverage thresholds
 - TypeORM major version jumps (especially 1.x)
 
@@ -96,9 +97,8 @@ Resolve upward, never downward.
 | -------------------------------- | ------------------------------------------------------------------------------------ | ------------- |
 | Husky pre-commit (`lint-staged`) | ESLint + Prettier on staged files                                                    | Yes (commit)  |
 | Husky commit-msg                 | Conventional Commits + scope enum                                                    | Yes (commit)  |
-| Husky pre-push                   | `make preflight` (root + lambda)                                                     | Yes (push)    |
+| Husky pre-push                   | `make preflight`                                                                     | Yes (push)    |
 | GitHub Actions PR workflow       | lint, format-check, test (Jest 80%), build; npm audit (high+, blocking once clean)   | Yes (merge)   |
-| GitHub Actions lambda PR         | lambda lint, test, package                                                           | Yes (merge)   |
 | GitHub Actions deploy workflows  | quality gates then deploy                                                            | Yes (deploy)  |
 | PR review                        | Architecture, security, tests, and the `docs/review/` criteria with a checked ledger | Yes (process) |
 

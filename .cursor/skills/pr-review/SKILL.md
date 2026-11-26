@@ -36,17 +36,17 @@ npm run review:inventory -- --kind pr --base <base> [--worktree] --init .review/
 
 ## Phase 2 — Gates
 
-Run every required gate and record `status`, `exitCode`, and key output in `evidence`. A failing gate does not stop the review; record it and continue. Each gate covers both the Nest package and `lambda/`.
+Run every required gate and record `status`, `exitCode`, and key output in `evidence`. A failing gate does not stop the review; record it and continue.
 
 | Gate      | Command                                                                                                                               |
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | hooks     | `git config core.hooksPath` (expect `.husky/_`) and `test -d .husky/_`; then `npx --no-install commitlint --from <baseSha> --to HEAD` |
-| lint      | `make lint` and `make lambda-lint` (list warnings in changed files)                                                                   |
-| typecheck | `npx tsc --noEmit -p tsconfig.build.json` and `(cd lambda && npx tsc --noEmit -p tsconfig.json)`                                       |
-| format    | `make format-check` and `make lambda-format-check`                                                                                    |
-| test      | `make test`, `make lambda-test`, and `make porch-test` (record coverage summaries)                                                    |
-| build     | `make build` and `make lambda-build`                                                                                                  |
-| security  | `npm audit --audit-level=high` in the root and in `lambda/`                                                                           |
+| lint      | `make lint` (list warnings in changed files)                                                                                          |
+| typecheck | `npx tsc --noEmit -p tsconfig.build.json` and `npx tsc --noEmit -p tsconfig.spec.json`                                                |
+| format    | `make format-check`                                                                                                                   |
+| test      | `make test` and `make porch-test` (record coverage summaries)                                                                         |
+| build     | `make build`                                                                                                                          |
+| security  | `npm audit --audit-level=high`                                                                                                        |
 
 Record `node -v` in the hooks evidence (GATE-02). Run the suppression search from GATE-11. Run `npm run test:e2e` when bootstrap, the global pipe, or module wiring changed; otherwise record why it was not run.
 
@@ -56,7 +56,7 @@ If a gate cannot run (no network, missing credentials), set `not-run` with the r
 
 1. `git log --oneline <baseSha>..HEAD` and `git diff --stat <baseSha>...HEAD`.
 2. State in one paragraph what the change claims to do, and group the files by purpose. This is what COR-11 and PR-01 are checked against.
-3. List what the change **should** have touched but did not: tests for changed behavior, docs that name changed things, and the other side of a contract. The Nest tree and `lambda/` do not share types, so a field renamed in one can leave the other compiling cleanly. Missing changes are findings.
+3. List what the change **should** have touched but did not: tests for changed behavior, docs that name changed things, and the other side of a contract (Nest API vs LAN Python vs OpenAPI). Missing changes are findings.
 
 ## Phase 4 — Read every file, line by line
 

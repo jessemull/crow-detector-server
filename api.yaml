@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Crow Detector Server API
-  description: API for managing crow detection events and feed events for the Critter Canteen system
+  description: API for Critter Canteen porch clips, feeder dispense proofs, and feeder animal visits
   version: 1.0.0
   contact:
     name: Critter Canteen
@@ -46,534 +46,6 @@ paths:
           description: Database is reachable
         '503':
           description: Database is unreachable
-
-  /detection:
-    post:
-      summary: Create detection event
-      description: Record a new detection event with image processing pipeline
-      tags:
-        - Detection
-      security:
-        - ECDSA: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateDetectionDTO'
-      responses:
-        '201':
-          description: Detection event created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DetectionResponse'
-        '400':
-          description: Bad request - invalid input data
-        '401':
-          description: Unauthorized - invalid authentication
-        '500':
-          description: Internal server error
-
-    get:
-      summary: Get detection events
-      description: Retrieve detection events with optional filtering
-      tags:
-        - Detection
-      security:
-        - ECDSA: []
-      parameters:
-        - name: limit
-          in: query
-          description: Maximum number of events to return
-          required: false
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-            default: 50
-        - name: from
-          in: query
-          description: Start date for filtering (ISO 8601 format)
-          required: false
-          schema:
-            type: string
-            format: date-time
-        - name: to
-          in: query
-          description: End date for filtering (ISO 8601 format)
-          required: false
-          schema:
-            type: string
-            format: date-time
-      responses:
-        '200':
-          description: List of detection events
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/DetectionEvent'
-        '401':
-          description: Unauthorized - invalid authentication
-        '500':
-          description: Internal server error
-
-  /detection/{id}:
-    get:
-      summary: Get detection event by ID
-      description: Retrieve a specific detection event by its unique identifier
-      tags:
-        - Detection
-      security:
-        - ECDSA: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: Unique identifier of the detection event
-          schema:
-            type: string
-            format: uuid
-      responses:
-        '200':
-          description: Detection event retrieved successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                  - data
-                  - message
-                properties:
-                  data:
-                    $ref: '#/components/schemas/DetectionEvent'
-                  message:
-                    type: string
-        '404':
-          description: Detection event not found
-        '401':
-          description: Unauthorized - invalid authentication
-        '500':
-          description: Internal server error
-
-    patch:
-      summary: Update detection event
-      description: Update an existing detection event with flexible field updates
-      tags:
-        - Detection
-      security:
-        - ECDSA: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: Unique identifier of the detection event
-          schema:
-            type: string
-            format: uuid
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchDetectionDTO'
-      responses:
-        '200':
-          description: Detection event updated successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DetectionResponse'
-        '400':
-          description: Bad request - invalid input data
-        '401':
-          description: Unauthorized - invalid authentication
-        '404':
-          description: Detection event not found
-        '409':
-          description: The detection changed before the update was applied
-        '500':
-          description: Internal server error
-
-  /feed:
-    post:
-      summary: Create feed event
-      description: Record a new feed event with image processing pipeline
-      tags:
-        - Feed
-      security:
-        - ECDSA: []
-      parameters:
-        - name: x-skip-cooldown
-          in: header
-          required: false
-          schema:
-            type: string
-            enum: ['true', 'false']
-          description: Authenticated devices may send true to skip the feed cooldown
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateFeedDTO'
-      responses:
-        '201':
-          description: Feed event created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/FeedResponse'
-        '400':
-          description: Bad request - invalid input data
-        '401':
-          description: Unauthorized - invalid authentication
-        '409':
-          description: Feed cooldown is still active
-        '500':
-          description: Internal server error
-
-  /feed/events:
-    get:
-      summary: Get feed events
-      description: Retrieve feed events with optional filtering
-      tags:
-        - Feed
-      security:
-        - ECDSA: []
-      parameters:
-        - name: limit
-          in: query
-          description: Maximum number of events to return
-          required: false
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-            default: 50
-        - name: from
-          in: query
-          description: Start date for filtering (ISO 8601 format)
-          required: false
-          schema:
-            type: string
-            format: date-time
-        - name: to
-          in: query
-          description: End date for filtering (ISO 8601 format)
-          required: false
-          schema:
-            type: string
-            format: date-time
-      responses:
-        '200':
-          description: List of feed events
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/FeedEvent'
-        '401':
-          description: Unauthorized - invalid authentication
-        '500':
-          description: Internal server error
-
-  /feed/{id}:
-    get:
-      summary: Get feed event by ID
-      description: Retrieve a specific feed event by its unique identifier
-      tags:
-        - Feed
-      security:
-        - ECDSA: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: Unique identifier of the feed event
-          schema:
-            type: string
-            format: uuid
-      responses:
-        '200':
-          description: Feed event retrieved successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/FeedEvent'
-        '404':
-          description: Feed event not found
-        '401':
-          description: Unauthorized - invalid authentication
-        '500':
-          description: Internal server error
-
-    patch:
-      summary: Update feed event
-      description: Update an existing feed event with flexible field updates
-      tags:
-        - Feed
-      security:
-        - ECDSA: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: Unique identifier of the feed event
-          schema:
-            type: string
-            format: uuid
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchFeedDTO'
-      responses:
-        '200':
-          description: Feed event updated successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/FeedResponse'
-        '400':
-          description: Bad request - invalid input data
-        '401':
-          description: Unauthorized - invalid authentication
-        '404':
-          description: Feed event not found
-        '409':
-          description: The feed event changed before the update was applied
-        '500':
-          description: Internal server error
-
-  /feed/reprocess/{id}:
-    post:
-      summary: Reprocess feed event image
-      description: Trigger image reprocessing for a specific feed event
-      tags:
-        - Feed
-      security:
-        - ECDSA: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: Unique identifier of the feed event to reprocess
-          schema:
-            type: string
-            format: uuid
-      responses:
-        '201':
-          description: Image reprocessing started successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/FeedResponse'
-        '404':
-          description: Feed event not found
-        '401':
-          description: Unauthorized - invalid authentication
-        '409':
-          description: The feed event is not failed, so it cannot be reprocessed
-        '500':
-          description: Internal server error
-
-  /feed/status/latest:
-    get:
-      summary: Get latest feed event status
-      description: Retrieve the status of the most recent feed event for feeder control
-      tags:
-        - Feed
-      security:
-        - ECDSA: []
-      responses:
-        '200':
-          description: Latest status, or data null when no feed events exist
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    nullable: true
-                    type: object
-                    properties:
-                      id:
-                        type: string
-                        format: uuid
-                        description: Feed event ID
-                      status:
-                        type: string
-                        enum:
-                          [
-                            PENDING,
-                            FEEDING,
-                            FEEDING_COMPLETE,
-                            PHOTO_TAKEN,
-                            COMPLETE,
-                          ]
-                        description: Current feeder status
-                      createdAt:
-                        type: string
-                        format: date-time
-                        description: When the feed event was created
-                  message:
-                    type: string
-                    description: Response message
-        '401':
-          description: Unauthorized - invalid authentication
-        '500':
-          description: Internal server error
-
-  /feed/status/{id}:
-    patch:
-      summary: Update feed event status
-      description: Update the feeder status of a specific feed event
-      tags:
-        - Feed
-      security:
-        - ECDSA: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: Unique identifier of the feed event
-          schema:
-            type: string
-            format: uuid
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateFeedStatusDTO'
-      responses:
-        '200':
-          description: Feed event status updated successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/FeedResponse'
-        '400':
-          description: Bad request - invalid input data
-        '401':
-          description: Unauthorized - invalid authentication
-        '404':
-          description: Feed event not found
-        '409':
-          description: The feed event cannot move to that status from its current status
-        '500':
-          description: Internal server error
-
-  /urls/feed:
-    post:
-      summary: Create signed URL for feed image upload
-      description: Generate a pre-signed URL for uploading feed event images
-      tags:
-        - URLs
-      security:
-        - ECDSA: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateFeedImageUrlDTO'
-      responses:
-        '201':
-          description: Signed URL created successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  signedUrl:
-                    type: string
-                    format: uri
-                    description: Pre-signed URL for image upload
-                  key:
-                    type: string
-                    description: Object key under feed/
-                  bucket:
-                    type: string
-                  expiresAt:
-                    type: string
-                    format: date-time
-                    description: When the signed URL expires
-                  metadata:
-                    type: object
-                    properties:
-                      timestamp:
-                        type: integer
-                      source:
-                        type: string
-                      type:
-                        type: string
-                        enum: [feed]
-        '400':
-          description: Bad request - invalid input data
-        '401':
-          description: Unauthorized - invalid authentication
-        '500':
-          description: Internal server error
-
-  /urls/detection:
-    post:
-      summary: Create signed URL for detection image upload
-      description: Generate a pre-signed URL for uploading detection event images
-      tags:
-        - URLs
-      security:
-        - ECDSA: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateDetectionImageUrlDTO'
-      responses:
-        '201':
-          description: Signed URL created successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  signedUrl:
-                    type: string
-                    format: uri
-                    description: Pre-signed URL for image upload
-                  key:
-                    type: string
-                    description: Object key under detection/
-                  bucket:
-                    type: string
-                  expiresAt:
-                    type: string
-                    format: date-time
-                    description: When the signed URL expires
-                  metadata:
-                    type: object
-                    properties:
-                      timestamp:
-                        type: integer
-                      feedEventId:
-                        type: string
-                      type:
-                        type: string
-                        enum: [detection]
-        '400':
-          description: Bad request - invalid input data
-        '401':
-          description: Unauthorized - invalid authentication
-        '404':
-          description: No feed event exists yet, so a detection key cannot be assigned
-        '500':
-          description: Internal server error
 
   /urls/porch:
     post:
@@ -644,6 +116,226 @@ paths:
         '500':
           description: Internal server error
 
+  /feeder/dispense:
+    post:
+      summary: Request a feeder dispense proof
+      description: |
+        Public unauthenticated write (rate-limited). Creates a dispense row when
+        the 10-minute cooldown is clear. The feeder host later claims the row and
+        uploads a separate proof clip. Apply scripts/db-seed/feeder-video.sql
+        before serving this route. Keep under human review before widening prod
+        exposure (docs/GOVERNANCE.md / docs/DEVICES.md).
+      tags:
+        - Feeder
+      responses:
+        '201':
+          description: Dispense requested
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DispenseRequest'
+        '409':
+          description: Cooldown is active
+        '429':
+          description: Too many requests
+        '503':
+          description: Cooldown check failed closed
+
+  /feeder/dispense/{id}:
+    get:
+      summary: Read a dispense request
+      description: Public status. Includes a short-lived proof URL once the clip is ready.
+      tags:
+        - Feeder
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Dispense status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DispenseRequest'
+        '404':
+          description: Dispense request not found
+        '429':
+          description: Too many requests
+    patch:
+      summary: Finish a dispense proof
+      description: Feeder host only. The row must already be recording.
+      tags:
+        - Feeder
+      security:
+        - ECDSA: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompleteDispenseDTO'
+      responses:
+        '200':
+          description: Dispense updated
+        '400':
+          description: The row is not recording, or the proof key is invalid
+        '401':
+          description: Unauthorized
+        '403':
+          description: Caller is not the feeder host
+        '404':
+          description: Dispense request not found
+
+  /feeder/dispense/pending:
+    get:
+      summary: Claim the next dispense proof
+      description: |
+        Feeder host only. Claims the oldest requested row, or a recording row
+        abandoned for more than five minutes. Returns `{ "request": null }` when
+        nothing is waiting.
+      tags:
+        - Feeder
+      security:
+        - ECDSA: []
+      responses:
+        '200':
+          description: Claim result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  request:
+                    nullable: true
+                    allOf:
+                      - $ref: '#/components/schemas/DispenseRequest'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Caller is not the feeder host
+
+  /feeder/clips:
+    get:
+      summary: List feeder visit clips
+      description: |
+        Public list of stored feeder visits (rate-limited). When FEEDER_REQUIRE_ANIMAL
+        is off on the host, motion visits may be published without Claude classify.
+      tags:
+        - Feeder
+      responses:
+        '200':
+          description: Visit list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FeederClip'
+        '429':
+          description: Too many requests
+
+  /feeder/classify:
+    post:
+      summary: Classify one feeder frame
+      description: |
+        Feeder host only. The app-wide Fastify JSON body limit is 4 MiB so this
+        route can accept large base64 frames (ClassifyFrameDTO maxLength 2_800_000).
+        Decoded frames over 2_000_000 bytes are rejected. There is no Sharp resize
+        step; JPEG/PNG/WebP media types only.
+      tags:
+        - Feeder
+      security:
+        - ECDSA: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClassifyFrameDTO'
+      responses:
+        '201':
+          description: Analysis result
+        '400':
+          description: Validation failed (empty body, media type, or field limits)
+        '401':
+          description: Unauthorized
+        '403':
+          description: Caller is not the feeder host, or the frame is empty or too large
+
+  /feeder/visits:
+    post:
+      summary: Store an animal visit
+      description: Feeder host only. The video key must be a feeder mp4 of at most 1024 characters.
+      tags:
+        - Feeder
+      security:
+        - ECDSA: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFeederVisitDTO'
+      responses:
+        '201':
+          description: Visit stored
+        '400':
+          description: Invalid visit
+        '401':
+          description: Unauthorized
+        '403':
+          description: Caller is not the feeder host
+
+  /urls/feeder:
+    post:
+      summary: Create signed URL for feeder clip upload
+      description: |
+        Feeder host only. The presigned PUT is bound to video/mp4 and the
+        declared content length, up to 100 MiB.
+      tags:
+        - URLs
+      security:
+        - ECDSA: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFeederClipUrlDTO'
+      responses:
+        '201':
+          description: Signed URL created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  signedUrl:
+                    type: string
+                    format: uri
+                  key:
+                    type: string
+                  expiresAt:
+                    type: string
+                    format: date-time
+        '400':
+          description: Invalid file name, content type, or size
+        '401':
+          description: Unauthorized
+        '403':
+          description: Caller is not the feeder host
+
 components:
   securitySchemes:
     ECDSA:
@@ -653,176 +345,11 @@ components:
       description: |
         ECDSA signature for request authentication.
         Required headers:
-        - x-device-id: Device identifier (pi-user, pi-motion, pi-feeder, pi-porch, lambda-s3)
+        - x-device-id: Device identifier (pi-user, pi-feeder, pi-porch)
         - x-signature: Base64-encoded ECDSA signature
         - x-timestamp: Request timestamp in milliseconds
 
   schemas:
-    CreateDetectionDTO:
-      type: object
-      required:
-        - imageUrl
-      properties:
-        imageUrl:
-          type: string
-          format: uri
-          description: URL of the detection image
-          example: 'https://example.com/images/detection.jpg'
-
-    PatchDetectionDTO:
-      type: object
-      properties:
-        confidence:
-          type: number
-          format: float
-          minimum: 0
-          maximum: 1
-          description: Confidence score of the detection (0.0 to 1.0)
-          example: 0.95
-        crowCount:
-          type: integer
-          minimum: 0
-          description: Number of crows detected in the image
-          example: 3
-        animalCount:
-          type: integer
-          minimum: 0
-          description: Total number of animals detected in the image
-          example: 5
-        processingError:
-          type: string
-          description: Error message if processing failed
-          example: 'Image processing timeout'
-        detectedAnimals:
-          type: array
-          description: Array of detected animals with confidence scores and counts
-          items:
-            $ref: '#/components/schemas/DetectedAnimal'
-          example:
-            - name: 'Crow'
-              confidence: 99.1
-              count: 2
-            - name: 'Squirrel'
-              confidence: 87.5
-              count: 1
-        originalImageSize:
-          type: integer
-          description: Size of the original image in bytes
-          example: 156789
-        processingDuration:
-          type: integer
-          description: Time taken to process the image in milliseconds
-          example: 2340
-
-    CreateFeedDTO:
-      type: object
-      required:
-        - imageUrl
-      properties:
-        imageUrl:
-          type: string
-          format: uri
-          maxLength: 2048
-          description: URL of the feed event image
-          example: 'https://example.com/images/feed.jpg'
-
-    PatchFeedDTO:
-      type: object
-      properties:
-        confidence:
-          type: number
-          minimum: 0
-          maximum: 1
-          example: 0.87
-        croppedImageUrl:
-          type: string
-          pattern: '^processed/[A-Za-z0-9][A-Za-z0-9._-]{0,200}$'
-          description: Object key under processed/, not a URL
-          example: processed/123-test_cropped.jpg
-        isAppropriate:
-          type: boolean
-        source:
-          $ref: '#/components/schemas/Source'
-        status:
-          $ref: '#/components/schemas/Status'
-        processingError:
-          type: string
-        moderationLabels:
-          type: string
-        faceDetected:
-          type: boolean
-        faceBoundingBox:
-          type: string
-        originalImageSize:
-          type: integer
-        processedImageSize:
-          type: integer
-        processingDuration:
-          type: integer
-
-    UpdateFeedStatusDTO:
-      type: object
-      required:
-        - status
-      properties:
-        status:
-          type: string
-          enum: [FEEDING, FEEDING_COMPLETE, PHOTO_TAKEN, COMPLETE]
-          description: Next feeder status. PENDING is not a legal target.
-          example: 'FEEDING'
-        photoUrl:
-          type: string
-          format: uri
-          maxLength: 2048
-          pattern: '^https://[^/?#]+/feed/[^?#]+$'
-          description: Optional HTTPS verification photo whose object key is under feed/. PHOTO_TAKEN stores it. Keys containing .., ://, or a backslash are rejected.
-          example: 'https://bucket.s3.amazonaws.com/feed/verification.jpg'
-
-    CreateFeedImageUrlDTO:
-      type: object
-      required:
-        - fileName
-        - format
-        - source
-        - contentLength
-      properties:
-        fileName:
-          type: string
-          maxLength: 120
-          description: Basename without a path or extension
-          example: 'feed-event'
-        format:
-          $ref: '#/components/schemas/ImageFormat'
-        source:
-          type: string
-          description: Source identifier for the image
-          example: 'pi-feeder-01'
-        contentLength:
-          type: integer
-          minimum: 1
-          maximum: 5242880
-          description: Exact PUT body size in bytes. The signed URL rejects any other length. Images above 5 MiB are rejected before Rekognition.
-
-    CreateDetectionImageUrlDTO:
-      type: object
-      required:
-        - fileName
-        - format
-        - contentLength
-      properties:
-        fileName:
-          type: string
-          maxLength: 120
-          description: Basename without a path or extension
-          example: 'detection'
-        format:
-          $ref: '#/components/schemas/ImageFormat'
-        contentLength:
-          type: integer
-          minimum: 1
-          maximum: 5242880
-          description: Exact PUT body size in bytes. The signed URL rejects any other length. Images above 5 MiB are rejected before analysis.
-
     CreatePorchClipUrlDTO:
       type: object
       required:
@@ -839,6 +366,138 @@ components:
           minimum: 1
           maximum: 104857600
           description: Exact PUT body size in bytes. Content type is video/mp4.
+
+    CreateFeederClipUrlDTO:
+      type: object
+      required:
+        - fileName
+        - contentLength
+      properties:
+        fileName:
+          type: string
+          maxLength: 120
+          description: Clip file name without a path or ".."
+          example: 'proof-req'
+        contentLength:
+          type: integer
+          minimum: 1
+          maximum: 104857600
+          description: Exact upload size in bytes. The presigned PUT is bound to this length.
+        contentType:
+          type: string
+          enum: [video/mp4]
+          description: Feeder clips are mp4 only
+
+    DispenseRequest:
+      type: object
+      required:
+        - id
+        - status
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [requested, recording, ready, failed]
+        proofKey:
+          type: string
+          maxLength: 1024
+          description: S3 object key under feeder/ when status is ready (host/claim payloads)
+        proofClipUrl:
+          type: string
+          format: uri
+          description: Short-lived playback URL on public GET when status is ready
+        expiresAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CompleteDispenseDTO:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [ready, failed]
+        proofKey:
+          type: string
+          maxLength: 1024
+          pattern: '^feeder/(?!.*\\.\\.)[A-Za-z0-9._/-]+\\.mp4$'
+          description: Required when status is ready. Must be a feeder mp4 key.
+
+    ClassifyFrameDTO:
+      type: object
+      required:
+        - imageBase64
+        - mediaType
+      properties:
+        imageBase64:
+          type: string
+          maxLength: 2800000
+        mediaType:
+          type: string
+          enum: [image/jpeg, image/png, image/webp]
+
+    CreateFeederVisitDTO:
+      type: object
+      required:
+        - videoKey
+        - animalCount
+      properties:
+        videoKey:
+          type: string
+          maxLength: 1024
+          pattern: '^feeder/(?!.*\\.\\.)[A-Za-z0-9._/-]+\\.mp4$'
+        animalCount:
+          type: integer
+          minimum: 1
+          maximum: 100
+        crowCount:
+          type: integer
+          minimum: 0
+          maximum: 100
+        dispenseRequestId:
+          type: string
+          format: uuid
+        detectedAnimals:
+          type: array
+          maxItems: 20
+          items:
+            $ref: '#/components/schemas/DetectedAnimal'
+
+    FeederClip:
+      type: object
+      required:
+        - id
+        - recordedAt
+        - animalCount
+        - crowCount
+        - playbackUrl
+        - expiresAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        recordedAt:
+          type: string
+          format: date-time
+        animalCount:
+          type: integer
+        crowCount:
+          type: integer
+        playbackUrl:
+          type: string
+          format: uri
+        expiresAt:
+          type: string
+          format: date-time
 
     PorchClip:
       type: object
@@ -862,184 +521,6 @@ components:
         expiresAt:
           type: string
           format: date-time
-
-    DetectionEvent:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-          description: Unique identifier for the detection event
-          example: '123e4567-e89b-12d3-a456-426614174000'
-        confidence:
-          type: number
-          format: float
-          minimum: 0
-          maximum: 1
-          description: Confidence score of the detection
-          example: 0.95
-        crowCount:
-          type: integer
-          minimum: 0
-          description: Number of crows detected
-          example: 3
-        animalCount:
-          type: integer
-          minimum: 0
-          description: Total number of animals detected
-          example: 5
-        imageUrl:
-          type: string
-          format: uri
-          description: URL of the detection image
-          example: 'https://example.com/images/detection.jpg'
-        processingStatus:
-          type: string
-          enum: [PENDING, PROCESSING, COMPLETED, FAILED]
-          description: Current processing status of the image
-          example: 'COMPLETED'
-        processingError:
-          type: string
-          description: Error message if processing failed
-          example: 'Image processing timeout'
-        detectedAnimals:
-          type: array
-          description: Array of detected animals with confidence scores and counts
-          items:
-            $ref: '#/components/schemas/DetectedAnimal'
-          example:
-            - name: 'Crow'
-              confidence: 99.1
-              count: 2
-            - name: 'Pig'
-              confidence: 99.2
-              count: 1
-        originalImageSize:
-          type: integer
-          description: Size of the original image in bytes
-          example: 156789
-        processingDuration:
-          type: integer
-          description: Time taken to process the image in milliseconds
-          example: 2340
-        createdAt:
-          type: string
-          format: date-time
-          description: When the detection event was created
-          example: '2024-01-15T10:30:00Z'
-        updatedAt:
-          type: string
-          format: date-time
-          description: When the detection event was last updated
-          example: '2024-01-15T10:35:00Z'
-        feedEvent:
-          $ref: '#/components/schemas/FeedEvent'
-
-    FeedEvent:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-          description: Unique identifier for the feed event
-          example: '123e4567-e89b-12d3-a456-426614174000'
-        confidence:
-          type: number
-          format: float
-          minimum: 0
-          maximum: 1
-          description: Confidence score of the feed detection
-          example: 0.87
-        imageUrl:
-          type: string
-          format: uri
-          description: URL of the feed event image
-          example: 'https://example.com/images/feed.jpg'
-        croppedImageUrl:
-          type: string
-          description: Presigned URL for the cropped image. The stored value is a key under processed/.
-          example: 'https://example.com/images/processed/feed-cropped.jpg'
-        isAppropriate:
-          type: boolean
-          description: Whether the feed image is appropriate
-          example: true
-        source:
-          $ref: '#/components/schemas/Source'
-        status:
-          $ref: '#/components/schemas/Status'
-        processingStatus:
-          type: string
-          enum: [PENDING, PROCESSING, COMPLETED, FAILED]
-          description: Current processing status of the image
-          example: 'COMPLETED'
-        processingError:
-          type: string
-          description: Error message if processing failed
-          example: 'Image processing timeout'
-        moderationLabels:
-          type: string
-          description: JSON string of content moderation labels
-          example: '["Safe Content"]'
-        faceDetected:
-          type: boolean
-          description: Whether a face was detected in the image
-          example: true
-        faceBoundingBox:
-          type: string
-          description: JSON string of face bounding box coordinates
-          example: '{"Width":0.3,"Height":0.4,"Left":0.2,"Top":0.1}'
-        originalImageSize:
-          type: integer
-          description: Size of the original image in bytes
-          example: 210453
-        processedImageSize:
-          type: integer
-          description: Size of the processed image in bytes
-          example: 9842
-        processingDuration:
-          type: integer
-          description: Time taken to process the image in milliseconds
-          example: 1325
-        createdAt:
-          type: string
-          format: date-time
-          description: When the feed event was created
-          example: '2024-01-15T10:30:00Z'
-        updatedAt:
-          type: string
-          format: date-time
-          description: When the feed event was last updated
-          example: '2024-01-15T10:35:00Z'
-        detectionEvents:
-          type: array
-          items:
-            $ref: '#/components/schemas/DetectionEvent'
-          description: Associated detection events
-        feedEventStatus:
-          type: string
-          enum: [PENDING, FEEDING, FEEDING_COMPLETE, PHOTO_TAKEN, COMPLETE]
-          description: Current feeder status for the feed event
-          example: 'PENDING'
-        feederTriggeredAt:
-          type: string
-          format: date-time
-          description: When the feeder was triggered
-          example: '2024-01-15T10:32:00Z'
-        feedingCompletedAt:
-          type: string
-          format: date-time
-          description: When the feeding was completed
-          example: '2024-01-15T10:33:00Z'
-        photoTakenAt:
-          type: string
-          format: date-time
-          description: When the verification photo was taken
-          example: '2024-01-15T10:34:00Z'
-        photoUrl:
-          type: string
-          format: uri
-          description: URL of the verification photo
-          example: 'https://example.com/images/verification.jpg'
 
     DetectedAnimal:
       type: object
@@ -1065,71 +546,3 @@ components:
         - confidence
         - count
       description: Represents a detected animal with confidence score and instance count
-
-    DetectionResponse:
-      type: object
-      properties:
-        data:
-          oneOf:
-            - $ref: '#/components/schemas/DetectionEvent'
-            - type: string
-              nullable: true
-          description: The detection event data or null if not found
-        message:
-          type: string
-          description: Response message
-          example: 'Detection event created successfully!'
-
-    FeedResponse:
-      type: object
-      properties:
-        data:
-          oneOf:
-            - $ref: '#/components/schemas/FeedEvent'
-            - type: string
-              nullable: true
-          description: The feed event data or null if not found
-        message:
-          type: string
-          description: Response message
-          example: 'Feeder event created successfully!'
-
-    Source:
-      type: string
-      enum:
-        - API
-        - BUTTON
-        - SCRIPT
-        - TEST
-      description: Source of the feed event
-      example: 'BUTTON'
-
-    Status:
-      type: string
-      enum:
-        - ACCEPTED
-        - REJECTED
-      description: Status of the feed event
-      example: 'ACCEPTED'
-
-    ImageFormat:
-      type: string
-      enum:
-        - jpg
-        - jpeg
-        - png
-        - gif
-        - bmp
-        - webp
-      description: Supported image formats
-      example: 'jpg'
-
-tags:
-  - name: Health
-    description: Health check endpoints
-  - name: Detection
-    description: Crow detection event management
-  - name: Feed
-    description: Feed event management
-  - name: URLs
-    description: Pre-signed URL generation for image uploads

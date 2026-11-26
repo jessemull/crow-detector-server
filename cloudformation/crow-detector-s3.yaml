@@ -44,6 +44,14 @@ Resources:
             Prefix: porch/
             ExpirationInDays: 30
             NoncurrentVersionExpirationInDays: 7
+          # feeder/ clips expire in 30 days. The S3 stack applies this rule;
+          # the ECS image deploy does not. Review it with the public dispense
+          # route before production (docs/GOVERNANCE.md).
+          - Id: DeleteOldFeederClips
+            Status: Enabled
+            Prefix: feeder/
+            ExpirationInDays: 30
+            NoncurrentVersionExpirationInDays: 7
       CorsConfiguration:
         CorsRules:
           - AllowedHeaders: ['*']
@@ -57,128 +65,6 @@ Resources:
                 - http://localhost:3000
                 - http://127.0.0.1:3000
             MaxAge: 3000
-      NotificationConfiguration:
-        QueueConfigurations:
-          - Event: s3:ObjectCreated:Put
-            Queue: !ImportValue
-              Fn::Sub: 'CrowDetectorSQSQueueArn-${Environment}'
-            Filter:
-              S3Key:
-                Rules:
-                  - Name: prefix
-                    Value: feed/
-                  - Name: suffix
-                    Value: .jpg
-          - Event: s3:ObjectCreated:Put
-            Queue: !ImportValue
-              Fn::Sub: 'CrowDetectorSQSQueueArn-${Environment}'
-            Filter:
-              S3Key:
-                Rules:
-                  - Name: prefix
-                    Value: feed/
-                  - Name: suffix
-                    Value: .jpeg
-          - Event: s3:ObjectCreated:Put
-            Queue: !ImportValue
-              Fn::Sub: 'CrowDetectorSQSQueueArn-${Environment}'
-            Filter:
-              S3Key:
-                Rules:
-                  - Name: prefix
-                    Value: feed/
-                  - Name: suffix
-                    Value: .png
-          - Event: s3:ObjectCreated:Put
-            Queue: !ImportValue
-              Fn::Sub: 'CrowDetectorSQSQueueArn-${Environment}'
-            Filter:
-              S3Key:
-                Rules:
-                  - Name: prefix
-                    Value: feed/
-                  - Name: suffix
-                    Value: .gif
-          - Event: s3:ObjectCreated:Put
-            Queue: !ImportValue
-              Fn::Sub: 'CrowDetectorSQSQueueArn-${Environment}'
-            Filter:
-              S3Key:
-                Rules:
-                  - Name: prefix
-                    Value: feed/
-                  - Name: suffix
-                    Value: .bmp
-          - Event: s3:ObjectCreated:Put
-            Queue: !ImportValue
-              Fn::Sub: 'CrowDetectorSQSQueueArn-${Environment}'
-            Filter:
-              S3Key:
-                Rules:
-                  - Name: prefix
-                    Value: feed/
-                  - Name: suffix
-                    Value: .webp
-          - Event: s3:ObjectCreated:Put
-            Queue: !ImportValue
-              Fn::Sub: 'CrowDetectorSQSQueueArn-${Environment}'
-            Filter:
-              S3Key:
-                Rules:
-                  - Name: prefix
-                    Value: detection/
-                  - Name: suffix
-                    Value: .jpg
-          - Event: s3:ObjectCreated:Put
-            Queue: !ImportValue
-              Fn::Sub: 'CrowDetectorSQSQueueArn-${Environment}'
-            Filter:
-              S3Key:
-                Rules:
-                  - Name: prefix
-                    Value: detection/
-                  - Name: suffix
-                    Value: .jpeg
-          - Event: s3:ObjectCreated:Put
-            Queue: !ImportValue
-              Fn::Sub: 'CrowDetectorSQSQueueArn-${Environment}'
-            Filter:
-              S3Key:
-                Rules:
-                  - Name: prefix
-                    Value: detection/
-                  - Name: suffix
-                    Value: .png
-          - Event: s3:ObjectCreated:Put
-            Queue: !ImportValue
-              Fn::Sub: 'CrowDetectorSQSQueueArn-${Environment}'
-            Filter:
-              S3Key:
-                Rules:
-                  - Name: prefix
-                    Value: detection/
-                  - Name: suffix
-                    Value: .gif
-          - Event: s3:ObjectCreated:Put
-            Queue: !ImportValue
-              Fn::Sub: 'CrowDetectorSQSQueueArn-${Environment}'
-            Filter:
-              S3Key:
-                Rules:
-                  - Name: prefix
-                    Value: detection/
-                  - Name: suffix
-                    Value: .bmp
-          - Event: s3:ObjectCreated:Put
-            Queue: !ImportValue
-              Fn::Sub: 'CrowDetectorSQSQueueArn-${Environment}'
-            Filter:
-              S3Key:
-                Rules:
-                  - Name: prefix
-                    Value: detection/
-                  - Name: suffix
-                    Value: .webp
 
   CrowDetectorImagesBucketPolicy:
     Type: AWS::S3::BucketPolicy

@@ -30,28 +30,27 @@ const REQUIRED_GATES = [
     name: 'hooks',
     command: 'git config core.hooksPath && test -d .husky/_',
   },
-  { name: 'lint', command: 'make lint && make lambda-lint' },
+  { name: 'lint', command: 'make lint' },
   {
     name: 'typecheck',
     command:
-      'npx tsc --noEmit -p tsconfig.build.json && npx tsc --noEmit -p tsconfig.spec.json && (cd lambda && npx tsc --noEmit -p tsconfig.json && npx tsc --noEmit -p tsconfig.spec.json)',
+      'npx tsc --noEmit -p tsconfig.build.json && npx tsc --noEmit -p tsconfig.spec.json',
   },
   {
     name: 'format',
-    command: 'make format-check && make lambda-format-check',
+    command: 'make format-check',
   },
   {
     name: 'test',
-    command: 'make test && make lambda-test && make porch-test',
+    command: 'make test && make porch-test',
   },
   {
     name: 'build',
-    command: 'make build && make lambda-build',
+    command: 'make build',
   },
   {
     name: 'security',
-    command:
-      'npm audit --audit-level=high && (cd lambda && npm audit --audit-level=high)',
+    command: 'npm audit --audit-level=high',
   },
 ];
 
@@ -169,10 +168,7 @@ const classifyPath = (filePath) => {
   if (filePath.startsWith('.github/')) {
     return 'workflow';
   }
-  if (
-    filePath.startsWith('cloudformation/') ||
-    filePath.startsWith('lambda/cloudformation/')
-  ) {
+  if (filePath.startsWith('cloudformation/')) {
     return 'infra';
   }
   if (
@@ -195,7 +191,6 @@ const classifyPath = (filePath) => {
   }
   if (
     filePath.startsWith('src/') ||
-    filePath.startsWith('lambda/src/') ||
     filePath.startsWith('pi/') ||
     filePath === 'Dockerfile' ||
     filePath === 'api.yaml'
