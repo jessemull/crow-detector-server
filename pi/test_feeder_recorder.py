@@ -86,17 +86,19 @@ class RecordClipTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "proof.mp4"
             original_url = feeder.RTSP_URL
-            original_run = feeder.subprocess.run
-            feeder.RTSP_URL = "rtsp://user:pass@10.0.0.5/stream1"
-            feeder.subprocess.run = fake_run  # type: ignore[method-assign]
-            try:
-                feeder.record_clip(out, 12)
-            finally:
-                feeder.RTSP_URL = original_url
-                feeder.subprocess.run = original_run  # type: ignore[method-assign]
+            with (
+                mock.patch.object(feeder.shutil, "which", return_value="/usr/bin/ffmpeg"),
+                mock.patch.object(feeder.subprocess, "run", side_effect=fake_run),
+            ):
+                feeder.RTSP_URL = "rtsp://user:pass@10.0.0.5/stream1"
+                try:
+                    feeder.record_clip(out, 12)
+                finally:
+                    feeder.RTSP_URL = original_url
 
         self.assertEqual(len(calls), 1)
         argv = calls[0]
+        self.assertEqual(argv[0], "/usr/bin/ffmpeg")
         self.assertIn("libx264", argv)
         self.assertIn("yuv420p", argv)
         self.assertIn("+faststart", argv)

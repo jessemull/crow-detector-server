@@ -116,6 +116,24 @@ paths:
         '500':
           description: Internal server error
 
+  /feeder/status:
+    get:
+      summary: Public feeder cooldown status
+      description: |
+        Whether the public Feed button can fire, when the cooldown ends, and the
+        most recent ready feed timestamp. Rate-limited.
+      tags:
+        - Feeder
+      responses:
+        '200':
+          description: Feeder status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeederStatus'
+        '429':
+          description: Too many requests
+
   /feeder/dispense:
     post:
       summary: Request a feeder dispense proof
@@ -133,9 +151,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DispenseRequest'
+                $ref: '#/components/schemas/DispenseCreateResponse'
         '409':
           description: Cooldown is active
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeederCooldownConflict'
         '429':
           description: Too many requests
         '503':
@@ -225,12 +247,33 @@ paths:
         '403':
           description: Caller is not the feeder host
 
+  /feeder/feeds:
+    get:
+      summary: List feed sections with proof and visit clips
+      description: |
+        Public gallery (rate-limited). Each ready dispense is a section with a
+        re-signed proof clip and visits in that feed's time window (or linked by
+        dispenseRequestId). Visits before the oldest listed feed are returned as
+        ungroupedVisits.
+      tags:
+        - Feeder
+      responses:
+        '200':
+          description: Feed sections
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeederFeedsResponse'
+        '429':
+          description: Too many requests
+
   /feeder/clips:
     get:
       summary: List feeder visit clips
       description: |
         Public list of stored feeder visits (rate-limited). When FEEDER_REQUIRE_ANIMAL
         is off on the host, motion visits may be published without Claude classify.
+        Prefer GET /feeder/feeds for the Feeder Cam gallery.
       tags:
         - Feeder
       responses:
@@ -417,6 +460,115 @@ components:
         updatedAt:
           type: string
           format: date-time
+
+    DispenseCreateResponse:
+      type: object
+      required:
+        - id
+        - status
+        - cooldownEndsAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [requested, recording, ready, failed]
+        cooldownEndsAt:
+          type: string
+          format: date-time
+
+    FeederStatus:
+      type: object
+      required:
+        - canFeed
+        - cooldownEndsAt
+        - lastFeedAt
+        - lastFeedId
+      properties:
+        canFeed:
+          type: boolean
+        cooldownEndsAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastFeedAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastFeedId:
+          type: string
+          format: uuid
+          nullable: true
+
+    FeederCooldownConflict:
+      type: object
+      required:
+        - message
+        - cooldownEndsAt
+      properties:
+        statusCode:
+          type: integer
+          example: 409
+        error:
+          type: string
+          example: Conflict
+        message:
+          type: string
+        cooldownEndsAt:
+          type: string
+          format: date-time
+
+    FeederFeedProof:
+      type: object
+      required:
+        - playbackUrl
+        - expiresAt
+      properties:
+        playbackUrl:
+          type: string
+          format: uri
+        expiresAt:
+          type: string
+          format: date-time
+
+    FeederFeed:
+      type: object
+      required:
+        - id
+        - fedAt
+        - proof
+        - visits
+      properties:
+        id:
+          type: string
+          format: uuid
+        fedAt:
+          type: string
+          format: date-time
+        proof:
+          allOf:
+            - $ref: '#/components/schemas/FeederFeedProof'
+          nullable: true
+        visits:
+          type: array
+          items:
+            $ref: '#/components/schemas/FeederClip'
+
+    FeederFeedsResponse:
+      type: object
+      required:
+        - feeds
+        - ungroupedVisits
+      properties:
+        feeds:
+          type: array
+          items:
+            $ref: '#/components/schemas/FeederFeed'
+        ungroupedVisits:
+          type: array
+          items:
+            $ref: '#/components/schemas/FeederClip'
 
     CompleteDispenseDTO:
       type: object
