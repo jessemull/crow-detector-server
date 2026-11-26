@@ -125,11 +125,11 @@ Resources:
           SecurityGroups:
             # aws-infra-ecs-sg must allow port 3000 only from the ALB. This repo does not own that group.
             - !ImportValue 'aws-infra-ecs-sg-id'
+          # Only AZs where the ALB is registered (public 1+2 → 2a/2b).
+          # Tasks in 2c/2d fail ELB health checks: AZ not enabled for the LB.
           Subnets:
             - !ImportValue 'aws-infra-private-subnet-1-id' # us-west-2a
             - !ImportValue 'aws-infra-private-subnet-2-id' # us-west-2b
-            - !ImportValue 'aws-infra-private-subnet-3-id' # us-west-2c
-            - !ImportValue 'aws-infra-private-subnet-4-id' # us-west-2d
 
 Outputs:
   TaskDefinitionArn:
