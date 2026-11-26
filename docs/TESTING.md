@@ -27,6 +27,7 @@ Integration against real AWS, RDS, or Claude is **out of scope** for the default
 - Co-located: `foo.ts` → `foo.spec.ts`
 - Jest config: `jest.config.js` (`testRegex: (src/.*\\.spec\\.ts|scripts/review/.*\\.test\\.js)$`)
 - Setup: `test/setup.ts`
+- Nest 12 ships ESM. `npm test` sets `NODE_OPTIONS=--experimental-vm-modules` so Jest can `require()` those packages on Node 26.
 
 ### LAN recorders (`pi/`)
 

@@ -225,7 +225,9 @@ export class DispenseRequestService {
   ): Promise<DispenseRequest | null> {
     const query = manager
       .createQueryBuilder(DispenseRequest, 'request')
-      .setLock('pessimistic_partial_write')
+      // TypeORM 1 dropped pessimistic_partial_write; SKIP LOCKED is the same idea.
+      .setLock('pessimistic_write')
+      .setOnLocked('skip_locked')
       .where('request.status = :status', { status })
       .orderBy('request.createdAt', 'ASC');
     if (updatedBefore) {

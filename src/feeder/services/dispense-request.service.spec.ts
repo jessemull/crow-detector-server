@@ -23,6 +23,7 @@ describe('DispenseRequestService', () => {
   const rows: Array<DispenseRequest | null> = [];
   const queryBuilder = {
     setLock: jest.fn().mockReturnThis(),
+    setOnLocked: jest.fn().mockReturnThis(),
     where: jest.fn().mockReturnThis(),
     andWhere: jest.fn().mockReturnThis(),
     orderBy: jest.fn().mockReturnThis(),
@@ -63,6 +64,7 @@ describe('DispenseRequestService', () => {
     jest.clearAllMocks();
     rows.length = 0;
     queryBuilder.setLock.mockReturnThis();
+    queryBuilder.setOnLocked.mockReturnThis();
     queryBuilder.where.mockReturnThis();
     queryBuilder.andWhere.mockReturnThis();
     queryBuilder.orderBy.mockReturnThis();
@@ -199,9 +201,8 @@ describe('DispenseRequestService', () => {
     const result = await service.claimNext();
 
     expect(result?.status).toBe(DispenseStatus.RECORDING);
-    expect(queryBuilder.setLock).toHaveBeenCalledWith(
-      'pessimistic_partial_write',
-    );
+    expect(queryBuilder.setLock).toHaveBeenCalledWith('pessimistic_write');
+    expect(queryBuilder.setOnLocked).toHaveBeenCalledWith('skip_locked');
     expect(update).toHaveBeenCalledWith(
       DispenseRequest,
       { id: 'req-1', status: DispenseStatus.REQUESTED },
