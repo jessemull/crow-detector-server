@@ -2,20 +2,14 @@ import {
   BadRequestException,
   Injectable,
   InternalServerErrorException,
-  NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
-  CreateFeedImageUrlDto,
-  CreateDetectionImageUrlDto,
   CreatePorchClipUrlDto,
   CreateFeederClipUrlDto,
   FEEDER_CLIP_CONTENT_TYPE,
   FEEDER_CLIP_MAX_BYTES,
 } from '../dto';
-import { FeedEvent } from '../../feed/entity/feed-event.entity';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { s3ClientOptions } from 'src/common/aws/client-options';
@@ -27,11 +21,7 @@ export class UrlsService {
   private readonly s3Client: S3Client;
   private readonly bucketName: string;
 
-  constructor(
-    private readonly configService: ConfigService,
-    @InjectRepository(FeedEvent)
-    private readonly feedEventRepository: Repository<FeedEvent>,
-  ) {
+  constructor(private readonly configService: ConfigService) {
     this.s3Client = new S3Client(
       s3ClientOptions(
         this.configService.get<string>('awsRegion') || 'us-west-2',
@@ -45,125 +35,6 @@ export class UrlsService {
     }
 
     this.bucketName = bucketName;
-  }
-
-  async createFeedImageSignedUrl(createFeedImageUrlDto: CreateFeedImageUrlDto) {
-    const { fileName, format, source, contentLength } = createFeedImageUrlDto;
-    const safeName = this.sanitizeObjectFileName(
-      fileName,
-      'Invalid feed image file name',
-    );
-
-    const timestamp = Date.now();
-    const key = `feed/${timestamp}-${safeName}.${format}`;
-
-    const command = new PutObjectCommand({
-      Bucket: this.bucketName,
-      Key: key,
-      ContentType: this.getContentType(format),
-      ContentLength: contentLength,
-      ServerSideEncryption: 'AES256',
-      Metadata: {
-        'x-amz-meta-timestamp': timestamp.toString(),
-        'x-amz-meta-source': source,
-        'x-amz-meta-type': 'feed',
-      },
-    });
-
-    try {
-      const signedUrl = await getSignedUrl(
-        this.s3Client,
-        command,
-        presignPutOptions(),
-      );
-
-      return {
-        signedUrl,
-        key,
-        expiresAt: new Date(Date.now() + 900 * 1000).toISOString(),
-        bucket: this.bucketName,
-        metadata: {
-          timestamp,
-          source,
-          type: 'feed',
-        },
-      };
-    } catch (error) {
-      logger.error(
-        { error: error instanceof Error ? error.message : String(error) },
-        'Failed to generate feed image signed URL',
-      );
-      throw new InternalServerErrorException(
-        'Failed to generate feed image signed URL',
-      );
-    }
-  }
-
-  async createDetectionImageSignedUrl(
-    createDetectionImageUrlDto: CreateDetectionImageUrlDto,
-  ) {
-    const { fileName, format, contentLength } = createDetectionImageUrlDto;
-
-    // Get the latest feed event ID from the database...
-
-    const latestFeedEvents = await this.feedEventRepository.find({
-      order: { createdAt: 'DESC' },
-      take: 1,
-    });
-
-    const latestFeedEvent = latestFeedEvents[0];
-
-    if (!latestFeedEvent) {
-      throw new NotFoundException(
-        'No feed events found. Please create a feed event first.',
-      );
-    }
-
-    const feedEventId = latestFeedEvent.id;
-    const timestamp = Date.now();
-    const uniqueFileName = `${timestamp}-${fileName}`;
-    const key = `detection/${feedEventId}/${uniqueFileName}.${format}`;
-
-    const command = new PutObjectCommand({
-      Bucket: this.bucketName,
-      Key: key,
-      ContentType: this.getContentType(format),
-      ContentLength: contentLength,
-      ServerSideEncryption: 'AES256',
-      Metadata: {
-        'x-amz-meta-timestamp': timestamp.toString(),
-        'x-amz-meta-feed-event-id': feedEventId,
-        'x-amz-meta-type': 'detection',
-      },
-    });
-
-    try {
-      const signedUrl = await getSignedUrl(
-        this.s3Client,
-        command,
-        presignPutOptions(),
-      );
-
-      return {
-        signedUrl,
-        key,
-        expiresAt: new Date(Date.now() + 900 * 1000).toISOString(),
-        bucket: this.bucketName,
-        metadata: {
-          timestamp,
-          feedEventId,
-          type: 'detection',
-        },
-      };
-    } catch (error) {
-      logger.error(
-        { error: error instanceof Error ? error.message : String(error) },
-        'Failed to generate detection image signed URL',
-      );
-      throw new InternalServerErrorException(
-        'Failed to generate detection image signed URL',
-      );
-    }
   }
 
   async createPorchClipSignedUrl(createPorchClipUrlDto: CreatePorchClipUrlDto) {
@@ -307,24 +178,6 @@ export class UrlsService {
     }
 
     return safeName;
-  }
-
-  private getContentType(format: string): string {
-    switch (format.toLowerCase()) {
-      case 'jpg':
-      case 'jpeg':
-        return 'image/jpeg';
-      case 'png':
-        return 'image/png';
-      case 'gif':
-        return 'image/gif';
-      case 'bmp':
-        return 'image/bmp';
-      case 'webp':
-        return 'image/webp';
-      default:
-        return 'application/octet-stream';
-    }
   }
 }
 

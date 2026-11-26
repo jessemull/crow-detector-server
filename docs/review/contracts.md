@@ -17,7 +17,7 @@ Record the search and every hit. Read each caller. The Nest tree and `lambda/` d
 Contracts a reviewer must trace:
 
 - ECDSA signed string: `method + url + JSON.stringify(body) + timestamp`, built in `src/auth/middleware/ecdsa-auth.guard.ts`, `lambda/src/util/auth.ts`, `pi/record_on_motion_lib.py`, and `scripts/generate-auth-token.ts`. All four must build the same string.
-- Device ids: `pi-user`, `pi-motion`, `pi-feeder`, `pi-porch`, `lambda-s3`.
+- Device ids: `pi-user`, `pi-feeder`, `pi-porch` (`pi-motion` / `lambda-s3` removed with the photo pipeline).
 - S3 prefixes: `feed/`, `detection/`, `porch/`. The Lambda and the bucket notifications must agree on which suffixes each prefix handles.
 - Porch clip list: the JSON shape `api.yaml` and `porch-clips.service.ts` return, which the client renders.
 - Presigned URL responses: field names and expiry units shared with the uploaders.

@@ -1,8 +1,8 @@
 #!/usr/bin/env ts-node
 
 import { DataSource } from 'typeorm';
-import { DetectionEvent } from '../../src/detection/entity/detection-event.entity';
-import { FeedEvent } from '../../src/feed/entity/feed-event.entity';
+import { DispenseRequest } from '../../src/feeder/entity/dispense-request.entity';
+import { FeederVisit } from '../../src/feeder/entity/feeder-visit.entity';
 import { config } from 'dotenv';
 import { createLogger } from '../../src/common/logger/logger.config';
 import { buildRdsSslOptions } from '../../src/config/rds-ca';
@@ -27,7 +27,7 @@ async function testConnection() {
     username: process.env.RDS_USERNAME,
     password: process.env.RDS_PASSWORD,
     database: process.env.RDS_DATABASE,
-    entities: [FeedEvent, DetectionEvent],
+    entities: [DispenseRequest, FeederVisit],
     synchronize: false,
     logging: true,
     ssl: postgresSsl(),
@@ -54,15 +54,15 @@ async function testConnection() {
       'Current database time',
     );
 
-    const feedEventCount = await dataSource.getRepository(FeedEvent).count();
-    const detectionEventCount = await dataSource
-      .getRepository(DetectionEvent)
+    const dispenseCount = await dataSource
+      .getRepository(DispenseRequest)
       .count();
+    const visitCount = await dataSource.getRepository(FeederVisit).count();
 
     logger.info(
       {
-        feedEvents: feedEventCount,
-        detectionEvents: detectionEventCount,
+        dispenseRequests: dispenseCount,
+        feederVisits: visitCount,
       },
       'Current table counts',
     );

@@ -2,8 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { UrlsController } from './urls.controller';
 import { UrlsService } from './services/urls.service';
 import { ConfigService } from '@nestjs/config';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { FeedEvent } from '../feed/entity/feed-event.entity';
 
 describe('UrlsModule', () => {
   let module: TestingModule;
@@ -21,16 +19,6 @@ describe('UrlsModule', () => {
               if (key === 's3BucketName') return 'test-bucket';
               return undefined;
             }),
-          },
-        },
-        {
-          provide: getRepositoryToken(FeedEvent),
-          useValue: {
-            findOne: jest.fn(),
-            find: jest.fn(),
-            save: jest.fn(),
-            create: jest.fn(),
-            update: jest.fn(),
           },
         },
       ],

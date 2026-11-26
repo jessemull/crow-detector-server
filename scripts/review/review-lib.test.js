@@ -124,14 +124,11 @@ describe('file measurements', () => {
 
   it.each([
     ['package-lock.json', 'lockfile'],
-    ['lambda/package-lock.json', 'lockfile'],
     ['next-env.d.ts', 'generated'],
     ['certs/rds-global-bundle.pem', 'generated'],
     ['.github/workflows/merge.yml', 'workflow'],
     ['cloudformation/stack.yml', 'infra'],
-    ['lambda/cloudformation/crow-detector-sqs.yaml', 'infra'],
     ['src/auth/middleware/ecdsa-auth.guard.spec.ts', 'test'],
-    ['lambda/src/util/api.test.ts', 'test'],
     ['pi/test_record_on_motion_lib.py', 'test'],
     ['test/setup.ts', 'test'],
     ['jest.setup.ts', 'test'],
@@ -141,12 +138,10 @@ describe('file measurements', () => {
     ['scripts/porch-recorder.service', 'script'],
     ['.husky/pre-push', 'script'],
     ['src/main.ts', 'source'],
-    ['lambda/src/index.ts', 'source'],
     ['pi/record-on-motion.py', 'source'],
     ['Dockerfile', 'source'],
     ['api.yaml', 'source'],
     ['package.json', 'config'],
-    ['lambda/webpack.config.js', 'config'],
   ])('classifies %s as %s', (filePath, category) => {
     expect(classifyPath(filePath)).toBe(category);
   });

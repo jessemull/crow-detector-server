@@ -61,16 +61,6 @@ Resources:
                 Action:
                   - s3:ListBucket
                 Resource: !Sub 'arn:${AWS::Partition}:s3:::crow-detector-images-${Environment}'
-        - PolicyName: RekognitionAccess
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  # Animal photos are named by Claude. The feed still uses these two.
-                  - rekognition:DetectFaces
-                  - rekognition:DetectModerationLabels
-                Resource: '*'
 
 Outputs:
   TaskExecutionRoleArn:

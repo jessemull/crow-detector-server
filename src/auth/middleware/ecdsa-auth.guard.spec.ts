@@ -30,7 +30,6 @@ describe('EcdsaAuthGuard', () => {
 
   beforeEach(async () => {
     delete process.env.NODE_ENV;
-    delete process.env.PI_MOTION_PUBLIC_KEY;
     delete process.env.PI_FEEDER_PUBLIC_KEY;
 
     process.env.PI_USER_PUBLIC_KEY = 'test-public-key';
@@ -43,8 +42,8 @@ describe('EcdsaAuthGuard', () => {
 
     mockRequest = {
       method: 'POST',
-      url: '/detection',
-      body: { confidence: 0.85, imageUrl: 'test.jpg' },
+      url: '/urls/porch',
+      body: { fileName: 'clip-1', contentLength: 1200 },
       headers: {},
     };
 
@@ -297,7 +296,7 @@ describe('EcdsaAuthGuard', () => {
       const result = guard.canActivate(mockContext);
 
       const timestamp = String(mockRequest.headers['x-timestamp']);
-      const expectedData = `POST/detection{"confidence":0.85,"imageUrl":"test.jpg"}${timestamp}`;
+      const expectedData = `POST/urls/porch{"fileName":"clip-1","contentLength":1200}${timestamp}`;
       expect(mockVerifier.update).toHaveBeenCalledWith(expectedData);
       expect(result).toBe(true);
     });
@@ -314,7 +313,7 @@ describe('EcdsaAuthGuard', () => {
       const result = guard.canActivate(mockContext);
 
       const timestamp = String(mockRequest.headers['x-timestamp']);
-      const expectedData = `POST/detection{}${timestamp}`;
+      const expectedData = `POST/urls/porch{}${timestamp}`;
       expect(mockVerifier.update).toHaveBeenCalledWith(expectedData);
       expect(result).toBe(true);
     });
@@ -323,7 +322,8 @@ describe('EcdsaAuthGuard', () => {
       const mockRequestWithDifferentMethod = {
         ...mockRequest,
         method: 'PATCH',
-        url: '/feed',
+        url: '/feeder/dispense',
+        body: { note: 'test' },
       };
       const mockVerifier = {
         update: jest.fn().mockReturnThis(),
@@ -341,7 +341,7 @@ describe('EcdsaAuthGuard', () => {
       const timestamp = String(
         mockRequestWithDifferentMethod.headers['x-timestamp'],
       );
-      const expectedData = `PATCH/feed{"confidence":0.85,"imageUrl":"test.jpg"}${timestamp}`;
+      const expectedData = `PATCH/feeder/dispense{"note":"test"}${timestamp}`;
       expect(mockVerifier.update).toHaveBeenCalledWith(expectedData);
       expect(result).toBe(true);
     });

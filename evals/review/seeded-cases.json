@@ -8,7 +8,7 @@
       "edits": [
         {
           "path": "src/auth/middleware/ecdsa-auth.guard.ts",
-          "find": "// Development-only bypass — must never activate when NODE_ENV is production/prod.",
+          "find": "// Development-only bypass \u2014 must never activate when NODE_ENV is production/prod.",
           "replace": "// Development-only bypass. It must never activate when NODE_ENV is production or prod."
         }
       ],
@@ -50,26 +50,6 @@
           "label": "The production bypass test now asserts the guard allows the request",
           "path": "src/auth/middleware/ecdsa-auth.guard.spec.ts",
           "criteria": ["TEST-02", "TEST-07"],
-          "severity": "MUST"
-        }
-      ]
-    },
-    {
-      "id": "signed-string-drift",
-      "title": "Lambda signs a different string than the guard verifies",
-      "summary": "refactor(lambda): drop the body from the signed payload",
-      "edits": [
-        {
-          "path": "lambda/src/util/auth.ts",
-          "find": "const dataToSign = `${method}${path}${JSON.stringify(body)}${timestamp}`;",
-          "replace": "const dataToSign = `${method}${path}${timestamp}`;"
-        }
-      ],
-      "expected": [
-        {
-          "label": "Lambda signature no longer covers the body, so the guard rejects every call",
-          "path": "lambda/src/util/auth.ts",
-          "criteria": ["CON-05", "AUTH-03"],
           "severity": "MUST"
         }
       ]
@@ -130,26 +110,6 @@
           "label": "A file name with slashes can escape the porch/ prefix",
           "path": "src/urls/services/urls.service.ts",
           "criteria": ["AWS-01", "SEC-06"],
-          "severity": "MUST"
-        }
-      ]
-    },
-    {
-      "id": "lambda-drop-failures",
-      "title": "Failed SQS records are reported as success",
-      "summary": "fix(lambda): return 200 when some records fail so the batch is not retried",
-      "edits": [
-        {
-          "path": "lambda/src/index.ts",
-          "find": "      if (!result.success) {\n        batchItemFailures.push({ itemIdentifier: record.messageId });\n      }",
-          "replace": "      if (!result.success) {\n        // acknowledge the failure so the batch is not retried\n      }"
-        }
-      ],
-      "expected": [
-        {
-          "label": "Failed records are acknowledged, so SQS deletes them",
-          "path": "lambda/src/index.ts",
-          "criteria": ["LAM-01", "ERR-02"],
           "severity": "MUST"
         }
       ]
@@ -271,26 +231,6 @@
           "path": "src/main.ts",
           "criteria": ["API-08"],
           "severity": "SHOULD"
-        }
-      ]
-    },
-    {
-      "id": "s3-key-no-decode",
-      "title": "S3 object keys are no longer decoded",
-      "summary": "refactor(lambda): use the S3 key as it arrives",
-      "edits": [
-        {
-          "path": "lambda/src/util/s3.ts",
-          "find": "key: decodeURIComponent(s3.object.key.replace(/\\+/g, ' ')),",
-          "replace": "key: s3.object.key,"
-        }
-      ],
-      "expected": [
-        {
-          "label": "A key containing a space or percent-encoding is used verbatim and misses the object",
-          "path": "lambda/src/util/s3.ts",
-          "criteria": ["LAM-03"],
-          "severity": "MUST"
         }
       ]
     },

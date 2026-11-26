@@ -38,17 +38,14 @@ Public keys are typically base64-encoded PEM strings:
 | Variable               | Description                 | Required |
 | ---------------------- | --------------------------- | -------- |
 | `PI_USER_PUBLIC_KEY`   | User Pi device public key   | Prod yes |
-| `PI_MOTION_PUBLIC_KEY` | Motion Pi device public key | Prod yes |
 | `PI_FEEDER_PUBLIC_KEY` | Feeder Pi device public key | Prod yes |
 | `PI_PORCH_PUBLIC_KEY`  | Porch camera Pi public key  | Prod yes |
-| `LAMBDA_S3_PUBLIC_KEY` | S3 Lambda caller public key | Prod yes |
 
 Local helpers may also use filesystem paths (scripts only):
 
 | Variable                     | Description                |
 | ---------------------------- | -------------------------- |
 | `PI_USER_PRIVATE_KEY_PATH`   | Path to user private key   |
-| `PI_MOTION_PRIVATE_KEY_PATH` | Path to motion private key |
 | `PI_FEEDER_PRIVATE_KEY_PATH` | Path to feeder private key |
 | `PI_PORCH_PRIVATE_KEY_PATH`  | Path to porch private key  |
 
@@ -129,19 +126,18 @@ Example: `DEPLOY_HOST=juzu-inui FEEDER_GIT_REF=feat/feeder-video ./scripts/deplo
 
 Example: `DEPLOY_HOST=juzu-inui FEEDER_GIT_REF=feat/feeder-video ./scripts/deploy-feeder-visits-host.sh`
 
-Legacy Pi helpers still exist: `npm run pi:sync` / `pi:start` / `pi:stop` (hardcoded old `critter-cam.local` paths). The outdoor porch path is **LAN host + RTSP**, not Pi CSI/PIR.
+The outdoor porch and feeder paths are **LAN host + RTSP**, not Pi CSI/PIR. Drop leftover photo tables with `scripts/db-seed/drop-photo-pipeline.sql` (hand-applied).
 
 ---
 
 ## AWS / S3 / AI (Nest)
 
-| Variable              | Description         | Required | Default            |
-| --------------------- | ------------------- | -------- | ------------------ |
-| `AWS_REGION`          | AWS region          | No       | `us-west-2`        |
-| `S3_BUCKET_NAME`      | Image bucket        | Yes      | -                  |
-| `CLAUDE_API_KEY`      | Anthropic API key   | Prod yes | -                  |
-| `CLAUDE_MODEL`        | Claude model id     | No       | `claude-haiku-5-5` |
-| `FEED_COOLDOWN_HOURS` | Hours between feeds | No       | `4`                |
+| Variable         | Description       | Required | Default            |
+| ---------------- | ----------------- | -------- | ------------------ |
+| `AWS_REGION`     | AWS region        | No       | `us-west-2`        |
+| `S3_BUCKET_NAME` | Images bucket     | Yes      | -                  |
+| `CLAUDE_API_KEY` | Anthropic API key | Prod yes | -                  |
+| `CLAUDE_MODEL`   | Claude model id   | No       | `claude-haiku-5-5` |
 
 ---
 
@@ -160,17 +156,9 @@ Legacy Pi helpers still exist: `npm run pi:sync` / `pi:start` / `pi:stop` (hardc
 
 ---
 
-## Lambda package
+## Photo Lambda (removed)
 
-| Variable                | Description                                  | Required |
-| ----------------------- | -------------------------------------------- | -------- |
-| `API_BASE_URL`          | Nest API base URL. There is no code default. | Yes      |
-| `DETECTION_ENDPOINT`    | Detection path (default `/detection`)        | No       |
-| `FEED_ENDPOINT`         | Feed path (default `/feed`)                  | No       |
-| `LAMBDA_S3_PRIVATE_KEY` | Base64 private key for ECDSA signing         | Yes      |
-| `NODE_ENV`              | `test` keeps the Lambda logger quiet         | No       |
-
-Webpack may embed defaults for local packaging; runtime env in AWS should set real values.
+The nested `lambda/` package and S3→SQS photo event path are gone. Do not set `LAMBDA_S3_*`, `DETECTION_ENDPOINT`, or `FEED_ENDPOINT`.
 
 ---
 

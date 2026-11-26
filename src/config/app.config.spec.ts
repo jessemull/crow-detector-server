@@ -58,10 +58,8 @@ describe('app.config', () => {
           S3_BUCKET_NAME: 'bucket',
           CLAUDE_API_KEY: 'key',
           PI_USER_PUBLIC_KEY: 'a',
-          PI_MOTION_PUBLIC_KEY: 'b',
           PI_FEEDER_PUBLIC_KEY: 'c',
           PI_PORCH_PUBLIC_KEY: 'e',
-          LAMBDA_S3_PUBLIC_KEY: 'd',
         }),
       ),
     ).not.toThrow();

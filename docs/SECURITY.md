@@ -30,11 +30,11 @@
 
 Devices authenticate with headers:
 
-- `x-device-id` — one of `pi-user`, `pi-motion`, `pi-feeder`, `pi-porch`, `lambda-s3`
+- `x-device-id` — one of `pi-user`, `pi-feeder`, `pi-porch`
 - `x-signature` — base64 ECDSA signature
 - `x-timestamp` — ms epoch (replay window enforced)
 
-Public keys are loaded from env (`PI_*_PUBLIC_KEY`, `LAMBDA_S3_PUBLIC_KEY`), typically base64-encoded PEM from Secrets Manager in ECS.
+Public keys are loaded from env (`PI_USER_PUBLIC_KEY`, `PI_FEEDER_PUBLIC_KEY`, `PI_PORCH_PUBLIC_KEY`), typically base64-encoded PEM from Secrets Manager in ECS.
 
 ### Development bypass
 
@@ -59,12 +59,11 @@ In `production` / `prod`, CA verification is always on. Outside those environmen
 
 ## AWS IAM & infrastructure
 
-- Least privilege for ECS task roles and Lambda roles.
+- Least privilege for ECS task roles.
 - Broadening IAM or security groups requires human review.
 - S3 buckets should not be public; use presigned URLs.
-- Rekognition may require broad `Detect*` resource ARNs (`*`) — AWS service limitation; do not invent a finding if required.
 - Shared network resources come from `aws-infra-*` `ImportValue`s — do not hardcode subnet/SG IDs from other projects.
-- Infrastructure changes live in `cloudformation/` and `lambda/cloudformation/` and require human approval.
+- Infrastructure changes live in `cloudformation/` and require human approval.
 
 ### SHOULD (follow-up)
 
@@ -76,7 +75,7 @@ In `production` / `prod`, CA verification is always on. Outside those environmen
 
 - New npm dependencies require human approval (`docs/GOVERNANCE.md`).
 - Prefer maintained packages with clear licenses (MIT/BSD/Apache).
-- Keep root and `lambda/` lockfiles intentional — no drive-by churn.
+- Keep the root lockfile intentional — no drive-by churn.
 - CI runs `npm audit --audit-level=high` as a **blocking** gate once the tree is clean.
 
 ---

@@ -7,12 +7,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { FastifyRequest } from 'fastify';
-import {
-  CreateFeedImageUrlDto,
-  CreateDetectionImageUrlDto,
-  CreatePorchClipUrlDto,
-  CreateFeederClipUrlDto,
-} from './dto';
+import { CreatePorchClipUrlDto, CreateFeederClipUrlDto } from './dto';
 import { UrlsService } from './services/urls.service';
 import { EcdsaAuthGuard } from '../auth/middleware/ecdsa-auth.guard';
 
@@ -21,24 +16,6 @@ type DeviceRequest = FastifyRequest & { deviceId?: string };
 @Controller('urls')
 export class UrlsController {
   constructor(private readonly urlsService: UrlsService) {}
-
-  @Post('feed')
-  @UseGuards(EcdsaAuthGuard)
-  async createFeedImageSignedUrl(
-    @Body() createFeedImageUrlDto: CreateFeedImageUrlDto,
-  ) {
-    return this.urlsService.createFeedImageSignedUrl(createFeedImageUrlDto);
-  }
-
-  @Post('detection')
-  @UseGuards(EcdsaAuthGuard)
-  async createDetectionImageSignedUrl(
-    @Body() createDetectionImageUrlDto: CreateDetectionImageUrlDto,
-  ) {
-    return this.urlsService.createDetectionImageSignedUrl(
-      createDetectionImageUrlDto,
-    );
-  }
 
   @Post('feeder')
   @UseGuards(EcdsaAuthGuard)

@@ -1,7 +1,6 @@
 import { DataSource } from 'typeorm';
-import { DetectionEvent } from '../../src/detection/entity/detection-event.entity';
-import { FeedEvent } from '../../src/feed/entity/feed-event.entity';
-import { FeedEventSeeder, DetectionEventSeeder } from './seeders';
+import { DispenseRequest } from '../../src/feeder/entity/dispense-request.entity';
+import { FeederVisit } from '../../src/feeder/entity/feeder-visit.entity';
 import { createLogger } from '../../src/common/logger/logger.config';
 import { buildRdsSslOptions } from '../../src/config/rds-ca';
 
@@ -34,7 +33,7 @@ export class DatabaseSeeder {
       username: process.env.RDS_USERNAME,
       password: process.env.RDS_PASSWORD,
       database: process.env.RDS_DATABASE,
-      entities: [FeedEvent, DetectionEvent],
+      entities: [DispenseRequest, FeederVisit],
       synchronize: false,
       logging: process.env.NODE_ENV === 'development',
       ssl: postgresSsl(),
@@ -58,62 +57,27 @@ export class DatabaseSeeder {
     }
   }
 
-  async seed(): Promise<void> {
+  seed(): void {
     assertLocalDatabase('seed');
-    try {
-      this.logger.info('Starting database seeding...');
-
-      const feedEventSeeder = new FeedEventSeeder(this.dataSource);
-      await feedEventSeeder.seed();
-
-      const detectionEventSeeder = new DetectionEventSeeder(this.dataSource);
-      await detectionEventSeeder.seed();
-
-      this.logger.info('Database seeding completed successfully!');
-    } catch (error) {
-      this.logger.error({ error }, 'Seeding failed');
-      throw error;
-    }
+    this.logger.info(
+      'No feed or detection seeders remain. Apply scripts/db-seed/feeder-video.sql for feeder tables.',
+    );
   }
 
-  async reset(): Promise<void> {
+  reset(): void {
     assertLocalDatabase('reset');
-    try {
-      this.logger.info('Starting database reset...');
-
-      const detectionEventSeeder = new DetectionEventSeeder(this.dataSource);
-      await detectionEventSeeder.clear();
-
-      const feedEventSeeder = new FeedEventSeeder(this.dataSource);
-      await feedEventSeeder.clear();
-
-      this.logger.info('Database reset completed successfully!');
-    } catch (error) {
-      this.logger.error({ error }, 'Reset failed');
-      throw error;
-    }
+    this.logger.info(
+      'No feed or detection seeders remain. Drop those tables with scripts/db-seed/drop-photo-pipeline.sql.',
+    );
   }
 
-  async synchronize(): Promise<void> {
+  synchronize(): void {
     assertLocalDatabase('synchronize');
-
-    try {
-      this.logger.info('Starting database synchronization...');
-
-      const detectionEventSeeder = new DetectionEventSeeder(this.dataSource);
-      await detectionEventSeeder.drop();
-
-      const feedEventSeeder = new FeedEventSeeder(this.dataSource);
-      await feedEventSeeder.drop();
-
-      this.logger.info('Tables dropped successfully');
-      this.logger.info(
-        'Nest will not recreate them: TypeORM synchronize is false.',
-      );
-      this.logger.info('Apply the schema yourself, then run: npm run db:seed');
-    } catch (error) {
-      this.logger.error({ error }, 'Synchronization failed');
-      throw error;
-    }
+    this.logger.info(
+      'Nest will not recreate tables: TypeORM synchronize is false.',
+    );
+    this.logger.info(
+      'Apply schema by hand (scripts/db-seed/*.sql), then seed if needed.',
+    );
   }
 }

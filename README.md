@@ -206,11 +206,9 @@ To clone the repository, install dependencies, and run the project locally follo
    CLAUDE_MODEL=claude-haiku-5-5
 
    # Feed Configuration
-   FEED_COOLDOWN_HOURS=4
 
    # Private Key Paths (for token generation)
    PI_USER_PRIVATE_KEY_PATH=/path/to/pi-user-private.pem
-   PI_MOTION_PRIVATE_KEY_PATH=/path/to/pi-motion-private.pem
    PI_FEEDER_PRIVATE_KEY_PATH=/path/to/pi-feeder-private.pem
    ```
 
@@ -260,7 +258,6 @@ The system uses ECDSA (Elliptic Curve Digital Signature Algorithm) for device au
 ### Device Types
 
 - **pi-user**: User interaction device (camera, LCD, feed button).
-- **pi-motion**: Motion detection device (PIR sensor, night vision camera).
 - **pi-porch**: Porch camera device (motion clips under `porch/`).
 - **pi-feeder**: Feeder host. Signs dispense proofs and animal-visit uploads. The relay is separate hardware and is not driven by the recorder.
 
@@ -277,10 +274,10 @@ Use the included authentication token generator:
 
 ```bash
 # Generate token for feed URL endpoint
-npm run auth:token POST /urls/feed '{"fileName":"test","format":"jpg","source":"motion","contentLength":1024}'
+npm run auth:token POST /urls/porch '{"fileName":"clip-1","contentLength":1200}' pi-porch
 
 # Generate token for detection URL endpoint
-npm run auth:token POST /urls/detection '{"fileName":"detection","format":"jpg","contentLength":1024}' pi-motion
+npm run auth:token POST /urls/feeder '{"fileName":"proof-1","contentLength":4096,"contentType":"video/mp4"}' pi-feeder
 ```
 
 ## Image Upload System
@@ -289,8 +286,6 @@ The system provides secure image upload capabilities through pre-signed S3 URLs:
 
 ### Upload Endpoints
 
-- **`POST /urls/feed`**: Generate signed URL for user interaction images.
-- **`POST /urls/detection`**: Generate signed URL for motion detection images.
 - **`POST /urls/porch`**: Generate signed URL for porch-camera mp4 uploads.
 - **`POST /urls/feeder`**: Generate a size-capped signed URL for feeder mp4 uploads (`pi-feeder`).
 - **`GET /porch/clips`**: Public list of porch clips with short-lived playback URLs.
@@ -299,13 +294,12 @@ The system provides secure image upload capabilities through pre-signed S3 URLs:
 
 ### S3 Organization
 
-- **Feed Images**: `feed/{timestamp}-{filename}.{format}` (triggers processing)
 - **Detection Images**: `detection/{feedEventId}/{timestamp}-{filename}.{format}` (triggers processing)
 - **Processed Images**: `processed/{filename}_cropped.{format}` (safe from reprocessing)
 
 ### Image Processing Flow
 
-1. **Upload**: Image uploaded to `feed/` or `detection/` directory.
+1. **Upload**: Video uploaded to `porch/` or `feeder/` (still-photo `feed/`/`detection/` path removed).
 2. **Processing**: Lambda function triggers image processing pipeline.
 3. **Storage**: Processed images stored in separate `processed/` directory.
 4. **Safety**: Processed images don't trigger reprocessing (prevents infinite loops).
@@ -360,7 +354,7 @@ The system provides comprehensive animal detection and analysis capabilities thr
 
 ## Feeder recorder
 
-The feeder host records a fixed 12-second proof from the public dispense request, and records animal visits separately with the motion detector. The relay is not part of this recorder. `FEED_COOLDOWN_HOURS` is the older image-feed cooldown, not the 10-minute public dispense cooldown.
+The feeder host records a fixed 12-second proof from the public dispense request, and records animal visits separately with the motion detector. The relay is not part of this recorder. Public dispense cooldown is 10 minutes (fail closed).
 
 - **Proof**: `POST /feeder/dispense` creates a request. The host claims `GET /feeder/dispense/pending`, uploads an mp4, then `PATCH /feeder/dispense/{id}` to `ready` or `failed`.
 - **Visits**: `POST /feeder/classify` and `POST /feeder/visits` publish a clip only when a sampled frame contains an animal.
@@ -533,9 +527,7 @@ The following secrets must be configured in AWS Secrets Manager:
 
 - **`crow-detector-keys`**: Contains device public keys for authentication
   - `pi-user-public-key`
-  - `pi-motion-public-key`
   - `pi-feeder-public-key`
-  - `lambda-s3-public-key`
 - **`crow-detector-db-{environment}`**: Database credentials
   - `username`
   - `password`
@@ -561,9 +553,8 @@ The S3 bucket is configured with:
 - **Lifecycle Rules**: Automatic cleanup of old images and versions.
 - **CORS Configuration**: Cross-origin resource sharing for web interface.
 - **Bucket Policies**: Enforces encryption and access controls.
-- **Event Notifications**: Smart triggers only on `feed/` and `detection/` directories.
+- **Event Notifications**: Removed with the still-photo pipeline. Porch and feeder videos do not enqueue SQS.
 - **Directory Structure**:
-  - `feed/` - User interaction images (triggers processing)
   - `detection/` - Motion detection images (triggers processing)
   - `porch/` - Porch camera clips (no notification; deleted after about 30 days via the S3 stack lifecycle rule — deploy `crow-detector-s3.yaml` when that rule changes; merge.yml does not update the S3 stack)
   - `feeder/` - Feeder proof and visit clips (no notification; same 30-day lifecycle rule; review the rule and the public dispense route before production)

@@ -2,7 +2,7 @@
 
 > **Precedence:** CONTEXT.md > GOVERNANCE.md > **ARCHITECTURE.md** > feature docs.
 >
-> **AI agents — read this file when:** adding Nest modules, changing Lambda glue, modifying CloudFormation, or altering data flow.
+> **AI agents — read this file when:** adding Nest modules, modifying CloudFormation, or altering data flow.
 
 ---
 
@@ -11,10 +11,11 @@
 This repository powers the **Crow Detector** interactive crow feeder backend:
 
 - **NestJS 11 + Fastify** API on **ECS Fargate** (Node 26)
-- **PostgreSQL** via **TypeORM 0.3** for feed/detection events
-- **S3** for images; **Rekognition** for feed moderation and faces; **Claude Haiku** for animal photos
-- **ECDSA** device authentication for Raspberry Pi devices and the S3 Lambda
-- Nested **`lambda/`** package (Node 24 runtime, webpack-bundled) that turns S3→SQS events into signed API calls
+- **PostgreSQL** via **TypeORM 0.3** for feeder dispense requests and animal visits
+- **S3** for porch and feeder video clips; **Claude Haiku** for feeder frame classify
+- **ECDSA** device authentication for `pi-user`, `pi-feeder`, and `pi-porch`
+
+The still-photo pipeline (S3 `feed/`/`detection/` → SQS → Lambda → Nest `/feed`/`/detection` + Rekognition) is **removed**. Do not reintroduce it without a product decision.
 
 Shared networking (VPC, subnets, security groups) comes from the **`aws-infra-*`** CloudFormation exports via `ImportValue`. Do **not** hardcode foreign subnet/SG IDs.
 
@@ -24,25 +25,22 @@ Shared networking (VPC, subnets, security groups) comes from the **`aws-infra-*`
 
 ```
 ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
-│ Pi / client  │ → │  S3 upload   │ → │ SQS notify   │
-│ (presigned)  │   │  (images)    │   │              │
-└──────────────┘   └──────────────┘   └──────┬───────┘
-                                             ▼
-                                    ┌────────────────┐
-                                    │ S3 Lambda      │
-                                    │ (ECDSA signed) │
-                                    └──────┬─────────┘
-                                           ▼
+│ LAN recorder │ → │ Presigned PUT│ → │ S3 porch/ or │
+│ (ECDSA)      │   │ /urls/porch  │   │ feeder/      │
+│              │   │ /urls/feeder │   │              │
+└──────────────┘   └──────────────┘   └──────────────┘
+
 ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
-│ Postgres     │ ← │ Nest API     │ ← │ /feed|/detect│
-│ (TypeORM)    │   │ (ECS)        │   │ + Rekog/Claude│
+│ Feeder host  │ → │ POST         │ → │ Claude Haiku │
+│ frame JPEG   │   │ /feeder/     │   │ (ClaudeSvc)  │
+│              │   │ classify     │   │              │
 └──────────────┘   └──────────────┘   └──────────────┘
 ```
 
-1. Devices/clients request presigned URLs from Nest (`urls` module).
-2. Objects land in S3; bucket notifications enqueue SQS messages.
-3. Lambda signs ECDSA requests and POSTs `/feed` or `/detection`. It does not PATCH.
-4. Nest processes images (Haiku for animal photos, Rekognition and Sharp for the feed), updates event status, stores metadata.
+1. Devices request porch/feeder presigned URLs from Nest (`urls` module).
+2. MP4 objects land under `porch/` or `feeder/` (lifecycle rules in the images stack).
+3. Feeder animal visits may sample frames and call `POST /feeder/classify`.
+4. Public clients list clips via `/porch/clips` and `/feeder/clips`.
 
 ---
 
@@ -51,64 +49,42 @@ Shared networking (VPC, subnets, security groups) comes from the **`aws-infra-*`
 | Module      | Responsibility                                            |
 | ----------- | --------------------------------------------------------- |
 | `auth`      | ECDSA guard                                               |
-| `feed`      | Feed events, face/crop pipeline, S3 metadata helpers      |
-| `detection` | Detection events, Claude Haiku animal counts              |
+| `detection` | `ClaudeService` only (feeder classify)                    |
+| `feeder`    | Public dispense, visits, clips, host classify             |
 | `porch`     | Public porch clip list with short-lived playback URLs     |
-| `urls`      | Presigned S3 URL creation (feed, detection, porch upload) |
+| `urls`      | Presigned S3 URL creation (`/urls/porch`, `/urls/feeder`) |
 | `health`    | Health endpoints                                          |
 | `common`    | Logger, shared types                                      |
 | `config`    | Typed environment configuration                           |
 
-Porch videos live under the `porch/` prefix. They never enter the animal photo pipeline (S3 notifications and the Lambda only handle image suffixes under `feed/` and `detection/`). Capture hardware and the LAN uploader plan are in **`docs/DEVICES.md`** (sealed outdoor cams + always-on host; not outdoor CSI/PIR kits). The reference recorder is `pi/record-on-motion.py` (ffmpeg RTSP + software motion → ECDSA upload). Production path: systemd on the LAN host + `scripts/deploy-porch-host.sh`. Legacy `npm run pi:sync` / `pi:start` / `pi:stop` remain for SSH copy/restart helpers.
+Capture hardware and the LAN uploader plan are in **`docs/DEVICES.md`**. Reference recorders: `pi/record-on-motion.py` (porch) and `pi/feeder-recorder.py` (feeder proofs + `--visits`). Deploy with `scripts/deploy-porch-host.sh`, `scripts/deploy-feeder-host.sh`, and `scripts/deploy-feeder-visits-host.sh`.
 
-Merge-to-main deploys the **ECS task** stack only. The 30-day `porch/` lifecycle rule lives in `cloudformation/crow-detector-s3.yaml` and must be applied with a one-shot deploy of the S3 stack after that template changes (it is not part of `merge.yml`).
+Merge-to-main deploys the **ECS task** stack only. The 30-day `porch/` and `feeder/` lifecycle rules live in `cloudformation/crow-detector-s3.yaml` and must be applied with a one-shot deploy of the S3 stack after that template changes (it is not part of `merge.yml`).
 
 ### Boundary rules
 
 - Controllers stay thin; services own business logic.
-- Shared services (e.g. `S3MetadataService`) are provided once and **exported** — do not duplicate providers across modules.
+- Shared services are provided once and **exported** — do not duplicate providers across modules.
 - Avoid cycles: shared `common/types` must not import TypeORM entities.
 - Config is read through Nest `ConfigModule` / typed helpers — avoid new raw `process.env` in feature services.
 - Global `ValidationPipe` is enabled in `main.ts`.
-
----
-
-## Lambda package
-
-| Concern   | Detail                                                                     |
-| --------- | -------------------------------------------------------------------------- |
-| Location  | `lambda/` nested npm package                                               |
-| Runtime   | Node.js **24** (AWS Lambda max managed runtime; Node 26 not available yet) |
-| Build     | webpack → single bundle → zip                                              |
-| Role      | Parse S3/SQS events, ECDSA sign, call Nest API                             |
-| Isolation | No imports from `../src` Nest tree                                         |
+- Schema changes are hand-applied SQL (for example `scripts/db-seed/drop-photo-pipeline.sql`). Do not enable TypeORM `synchronize`.
 
 ---
 
 ## Build & deploy shape
 
-- **API Docker** image: multi-stage Node 26 Alpine; Nest build; ECS Fargate.
-- **Lambda**: `npm run build:package` in `lambda/`; deploy via lambda CloudFormation + GitHub workflows.
-- **CloudFormation** (`cloudformation/`, `lambda/cloudformation/`): RDS, ALB, ECS task/service, S3, IAM, Lambda.
+- **API Docker** image: multi-stage Node 26 Alpine; Nest build; ECS Fargate (`linux/amd64`).
+- **CloudFormation** (`cloudformation/`): RDS, ALB, ECS task/service, S3, IAM.
 - Environments: `dev` / `prod` parameter mappings — env-specific imports must match (`crow-detector-db-${Environment}-*`), never hardcode `*-dev-*` in prod paths.
 
 ---
 
 ## Local development
 
-| Mechanism         | Path / command                                   |
-| ----------------- | ------------------------------------------------ |
-| Nest watch        | `npm run start:dev` (tunnel + watch)             |
-| SSH tunnel        | `scripts/tunnel.js` via `RDS_HOST` / bastion env |
-| DB seed           | `scripts/db-seed/`                               |
-| Auth token helper | `npm run auth:token`                             |
-| Lambda unit tests | `cd lambda && npm test`                          |
-
----
-
-## Related docs
-
-- `docs/SECURITY.md` — ECDSA, secrets, TLS, IAM
-- `docs/ENVIRONMENT.md` — all env vars
-- `docs/TESTING.md` — Jest strategy
-- `api.yaml` — HTTP contract
+| Mechanism         | Path / command                             |
+| ----------------- | ------------------------------------------ |
+| Nest + RDS tunnel | `npm run start:dev`                        |
+| Auth helper       | `npm run auth:token`                       |
+| DB helpers        | `npm run db:seed` / `db:reset` / `db:test` |
+| Quality           | `make preflight`                           |

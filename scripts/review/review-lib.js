@@ -169,10 +169,7 @@ const classifyPath = (filePath) => {
   if (filePath.startsWith('.github/')) {
     return 'workflow';
   }
-  if (
-    filePath.startsWith('cloudformation/') ||
-    filePath.startsWith('lambda/cloudformation/')
-  ) {
+  if (filePath.startsWith('cloudformation/')) {
     return 'infra';
   }
   if (
@@ -195,7 +192,6 @@ const classifyPath = (filePath) => {
   }
   if (
     filePath.startsWith('src/') ||
-    filePath.startsWith('lambda/src/') ||
     filePath.startsWith('pi/') ||
     filePath === 'Dockerfile' ||
     filePath === 'api.yaml'

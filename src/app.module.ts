@@ -1,6 +1,5 @@
 import { ConfigModule } from '@nestjs/config';
 import { DetectionModule } from './detection/detection.module';
-import { FeedModule } from './feed/feed.module';
 import { HealthModule } from './health/health.module';
 import { Module } from '@nestjs/common';
 import { FeederModule } from './feeder/feeder.module';
@@ -37,7 +36,6 @@ export const typeOrmSynchronize = false;
       ssl: buildRdsSslOptions(appConfig.rds.sslRejectUnauthorized),
     }),
     DetectionModule,
-    FeedModule,
     HealthModule,
     FeederModule,
     PorchModule,
