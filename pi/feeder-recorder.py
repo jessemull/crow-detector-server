@@ -121,22 +121,39 @@ def sweep_staging(now: float | None = None, ttl_seconds: int = STAGING_TTL_SECON
 
 
 def record_clip(destination: Path, seconds: int) -> None:
+    """Record a short proof clip in the same browser-safe form as visit files.
+
+    Visits go through concat + libx264. Proofs used to stream-copy the Tapo
+    main feed, which many players and browsers reject. Encode the same way.
+    """
     if not RTSP_URL:
         raise RuntimeError("FEEDER_RTSP_URL is not set")
+    ffmpeg_bin = shutil.which("ffmpeg")
+    if not ffmpeg_bin:
+        raise RuntimeError("ffmpeg not found")
     destination.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(
         [
-            "ffmpeg",
-            "-y",
+            ffmpeg_bin,
+            "-hide_banner",
+            "-loglevel",
+            "error",
             "-rtsp_transport",
             "tcp",
             "-i",
             RTSP_URL,
             "-t",
             str(seconds),
-            "-c",
-            "copy",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "veryfast",
+            "-pix_fmt",
+            "yuv420p",
             "-an",
+            "-movflags",
+            "+faststart",
+            "-y",
             str(destination),
         ],
         check=True,

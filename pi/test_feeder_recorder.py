@@ -37,6 +37,34 @@ class SweepTests(unittest.TestCase):
             self.assertTrue(fresh.exists())
 
 
+class RecordClipTests(unittest.TestCase):
+    def test_proof_uses_the_same_browser_safe_encode_as_visits(self) -> None:
+        calls: list[list[str]] = []
+
+        def fake_run(argv, **kwargs):  # type: ignore[no-untyped-def]
+            calls.append(list(argv))
+            return subprocess.CompletedProcess(argv, 0)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "proof.mp4"
+            original_url = feeder.RTSP_URL
+            original_run = feeder.subprocess.run
+            feeder.RTSP_URL = "rtsp://user:pass@10.0.0.5/stream1"
+            feeder.subprocess.run = fake_run  # type: ignore[method-assign]
+            try:
+                feeder.record_clip(out, 12)
+            finally:
+                feeder.RTSP_URL = original_url
+                feeder.subprocess.run = original_run  # type: ignore[method-assign]
+
+        self.assertEqual(len(calls), 1)
+        argv = calls[0]
+        self.assertIn("libx264", argv)
+        self.assertIn("yuv420p", argv)
+        self.assertIn("+faststart", argv)
+        self.assertNotIn("copy", argv)
+
+
 class SignerTests(unittest.TestCase):
     def test_canonical_json_keeps_non_ascii_characters(self) -> None:
         self.assertEqual(
