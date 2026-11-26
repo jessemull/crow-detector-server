@@ -18,7 +18,12 @@ from typing import IO, Any
 
 def signed_payload(method: str, path: str, body: dict, timestamp: str) -> str:
     """Bytes the API guard verifies: method + path + compact JSON + timestamp."""
-    return f"{method}{path}{json.dumps(body, separators=(',', ':'))}{timestamp}"
+    # Match JSON.stringify / feeder canonical_json: keep non-ASCII as-is.
+    return (
+        f"{method}{path}"
+        f"{json.dumps(body, separators=(',', ':'), ensure_ascii=False)}"
+        f"{timestamp}"
+    )
 
 
 def parse_env_line(line: str) -> tuple[str, str] | None:

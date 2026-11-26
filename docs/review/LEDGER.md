@@ -58,19 +58,19 @@ node scripts/review/check-ledger.js .review/<name>/ledger.json
 
 ### `files[]`
 
-| Field                  | Set by    | Meaning                                                                                             |
-| ---------------------- | --------- | --------------------------------------------------------------------------------------------------- |
-| `path`                 | inventory | Path in the reviewed tree (for deletions, the deleted path)                                         |
-| `change`               | inventory | `A`, `M`, `D`, `R`, `C`, `T`, `U` (PR) or `tracked` (repo)                                          |
-| `oldPath`              | inventory | Old path for renames and copies; read it too                                                        |
-| `category`             | inventory | `source`, `test`, `script`, `config`, `workflow`, `infra`, `doc`, `lockfile`, `generated`, `binary`. `source` includes `src/`, `lambda/src/`, `pi/*.py`, `Dockerfile`, and `api.yaml`; `infra` includes both `cloudformation/` trees; `test` includes `*.spec.ts`, `*.test.ts`, `pi/test_*.py`, and `test/`; `generated` includes `certs/` and `*.pem` |
-| `lineCount`            | inventory | Lines in the version under review (the base version for deletions)                                  |
-| `lineCoverageRequired` | inventory | `false` only for `binary`, `lockfile`, `generated`                                                  |
-| `chunks`               | inventory | Suggested `[start, end]` ranges of at most 150 lines                                                |
-| `status`               | reviewer  | `reviewed` or `not-inspected`                                                                       |
-| `linesRead`            | reviewer  | `[start, end]` ranges actually read; must cover `1..lineCount` when `lineCoverageRequired`          |
-| `evidence`             | reviewer  | What was checked in this file (callers searched, tests read, criteria applied)                      |
-| `reason`               | reviewer  | Required for `not-inspected`                                                                        |
+| Field                  | Set by    | Meaning                                                                                                                                                                                                                                                                                                                      |
+| ---------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `path`                 | inventory | Path in the reviewed tree (for deletions, the deleted path)                                                                                                                                                                                                                                                                  |
+| `change`               | inventory | `A`, `M`, `D`, `R`, `C`, `T`, `U` (PR) or `tracked` (repo)                                                                                                                                                                                                                                                                   |
+| `oldPath`              | inventory | Old path for renames and copies; read it too                                                                                                                                                                                                                                                                                 |
+| `category`             | inventory | `source`, `test`, `script`, `config`, `workflow`, `infra`, `doc`, `lockfile`, `generated`, `binary`. `source` includes `src/`, `pi/*.py`, `Dockerfile`, and `api.yaml`; `infra` includes `cloudformation/`; `test` includes `*.spec.ts`, `*.test.ts`, `pi/test_*.py`, and `test/`; `generated` includes `certs/` and `*.pem` |
+| `lineCount`            | inventory | Lines in the version under review (the base version for deletions)                                                                                                                                                                                                                                                           |
+| `lineCoverageRequired` | inventory | `false` only for `binary`, `lockfile`, `generated`                                                                                                                                                                                                                                                                           |
+| `chunks`               | inventory | Suggested `[start, end]` ranges of at most 150 lines                                                                                                                                                                                                                                                                         |
+| `status`               | reviewer  | `reviewed` or `not-inspected`                                                                                                                                                                                                                                                                                                |
+| `linesRead`            | reviewer  | `[start, end]` ranges actually read; must cover `1..lineCount` when `lineCoverageRequired`                                                                                                                                                                                                                                   |
+| `evidence`             | reviewer  | What was checked in this file (callers searched, tests read, criteria applied)                                                                                                                                                                                                                                               |
+| `reason`               | reviewer  | Required for `not-inspected`                                                                                                                                                                                                                                                                                                 |
 
 For a deleted file, read the base version (`git show <baseSha>:<path>`) and record those ranges. For a rename, record the new file's ranges and note in `evidence` that the old side was compared.
 
@@ -86,7 +86,7 @@ For a deleted file, read the base version (`git show <baseSha>:<path>`) and reco
 
 ### `gates[]`
 
-Required gates: `hooks`, `lint`, `typecheck`, `format`, `test`, `build`, `security`. Each one covers the root package and `lambda/` (and porch tests, for `test`). Optional: `e2e`.
+Required gates: `hooks`, `lint`, `typecheck`, `format`, `test`, `build`, `security`. The `test` gate includes porch/feeder Python tests. Optional: `e2e`.
 
 | Field             | Meaning                                                                 |
 | ----------------- | ----------------------------------------------------------------------- |

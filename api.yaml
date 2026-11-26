@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Crow Detector Server API
-  description: API for managing crow detection events and feed events for the Critter Canteen system
+  description: API for Critter Canteen porch clips, feeder dispense proofs, and feeder animal visits
   version: 1.0.0
   contact:
     name: Critter Canteen
@@ -120,9 +120,11 @@ paths:
     post:
       summary: Request a feeder dispense proof
       description: |
-        Public route. Creates a dispense row when the 10-minute cooldown is clear.
-        The feeder host later claims the row and uploads a separate proof clip.
-        Apply scripts/db-seed/feeder-video.sql before serving this route.
+        Public unauthenticated write (rate-limited). Creates a dispense row when
+        the 10-minute cooldown is clear. The feeder host later claims the row and
+        uploads a separate proof clip. Apply scripts/db-seed/feeder-video.sql
+        before serving this route. Keep under human review before widening prod
+        exposure (docs/GOVERNANCE.md / docs/DEVICES.md).
       tags:
         - Feeder
       responses:
@@ -132,7 +134,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DispenseRequest'
-        '400':
+        '409':
           description: Cooldown is active
         '429':
           description: Too many requests
@@ -226,7 +228,9 @@ paths:
   /feeder/clips:
     get:
       summary: List feeder visit clips
-      description: Public list of animal visits. Empty proofs and dropped visits are not included.
+      description: |
+        Public list of stored feeder visits (rate-limited). When FEEDER_REQUIRE_ANIMAL
+        is off on the host, motion visits may be published without Claude classify.
       tags:
         - Feeder
       responses:
@@ -245,8 +249,10 @@ paths:
     post:
       summary: Classify one feeder frame
       description: |
-        Feeder host only. The JSON body can be larger than Fastify's default 1 MiB
-        limit and is capped at 4 MiB. Decoded frames over 2_000_000 bytes are rejected.
+        Feeder host only. The app-wide Fastify JSON body limit is 4 MiB so this
+        route can accept large base64 frames (ClassifyFrameDTO maxLength 2_800_000).
+        Decoded frames over 2_000_000 bytes are rejected. There is no Sharp resize
+        step; JPEG/PNG/WebP media types only.
       tags:
         - Feeder
       security:
@@ -260,6 +266,8 @@ paths:
       responses:
         '201':
           description: Analysis result
+        '400':
+          description: Validation failed (empty body, media type, or field limits)
         '401':
           description: Unauthorized
         '403':
@@ -342,51 +350,6 @@ components:
         - x-timestamp: Request timestamp in milliseconds
 
   schemas:
-    CreateFeedImageUrlDTO:
-      type: object
-      required:
-        - fileName
-        - format
-        - source
-        - contentLength
-      properties:
-        fileName:
-          type: string
-          maxLength: 120
-          description: Basename without a path or extension
-          example: 'feed-event'
-        format:
-          $ref: '#/components/schemas/ImageFormat'
-        source:
-          type: string
-          description: Source identifier for the image
-          example: 'pi-feeder-01'
-        contentLength:
-          type: integer
-          minimum: 1
-          maximum: 15728640
-          description: Exact PUT body size in bytes. The signed URL rejects any other length.
-
-    CreateDetectionImageUrlDTO:
-      type: object
-      required:
-        - fileName
-        - format
-        - contentLength
-      properties:
-        fileName:
-          type: string
-          maxLength: 120
-          description: Basename without a path or extension
-          example: 'detection'
-        format:
-          $ref: '#/components/schemas/ImageFormat'
-        contentLength:
-          type: integer
-          minimum: 1
-          maximum: 15728640
-          description: Exact PUT body size in bytes. The signed URL rejects any other length.
-
     CreatePorchClipUrlDTO:
       type: object
       required:
@@ -437,10 +400,21 @@ components:
         status:
           type: string
           enum: [requested, recording, ready, failed]
+        proofKey:
+          type: string
+          maxLength: 1024
+          description: S3 object key under feeder/ when status is ready (host/claim payloads)
         proofClipUrl:
           type: string
           format: uri
+          description: Short-lived playback URL on public GET when status is ready
         expiresAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
           type: string
           format: date-time
 
@@ -455,6 +429,7 @@ components:
         proofKey:
           type: string
           maxLength: 1024
+          pattern: '^feeder/(?!.*\\.\\.)[A-Za-z0-9._/-]+\\.mp4$'
           description: Required when status is ready. Must be a feeder mp4 key.
 
     ClassifyFrameDTO:
@@ -479,17 +454,21 @@ components:
         videoKey:
           type: string
           maxLength: 1024
+          pattern: '^feeder/(?!.*\\.\\.)[A-Za-z0-9._/-]+\\.mp4$'
         animalCount:
           type: integer
           minimum: 1
+          maximum: 100
         crowCount:
           type: integer
           minimum: 0
+          maximum: 100
         dispenseRequestId:
           type: string
           format: uuid
         detectedAnimals:
           type: array
+          maxItems: 20
           items:
             $ref: '#/components/schemas/DetectedAnimal'
 

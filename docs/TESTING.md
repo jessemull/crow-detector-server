@@ -8,13 +8,13 @@
 
 ## Strategy
 
-| Layer                     | What to test                            | How                                     |
-| ------------------------- | --------------------------------------- | --------------------------------------- |
-| Nest services             | Business logic with mocked deps         | Unit `*.spec.ts`                        |
-| Nest controllers / guards | HTTP mapping, ECDSA auth edges          | Unit with Nest testing module           |
-| Nest DTOs / pipes         | Validation behavior when relevant       | Unit or e2e                             |
-| Lambda processors / auth  | SQS/S3 parsing, signing, API client     | Unit `*.test.ts`                        |
-| e2e                       | Smoke bootstrap / ValidationPipe wiring | `test/*.e2e-spec.ts` (optional locally) |
+| Layer                     | What to test                             | How                                     |
+| ------------------------- | ---------------------------------------- | --------------------------------------- |
+| Nest services             | Business logic with mocked deps          | Unit `*.spec.ts`                        |
+| Nest controllers / guards | HTTP mapping, ECDSA auth edges           | Unit with Nest testing module           |
+| Nest DTOs / pipes         | Validation behavior when relevant        | Unit or e2e                             |
+| Porch / feeder Python     | Motion helpers, ECDSA signing, recorders | `make porch-test` (`pi/test_*.py`)      |
+| e2e                       | Smoke bootstrap / ValidationPipe wiring  | `test/*.e2e-spec.ts` (optional locally) |
 
 Integration against real AWS, RDS, or Claude is **out of scope** for the default Jest suite.
 
@@ -28,16 +28,15 @@ Integration against real AWS, RDS, or Claude is **out of scope** for the default
 - Jest config: `jest.config.js` (`testRegex: (src/.*\\.spec\\.ts|scripts/review/.*\\.test\\.js)$`)
 - Setup: `test/setup.ts`
 
-### Lambda
+### LAN recorders (`pi/`)
 
-- Co-located: `foo.ts` → `foo.test.ts`
-- Jest config: `lambda/jest.config.js`
+- `python3 -m unittest discover -s pi -p 'test_*.py'` via `make porch-test`
 
 ---
 
 ## Coverage
 
-Configured in root and lambda Jest configs:
+Configured in the root Jest config:
 
 - **80%** global thresholds for branches, functions, lines, statements
 - Enforced in GitHub Actions PR workflows
@@ -46,17 +45,17 @@ Configured in root and lambda Jest configs:
 ```bash
 make test
 make test-cov
-make lambda-test
+make porch-test
 ```
 
 ---
 
 ## Mocking
 
-- Mock AWS SDK v3 clients (S3, Rekognition)
+- Mock AWS SDK v3 clients (S3)
 - Mock Anthropic / Claude clients
 - Mock TypeORM repositories / QueryRunners as needed
-- Never call real S3, Rekognition, Claude, or RDS in unit tests
+- Never call real S3, Claude, or RDS in unit tests
 - Fake clocks/timers for cooldown / timestamp logic when needed
 
 ---
@@ -69,9 +68,9 @@ Tests should serve **documentation**, **confidence**, and **safety**.
 
 - Public service methods with logic
 - Auth guard accept/reject paths (including ensuring prod cannot use dev bypass)
-- Image/status workflow transitions
+- Feeder dispense status transitions and visit key validation
 - Error handling and fail-fast config
-- Lambda event parsing and API call construction
+- Porch/feeder Python helpers that build signatures or motion windows
 
 ### Do not overtest
 
@@ -83,9 +82,9 @@ Tests should serve **documentation**, **confidence**, and **safety**.
 
 ## Commands
 
-| Command            | Scope                         |
-| ------------------ | ----------------------------- |
-| `make test`        | Root Jest                     |
-| `make test-cov`    | Root Jest + coverage          |
-| `make lambda-test` | Lambda Jest + coverage script |
-| `npm run test:e2e` | Nest e2e (when needed)        |
+| Command            | Scope                          |
+| ------------------ | ------------------------------ |
+| `make test`        | Root Jest                      |
+| `make test-cov`    | Root Jest + coverage           |
+| `make porch-test`  | Porch/feeder Python unit tests |
+| `npm run test:e2e` | Nest e2e (when needed)         |

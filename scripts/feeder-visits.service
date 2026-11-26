@@ -7,7 +7,8 @@ Wants=network-online.target
 Type=simple
 # Paths match the LAN host (juzu-inui): clone under ~/Development, secrets in ~.
 # If you reinstall on another account, edit User/Group/WorkingDirectory/EnvironmentFile/ExecStart.
-# Dispense proofs stay on feeder-recorder. This unit only watches for an animal.
+# Dispense proofs stay on feeder-recorder. This unit watches for motion visits
+# (Claude animal gate only when FEEDER_REQUIRE_ANIMAL=true in feeder.env).
 User=juzu-inui
 Group=juzu-inui
 WorkingDirectory=/home/juzu-inui/Development/crow-detector-server

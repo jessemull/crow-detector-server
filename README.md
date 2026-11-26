@@ -35,10 +35,10 @@ AI agents and contributors **must** start with the governance chain:
 | Doc                                                     | Purpose                                                  |
 | ------------------------------------------------------- | -------------------------------------------------------- |
 | [`CONTEXT.md`](./CONTEXT.md)                            | Primary entry — loading order, precedence, quality gates |
-| [`AGENTS.md`](./AGENTS.md)                              | Full development rules for Nest + Lambda                 |
+| [`AGENTS.md`](./AGENTS.md)                              | Full development rules for Nest + LAN recorders          |
 | [`CLAUDE.md`](./CLAUDE.md) / [`GEMINI.md`](./GEMINI.md) | Thin redirects to CONTEXT/AGENTS                         |
 | [`docs/GOVERNANCE.md`](./docs/GOVERNANCE.md)            | Authority, escalation, enforcement                       |
-| [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)        | Nest modules, Lambda, CloudFormation                     |
+| [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)        | Nest modules, feeder/porch flow, CloudFormation          |
 | [`docs/TESTING.md`](./docs/TESTING.md)                  | Jest strategy and 80% coverage                           |
 | [`docs/SECURITY.md`](./docs/SECURITY.md)                | ECDSA, secrets, IAM, logging                             |
 | [`docs/ENVIRONMENT.md`](./docs/ENVIRONMENT.md)          | Environment variable reference                           |
@@ -70,13 +70,12 @@ The **Crow Detector** is an interactive system that allows users to feed crows t
 - **Image Gallery**: Displays user images alongside detection images.
 - **Cooldown System**: Prevents spam feeding with configurable cooldown periods.
 
-### Image Processing Pipeline
+### Video and classify pipeline
 
-- **Content Moderation**: AWS Rekognition filters inappropriate content.
-- **Face Detection**: AWS Rekognition detects faces and provides bounding box coordinates.
-- **Image Cropping**: Sharp library crops images to focus on detected faces with padding.
-- **Image Storage**: Organized S3 storage with separate directories for original and processed images.
-- **Animal Detection**: Claude Haiku looks at the photo, names the animals, and counts them.
+- **Porch clips**: LAN host records RTSP visits and uploads mp4 objects under `porch/`.
+- **Feeder proofs / visits**: LAN host records dispense proofs and motion visits under `feeder/`.
+- **Animal classify**: Claude Haiku classifies sampled feeder frames via `POST /feeder/classify`.
+- **Still-photo path removed**: No Rekognition / Sharp / S3→SQS Lambda pipeline.
 - **Processing Workflow**: Comprehensive status tracking from upload to completion.
 
 ## System Architecture
@@ -143,7 +142,7 @@ The **Crow Detector Server** is built using modern technologies to ensure reliab
 - **AWS ECS**: Container orchestration for server deployment.
 - **AWS CloudFormation**: Infrastructure as Code for resource management.
 - **AWS IAM**: Identity and access management for secure resource access.
-- **AWS Rekognition**: Content moderation and face detection for feed photos. Animal identification uses Claude.
+- **Anthropic Claude**: Feeder frame classify (Haiku) for animal visits when enabled.
 
 ### Development Tools
 
@@ -294,70 +293,28 @@ The system provides secure image upload capabilities through pre-signed S3 URLs:
 
 ### S3 Organization
 
-- **Detection Images**: `detection/{feedEventId}/{timestamp}-{filename}.{format}` (triggers processing)
-- **Processed Images**: `processed/{filename}_cropped.{format}` (safe from reprocessing)
+- **Porch clips**: `porch/{timestamp}-{name}.mp4` (30-day lifecycle prefix rule)
+- **Feeder clips**: `feeder/{timestamp}-{name}.mp4` (30-day lifecycle prefix rule)
 
-### Image Processing Flow
+### Clip flow
 
-1. **Upload**: Video uploaded to `porch/` or `feeder/` (still-photo `feed/`/`detection/` path removed).
-2. **Processing**: Lambda function triggers image processing pipeline.
-3. **Storage**: Processed images stored in separate `processed/` directory.
-4. **Safety**: Processed images don't trigger reprocessing (prevents infinite loops).
-
-#### Detection Event Processing Workflow
-
-1. **Initial Status**: Detection events start with `PENDING` status.
-2. **Processing Phase**: Status changes to `PROCESSING` during analysis.
-3. **AI Analysis**: Claude Haiku looks at the photo and names the animals.
-4. **Completion**: Status updates to `COMPLETED` with results or `FAILED` with errors.
-5. **Metadata Storage**: Processing duration, error details, and analysis results saved.
-
-### Image Metadata
-
-- **Timestamp**: When the image was captured.
-- **Source**: Device type and location information.
-- **Feed Event ID**: Links detection images to feeding events.
-- **Content Type**: Image format and encoding information.
-- **Processing Status**: Current state of image processing pipeline.
-
-## Detection Event Processing
-
-The system provides comprehensive animal detection and analysis capabilities through a multi-stage processing pipeline:
-
-### Processing Stages
-
-- **PENDING**: Initial state when detection event is created.
-- **PROCESSING**: Active analysis phase using AWS services.
-- **COMPLETED**: Successful processing with results stored.
-- **FAILED**: Processing error with detailed error information.
-
-### Analysis Components
-
-- **Claude Haiku**: Looks at the animal photo and returns the names and counts.
-- **Fallback Detection**: Local processing when external services are unavailable.
-- **Error Handling**: Comprehensive error tracking and retry mechanisms.
-
-### Data Captured
-
-- **Animal Counts**: Total animals and specific crow counts.
-- **Species Detection**: Identified animal types and classifications.
-- **Processing Metrics**: Duration, file sizes, and performance data.
-- **Error Details**: Specific failure reasons for debugging.
-- **Temporal Data**: Timestamps for processing and completion.
+1. **Upload**: ECDSA device requests a presigned PUT (`/urls/porch` or `/urls/feeder`), then PUTs the mp4.
+2. **Classify (feeder visits)**: Optional Claude frame classify when `FEEDER_REQUIRE_ANIMAL=true` on the host.
+3. **List / playback**: Public list routes return short-lived signed GET URLs.
 
 ### Security Features
 
-- **Pre-signed URLs**: Time-limited upload permissions.
-- **Encryption**: Server-side encryption (AES256).
-- **Access Control**: IAM-based permissions for S3 operations.
-- **Lifecycle Management**: Automatic cleanup of old images.
+- **Pre-signed URLs**: Time-limited upload and playback permissions.
+- **Encryption**: Server-side encryption (AES256) on uploads.
+- **Access Control**: IAM-based permissions for S3 operations; device ECDSA on host routes.
+- **Lifecycle Management**: Automatic cleanup of old porch/ and feeder/ objects.
 
 ## Feeder recorder
 
-The feeder host records a fixed 12-second proof from the public dispense request, and records animal visits separately with the motion detector. The relay is not part of this recorder. Public dispense cooldown is 10 minutes (fail closed).
+The feeder host records a fixed 12-second proof from the public dispense request, and records motion visits separately. The relay is not part of this recorder. Public dispense cooldown is 10 minutes (fail closed). `POST /feeder/dispense` is a public unauthenticated write (rate-limited) and stays under human review for prod exposure.
 
 - **Proof**: `POST /feeder/dispense` creates a request. The host claims `GET /feeder/dispense/pending`, uploads an mp4, then `PATCH /feeder/dispense/{id}` to `ready` or `failed`.
-- **Visits**: `POST /feeder/classify` and `POST /feeder/visits` publish a clip only when a sampled frame contains an animal.
+- **Visits**: Default host config publishes each motion visit (`FEEDER_REQUIRE_ANIMAL=false`). Set `FEEDER_REQUIRE_ANIMAL=true` to classify via `POST /feeder/classify` and drop empty frames before `POST /feeder/visits`.
 - **Playback**: `GET /feeder/dispense/{id}` and `GET /feeder/clips` return short-lived playback URLs while the object is still inside the 30-day feeder lifecycle.
 
 ## Commits & Commitizen

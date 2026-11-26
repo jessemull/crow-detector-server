@@ -1,7 +1,4 @@
-import {
-  BadRequestException,
-  ServiceUnavailableException,
-} from '@nestjs/common';
+import { ConflictException, ServiceUnavailableException } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import {
   DispenseRequest,
@@ -64,7 +61,7 @@ describe('DispenseRequestService', () => {
 
   it('rejects a second request inside the cooldown', async () => {
     findOne.mockResolvedValue({ id: 'recent', createdAt: new Date() });
-    await expect(service.create()).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.create()).rejects.toBeInstanceOf(ConflictException);
     expect(save).not.toHaveBeenCalled();
     expect(query).toHaveBeenCalledWith(
       "SELECT pg_advisory_xact_lock(hashtext('dispense_cooldown'))",
@@ -211,6 +208,17 @@ describe('DispenseRequestService', () => {
         'req-1',
         DispenseStatus.READY,
         `feeder/${'a'.repeat(1100)}.mp4`,
+      ),
+    ).rejects.toThrow('Proof key must be a feeder mp4');
+    expect(repositoryUpdate).not.toHaveBeenCalled();
+  });
+
+  it('rejects a proof key that escapes the feeder prefix', async () => {
+    await expect(
+      service.complete(
+        'req-1',
+        DispenseStatus.READY,
+        'feeder/../secrets/not-a-clip.mp4',
       ),
     ).rejects.toThrow('Proof key must be a feeder mp4');
     expect(repositoryUpdate).not.toHaveBeenCalled();

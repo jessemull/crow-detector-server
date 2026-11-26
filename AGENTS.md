@@ -84,9 +84,6 @@ Prefer `make` targets. Run **`make`** or **`make help`** for a compact list.
 | `npm run db:seed`                                     | Seed database                                                                                                                    |
 | `npm run db:reset`                                    | Reset + seed                                                                                                                     |
 | `npm run auth:token`                                  | Generate ECDSA auth token helper                                                                                                 |
-| `npm run pi:sync`                                     | Legacy: copy recorder + `porch.env` over SSH, then restart                                                                       |
-| `npm run pi:start`                                    | Legacy: restart the porch recorder over SSH (no copy)                                                                            |
-| `npm run pi:stop`                                     | Legacy: stop the porch recorder over SSH                                                                                         |
 | `./scripts/deploy-porch-host.sh`                      | LAN host: SSH `git pull` + restart `porch-recorder` (`DEPLOY_HOST=juzu-inui`; repo default `~/Development/crow-detector-server`) |
 | `./scripts/deploy-feeder-host.sh`                     | LAN host: SSH `git pull` + restart `feeder-recorder` (same clone; `FEEDER_GIT_REF` defaults to the current branch)               |
 | `./scripts/deploy-feeder-visits-host.sh`              | LAN host: SSH `git pull` + restart `feeder-visits` (`pi/feeder-recorder.py --visits`)                                            |

@@ -92,24 +92,24 @@ SSH login key (Mac): `~/.ssh/id_ed25519_porch` — not the same as `~/keys/pi-po
 
 Feeder LAN recorder (host laptop/server, not Nest) — see `docs/DEVICES.md` and `pi/feeder.env.example`. This process does not read the porch variables.
 
-| Variable                      | Description                                        | Required | Default                                            |
-| ----------------------------- | -------------------------------------------------- | -------- | -------------------------------------------------- |
-| `FEEDER_API_BASE_URL`         | API base for feeder dispense, classify, and upload | Yes      | - (bring-up: `https://api-dev.crittercanteen.com`) |
-| `FEEDER_RTSP_URL`             | Full RTSP URL for the feeder camera                | Yes      | -                                                  |
-| `PI_FEEDER_PRIVATE_KEY_PATH`  | Path to the feeder private key on the host         | No       | `~/keys/pi-feeder-private.pem`                     |
-| `FEEDER_PIXEL_DELTA`          | Same motion test as `PORCH_PIXEL_DELTA`            | No       | `30`                                               |
-| `FEEDER_MIN_CHANGED_RATIO`    | Same motion test as the porch minimum              | No       | `0.004`                                            |
-| `FEEDER_MAX_CHANGED_RATIO`    | Same light rejection as the porch maximum          | No       | `0.45`                                             |
-| `FEEDER_LIGHT_DISARM_RATIO`   | A change this large disarms detection until quiet  | No       | `0.80`                                             |
-| `FEEDER_MIN_BLOB_FILL`        | Same compact-patch test as the porch               | No       | `0.25`                                             |
-| `FEEDER_MOTION_FRAMES`        | Compact frames in a row required                   | No       | `3`                                                |
-| `FEEDER_REFERENCE_ALPHA`      | Background reference blend                         | No       | `0.02`                                             |
-| `FEEDER_VISIT_GAP_SECONDS`    | Quiet time that still belongs to the same visit    | No       | `120`                                              |
-| `FEEDER_VISIT_CAP_SECONDS`    | Hard maximum length of one visit                   | No       | `600`                                              |
-| `FEEDER_PRE_ROLL_SECONDS`     | Seconds before the first motion kept in the file   | No       | `4`                                                |
-| `FEEDER_POST_ROLL_SECONDS`    | Seconds after the last motion kept in the file     | No       | `20`                                               |
-| `FEEDER_SEGMENT_TIME_SECONDS` | Continuous remux segment length                    | No       | `2`                                                |
-| `FEEDER_REQUIRE_ANIMAL`       | When `true`, drop visits Claude does not mark as animal                      | No       | `false`                                            |
+| Variable                      | Description                                             | Required | Default                                            |
+| ----------------------------- | ------------------------------------------------------- | -------- | -------------------------------------------------- |
+| `FEEDER_API_BASE_URL`         | API base for feeder dispense, classify, and upload      | Yes      | - (bring-up: `https://api-dev.crittercanteen.com`) |
+| `FEEDER_RTSP_URL`             | Full RTSP URL for the feeder camera                     | Yes      | -                                                  |
+| `PI_FEEDER_PRIVATE_KEY_PATH`  | Path to the feeder private key on the host              | No       | `~/keys/pi-feeder-private.pem`                     |
+| `FEEDER_PIXEL_DELTA`          | Same motion test as `PORCH_PIXEL_DELTA`                 | No       | `30`                                               |
+| `FEEDER_MIN_CHANGED_RATIO`    | Same motion test as the porch minimum                   | No       | `0.004`                                            |
+| `FEEDER_MAX_CHANGED_RATIO`    | Same light rejection as the porch maximum               | No       | `0.45`                                             |
+| `FEEDER_LIGHT_DISARM_RATIO`   | A change this large disarms detection until quiet       | No       | `0.80`                                             |
+| `FEEDER_MIN_BLOB_FILL`        | Same compact-patch test as the porch                    | No       | `0.25`                                             |
+| `FEEDER_MOTION_FRAMES`        | Compact frames in a row required                        | No       | `3`                                                |
+| `FEEDER_REFERENCE_ALPHA`      | Background reference blend                              | No       | `0.02`                                             |
+| `FEEDER_VISIT_GAP_SECONDS`    | Quiet time that still belongs to the same visit         | No       | `120`                                              |
+| `FEEDER_VISIT_CAP_SECONDS`    | Hard maximum length of one visit                        | No       | `600`                                              |
+| `FEEDER_PRE_ROLL_SECONDS`     | Seconds before the first motion kept in the file        | No       | `4`                                                |
+| `FEEDER_POST_ROLL_SECONDS`    | Seconds after the last motion kept in the file          | No       | `20`                                               |
+| `FEEDER_SEGMENT_TIME_SECONDS` | Continuous remux segment length                         | No       | `2`                                                |
+| `FEEDER_REQUIRE_ANIMAL`       | When `true`, drop visits Claude does not mark as animal | No       | `false`                                            |
 
 Host secrets live in `~/feeder.env` (`chmod 600`) and are never committed. Two systemd units share that file. `scripts/feeder-recorder.service` records the 12-second dispense proof (`./scripts/deploy-feeder-host.sh`). `scripts/feeder-visits.service` runs `pi/feeder-recorder.py --visits` and publishes an animal visit (`./scripts/deploy-feeder-visits-host.sh`). Apply `scripts/db-seed/feeder-video.sql` before the routes are used. `--visit-once` records the next visit and exits. `--dispense-id` links that one visit to a proof.
 
@@ -159,16 +159,15 @@ The outdoor porch and feeder paths are **LAN host + RTSP**, not Pi CSI/PIR. Drop
 
 ## Photo Lambda (removed)
 
-The nested `lambda/` package and S3→SQS photo event path are gone. Do not set `LAMBDA_S3_*`, `DETECTION_ENDPOINT`, or `FEED_ENDPOINT`.
+The nested `lambda/` package and S3→SQS photo event path are gone. Do not set `LAMBDA_S3_*`, `DETECTION_ENDPOINT`, or `FEED_ENDPOINT`. After merging this removal, confirm in AWS that photo-pipeline stacks (S3 notifications / SQS / Lambda artifact) and any `lambda-s3-private-key` secret material are decommissioned — git delete alone does not destroy live stacks.
 
 ---
 
 ## Node versions
 
-| Surface        | Node version | Notes                                                  |
-| -------------- | ------------ | ------------------------------------------------------ |
-| Nest API / ECS | **26**       | `.nvmrc` / `package.json` engines                      |
-| Lambda runtime | **24**       | AWS Lambda max (`nodejs24.x`); Node 26 not offered yet |
+| Surface        | Node version | Notes                             |
+| -------------- | ------------ | --------------------------------- |
+| Nest API / ECS | **26**       | `.nvmrc` / `package.json` engines |
 
 ---
 

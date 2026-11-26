@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import contextlib
+import importlib.util
 import io
+import os
 import subprocess
 import tempfile
 import time
 import unittest
 import urllib.error
 from pathlib import Path
-import importlib.util
+from unittest import mock
 
 SPEC = importlib.util.spec_from_file_location(
     "feeder_recorder",
@@ -217,7 +219,7 @@ class FailureTests(unittest.TestCase):
 
         def api(method: str, path: str, body: dict | None = None) -> dict:
             calls["n"] += 1
-            if calls["n"] == 1:
+            if path == "/feeder/classify":
                 raise urllib.error.URLError("down")
             return {"hasAnimals": False, "animalCount": 0}
 
@@ -227,11 +229,15 @@ class FailureTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             feeder.STAGING_DIR = root
-            with contextlib.redirect_stdout(io.StringIO()):
+            with (
+                mock.patch.dict(os.environ, {"FEEDER_REQUIRE_ANIMAL": "true"}),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
                 feeder.handle_visit_once()
             clips = list(root.glob("visit-*.mp4"))
             self.assertEqual(len(clips), 1)
             self.assertTrue(clips[0].exists())
+            self.assertGreaterEqual(calls["n"], 1)
 
     def test_proof_retries_upload_and_removes_the_file_after_ready(self) -> None:
         attempts = {"n": 0}

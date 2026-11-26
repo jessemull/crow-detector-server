@@ -50,7 +50,7 @@ Read the whole project before working on it. Agents that skip context make avoid
 
 ## 5. Configuration and tooling
 
-Root `package.json` (scripts, engines, overrides, dependencies), `lambda/package.json`, `Makefile`, `.nvmrc`, `tsconfig.json`, `tsconfig.build.json`, `nest-cli.json`, `eslint.config.mjs`, `lambda/eslint.config.mjs`, `jest.config.js`, `lambda/jest.config.js`, `commitlint.config.js`, `.prettierrc`, `.gitignore`, `.dockerignore`, `.env.example`, `pi/porch.env.example`, and every file in `.husky/` (not `.husky/_/`).
+Root `package.json` (scripts, engines, overrides, dependencies), `Makefile`, `.nvmrc`, `tsconfig.json`, `tsconfig.build.json`, `nest-cli.json`, `eslint.config.mjs`, `jest.config.js`, `commitlint.config.js`, `.prettierrc`, `.gitignore`, `.dockerignore`, `.env.example`, `pi/porch.env.example`, `pi/feeder.env.example`, and every file in `.husky/` (not `.husky/_/`).
 
 Do not read the lockfiles line by line. Record the installed versions with `npm ls @nestjs/core typeorm @anthropic-ai/sdk @aws-sdk/client-s3 --depth=0`.
 

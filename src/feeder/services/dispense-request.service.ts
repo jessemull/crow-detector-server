@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   HttpException,
   Injectable,
   NotFoundException,
@@ -57,7 +58,7 @@ export class DispenseRequestService {
             order: { createdAt: 'DESC' },
           });
           if (recent) {
-            throw new BadRequestException(
+            throw new ConflictException(
               'Feed cooldown active. Try again in a few minutes.',
             );
           }

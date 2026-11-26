@@ -35,5 +35,5 @@ Do not blind-patch. Follow reproduce → isolate → fix → verify.
 ```bash
 npx jest path/to/relevant.spec.ts
 make test
-make lambda-test
+make porch-test
 ```

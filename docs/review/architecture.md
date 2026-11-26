@@ -12,7 +12,7 @@ The boundaries that matter here are small and easy to break: controllers stay th
 
 - **ARCH-01** (MUST) Controllers do not contain business logic, SDK calls, or repository calls. Verify: read each changed controller method.
 - **ARCH-02** (MUST) A shared provider is declared in one module and exported. A second `providers: [S3MetadataService]` (or any service that already has an owner) is a MUST. Verify: search the class name in `*.module.ts`.
-- **ARCH-03** (MUST) `lambda/` does not import from `src/`, and `src/` does not import from `lambda/`. Verify: search `from '../src` and `from 'src/` under `lambda/`, and `lambda/` under `src/`.
+- **ARCH-03** (MUST) Do not reintroduce a nested `lambda/` package or Nest imports that revive the photo pipeline. Verify: `lambda/` is absent (or empty by product decision) and `src/` has no photo-pipeline Lambda clients.
 - **ARCH-04** (SHOULD) `src/common/types` does not import TypeORM entities. Verify: read the barrel.
 - **ARCH-05** (SHOULD) New domain code lives in the module that owns it (`feed`, `detection`, `urls`, `porch`, `auth`, `health`). A new top-level module needs the human review `docs/GOVERNANCE.md` requires. Verify: read the file path.
 - **ARCH-06** (SHOULD) Duplicated logic (signing, key decoding, S3 key building) is not copied a second time. The four signers must stay in lockstep but should not grow a fifth copy without a reason. Verify: search the copied block.
@@ -21,5 +21,5 @@ The boundaries that matter here are small and easy to break: controllers stay th
 
 ## Automatic-fail signals
 
-- A Nest import from `lambda/` or the reverse.
+- Reintroducing a nested `lambda/` photo pipeline without an explicit product decision.
 - The same provider constructed in two modules.

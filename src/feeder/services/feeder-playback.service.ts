@@ -1,8 +1,9 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { s3ClientOptions } from 'src/common/aws/client-options';
+import { assertFeederMp4Key } from './dispense-request.service';
 
 const PLAYBACK_EXPIRES_SECONDS = 300;
 
@@ -27,9 +28,7 @@ export class FeederPlaybackService {
   async signPlayback(
     key: string,
   ): Promise<{ playbackUrl: string; expiresAt: string }> {
-    if (!key.startsWith('feeder/') || !key.endsWith('.mp4')) {
-      throw new BadRequestException('Invalid feeder video key');
-    }
+    assertFeederMp4Key(key, 'Invalid feeder video key');
     const expiresAt = new Date(
       Date.now() + PLAYBACK_EXPIRES_SECONDS * 1000,
     ).toISOString();

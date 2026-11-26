@@ -169,19 +169,19 @@ Before implementing any changes, confirm you have read and understood:
 
 ## Project Summary
 
-| Field       | Value                                                                                  |
-| ----------- | -------------------------------------------------------------------------------------- |
-| Project     | Crow Detector Server                                                                   |
-| Type        | NestJS 11 + Fastify TypeScript API + nested S3 Lambda                                  |
-| Runtime     | Node.js 26 (API / ECS); Node.js 24 (Lambda runtime — AWS max; Node 26 not offered yet) |
-| Language    | TypeScript (strict)                                                                    |
-| Compute     | AWS ECS Fargate + Lambda                                                               |
-| Storage     | PostgreSQL (TypeORM) + S3                                                              |
-| AI / Vision | Anthropic Claude (feeder classify; still-photo Rekognition path removed)               |
-| Auth        | ECDSA device signatures                                                                |
-| IaC         | CloudFormation (`ImportValue` for `aws-infra-*`)                                       |
-| Logging     | Bunyan → CloudWatch                                                                    |
-| Testing     | Jest (80% coverage)                                                                    |
-| Lint/Format | ESLint + Prettier                                                                      |
-| Git         | Husky + lint-staged + Commitizen + Commitlint                                          |
-| CI          | GitHub Actions                                                                         |
+| Field       | Value                                                                    |
+| ----------- | ------------------------------------------------------------------------ |
+| Project     | Crow Detector Server                                                     |
+| Type        | NestJS 11 + Fastify TypeScript API + LAN RTSP recorders                  |
+| Runtime     | Node.js 26 (API / ECS)                                                   |
+| Language    | TypeScript (strict)                                                      |
+| Compute     | AWS ECS Fargate                                                          |
+| Storage     | PostgreSQL (TypeORM) + S3                                                |
+| AI / Vision | Anthropic Claude (feeder classify; still-photo Rekognition path removed) |
+| Auth        | ECDSA device signatures                                                  |
+| IaC         | CloudFormation (`ImportValue` for `aws-infra-*`)                         |
+| Logging     | Bunyan → CloudWatch                                                      |
+| Testing     | Jest (80% coverage)                                                      |
+| Lint/Format | ESLint + Prettier                                                        |
+| Git         | Husky + lint-staged + Commitizen + Commitlint                            |
+| CI          | GitHub Actions                                                           |

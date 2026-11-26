@@ -10,10 +10,10 @@ Do NOT duplicate governance from AGENTS.md or docs/ here. This file exists only 
 
 ## Quick Reference
 
-- Install: `npm install` (root) and `cd lambda && npm install`
+- Install: `npm install`
 - Hooks: installed via `npm prepare` (husky)
 - Preflight: `make preflight` (optional; `git push` runs push validation)
-- Test: `make test` / `make lambda-test`
-- Lint: `make lint` / `make lambda-lint`
+- Test: `make test` / `make porch-test`
+- Lint: `make lint`
 - Format: `make format`
-- Build: `make build` / `make lambda-build`
+- Build: `make build`

@@ -14,16 +14,16 @@ This directory contains comprehensive database seeding and reset scripts for the
 
 ```
 scripts/db-seed/
-├── seeders/           # Individual entity seeders
-│   ├── base-seeder.ts # Base class with common utilities
-│   ├── feed-event.seeder.ts
-│   ├── detection-event.seeder.ts
+├── seeders/                 # Individual entity seeders (photo seeders removed)
+│   ├── base-seeder.ts
 │   └── index.ts
-├── seeder.ts          # Main orchestrator class
-├── seed.ts            # CLI script for seeding
-├── reset.ts           # CLI script for resetting
-├── reset-and-seed.ts  # CLI script for reset + seed
-└── README.md          # This file
+├── feeder-video.sql         # Hand-applied feeder tables (not run by Nest)
+├── drop-photo-pipeline.sql  # Hand-applied drop of leftover photo tables
+├── seeder.ts                # Main orchestrator class
+├── seed.ts                  # CLI script for seeding
+├── reset.ts                 # CLI script for resetting
+├── reset-and-seed.ts        # CLI script for reset + seed
+└── README.md                # This file
 ```
 
 ## Setup

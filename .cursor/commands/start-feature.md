@@ -54,7 +54,6 @@ Ensure dependencies (and husky) are installed:
 
 ```bash
 npm install
-cd lambda && npm install && cd ..
 test -f .husky/pre-commit && echo OK
 ```
 

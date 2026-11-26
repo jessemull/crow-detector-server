@@ -39,7 +39,7 @@ export class InMemoryRateLimitGuard implements CanActivate {
       this.hitsByClient.size >= this.maxTrackedClients
     ) {
       throw new HttpException(
-        'Too many clip list requests. Try again in a minute.',
+        'Too many requests. Try again in a minute.',
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }
@@ -48,7 +48,7 @@ export class InMemoryRateLimitGuard implements CanActivate {
 
     if (recent.length >= this.maxRequests) {
       throw new HttpException(
-        'Too many clip list requests. Try again in a minute.',
+        'Too many requests. Try again in a minute.',
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }

@@ -8,7 +8,11 @@ import {
 import { logger } from './common/logger/logger.config';
 import { loadAppConfig } from './config/app.config';
 
-/** Classify frames are up to 2_800_000 base64 characters, above Fastify's 1 MiB default. */
+/**
+ * Fastify applies one bodyLimit to the whole adapter. Classify needs up to
+ * ~2.8M base64 characters (above the 1 MiB default); other JSON routes stay
+ * small in practice. Per-route limits would need a separate adapter or plugin.
+ */
 export const CLASSIFY_JSON_BODY_LIMIT_BYTES = 4 * 1024 * 1024;
 
 /**

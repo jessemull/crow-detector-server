@@ -67,4 +67,15 @@ describe('FeederPlaybackService', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(mockGetSignedUrl).not.toHaveBeenCalled();
   });
+
+  it('rejects feeder keys that contain path traversal', async () => {
+    const service = new FeederPlaybackService(
+      configService as unknown as ConfigService,
+    );
+
+    await expect(
+      service.signPlayback('feeder/../porch/visit.mp4'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(mockGetSignedUrl).not.toHaveBeenCalled();
+  });
 });

@@ -415,12 +415,18 @@ def main() -> None:
     parser.add_argument(
         "--visit-once",
         action="store_true",
-        help="Record the next motion visit, classify, upload only if an animal is present",
+        help=(
+            "Record the next motion visit and upload it. "
+            "With FEEDER_REQUIRE_ANIMAL=true, classify and drop empty frames"
+        ),
     )
     parser.add_argument(
         "--visits",
         action="store_true",
-        help="Watch the feeder camera and publish each motion visit that contains an animal",
+        help=(
+            "Watch the feeder camera and publish each motion visit. "
+            "With FEEDER_REQUIRE_ANIMAL=true, require Claude animal classify"
+        ),
     )
     parser.add_argument(
         "--dispense-id",
