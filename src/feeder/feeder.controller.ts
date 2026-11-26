@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  HttpCode,
   Param,
   ParseUUIDPipe,
   Post,
@@ -8,7 +9,15 @@ import {
 } from '@nestjs/common';
 import { InMemoryRateLimitGuard } from '../porch/guards/in-memory-rate-limit.guard';
 import { DispenseStatus } from './entity/dispense-request.entity';
-import { DispenseRequestService } from './services/dispense-request.service';
+import {
+  cooldownEndsAtFrom,
+  DispenseRequestService,
+  FeederPublicStatus,
+} from './services/dispense-request.service';
+import {
+  FeederFeedsResponse,
+  FeederFeedsService,
+} from './services/feeder-feeds.service';
 import { FeederPlaybackService } from './services/feeder-playback.service';
 import {
   FeederVisitService,
@@ -21,15 +30,28 @@ export class FeederController {
     private readonly dispenseRequestService: DispenseRequestService,
     private readonly feederVisitService: FeederVisitService,
     private readonly feederPlaybackService: FeederPlaybackService,
+    private readonly feederFeedsService: FeederFeedsService,
   ) {}
 
-  @Post('dispense')
+  @Get('status')
   @UseGuards(InMemoryRateLimitGuard)
-  async requestDispense(): Promise<{ id: string; status: DispenseStatus }> {
+  async getStatus(): Promise<FeederPublicStatus> {
+    return this.dispenseRequestService.getPublicStatus();
+  }
+
+  @Post('dispense')
+  @HttpCode(201)
+  @UseGuards(InMemoryRateLimitGuard)
+  async requestDispense(): Promise<{
+    id: string;
+    status: DispenseStatus;
+    cooldownEndsAt: string;
+  }> {
     const request = await this.dispenseRequestService.create();
     return {
       id: request.id,
       status: request.status,
+      cooldownEndsAt: cooldownEndsAtFrom(request.createdAt).toISOString(),
     };
   }
 
@@ -58,6 +80,12 @@ export class FeederController {
       };
     }
     return { id: request.id, status: request.status };
+  }
+
+  @Get('feeds')
+  @UseGuards(InMemoryRateLimitGuard)
+  async listFeeds(): Promise<FeederFeedsResponse> {
+    return this.feederFeedsService.listFeeds();
   }
 
   @Get('clips')

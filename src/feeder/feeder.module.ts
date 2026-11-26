@@ -7,6 +7,7 @@ import { FeederVisit } from './entity/feeder-visit.entity';
 import { FeederController } from './feeder.controller';
 import { FeederHostController } from './feeder-host.controller';
 import { DispenseRequestService } from './services/dispense-request.service';
+import { FeederFeedsService } from './services/feeder-feeds.service';
 import { FeederPlaybackService } from './services/feeder-playback.service';
 import { FeederVisitService } from './services/feeder-visit.service';
 
@@ -21,6 +22,7 @@ import { FeederVisitService } from './services/feeder-visit.service';
     DispenseRequestService,
     FeederVisitService,
     FeederPlaybackService,
+    FeederFeedsService,
   ],
 })
 export class FeederModule {}

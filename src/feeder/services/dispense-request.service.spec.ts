@@ -4,12 +4,20 @@ import {
   DispenseRequest,
   DispenseStatus,
 } from '../entity/dispense-request.entity';
-import { DispenseRequestService } from './dispense-request.service';
+import {
+  cooldownEndsAtFrom,
+  DispenseRequestService,
+} from './dispense-request.service';
 
 describe('DispenseRequestService', () => {
   const findOne = jest.fn();
+  const find = jest.fn();
   const create = jest.fn((_entity, value) => value);
-  const save = jest.fn((value) => ({ id: 'req-1', ...value }));
+  const save = jest.fn((value) => ({
+    id: 'req-1',
+    createdAt: new Date('2026-11-22T20:00:00.000Z'),
+    ...value,
+  }));
   const query = jest.fn();
   const update = jest.fn();
   const rows: Array<DispenseRequest | null> = [];
@@ -43,6 +51,7 @@ describe('DispenseRequestService', () => {
   const repositoryUpdate = jest.fn();
   const repository = {
     findOne,
+    find,
     save,
     update: repositoryUpdate,
     manager,
@@ -60,11 +69,108 @@ describe('DispenseRequestService', () => {
   });
 
   it('rejects a second request inside the cooldown', async () => {
-    findOne.mockResolvedValue({ id: 'recent', createdAt: new Date() });
-    await expect(service.create()).rejects.toBeInstanceOf(ConflictException);
+    const createdAt = new Date('2026-11-22T20:00:00.000Z');
+    findOne.mockResolvedValue({ id: 'recent', createdAt });
+    const rejection = service.create();
+    await expect(rejection).rejects.toBeInstanceOf(ConflictException);
+    await expect(rejection).rejects.toMatchObject({
+      response: expect.objectContaining({
+        cooldownEndsAt: cooldownEndsAtFrom(createdAt).toISOString(),
+        message: 'Feed cooldown active. Try again in a few minutes.',
+      }),
+    });
     expect(save).not.toHaveBeenCalled();
     expect(query).toHaveBeenCalledWith(
       "SELECT pg_advisory_xact_lock(hashtext('dispense_cooldown'))",
+    );
+  });
+
+  it('reports public status while cooling down', async () => {
+    const createdAt = new Date(Date.now() - 60_000);
+    const readyAt = new Date(Date.now() - 120_000);
+    find.mockResolvedValueOnce([
+      {
+        id: 'newest',
+        status: DispenseStatus.REQUESTED,
+        createdAt,
+      },
+      {
+        id: 'ready-1',
+        status: DispenseStatus.READY,
+        createdAt: readyAt,
+      },
+    ]);
+
+    await expect(service.getPublicStatus()).resolves.toEqual({
+      canFeed: false,
+      cooldownEndsAt: cooldownEndsAtFrom(createdAt).toISOString(),
+      lastFeedAt: readyAt.toISOString(),
+      lastFeedId: 'ready-1',
+    });
+  });
+
+  it('reports canFeed when there are no dispense rows', async () => {
+    find.mockResolvedValueOnce([]);
+
+    await expect(service.getPublicStatus()).resolves.toEqual({
+      canFeed: true,
+      cooldownEndsAt: null,
+      lastFeedAt: null,
+      lastFeedId: null,
+    });
+  });
+
+  it('reports canFeed at the cooldown boundary', async () => {
+    const createdAt = new Date(Date.now() - 10 * 60 * 1000);
+    find.mockResolvedValueOnce([
+      {
+        id: 'newest',
+        status: DispenseStatus.READY,
+        createdAt,
+      },
+    ]);
+
+    await expect(
+      service.getPublicStatus(createdAt.getTime() + 10 * 60 * 1000),
+    ).resolves.toEqual({
+      canFeed: true,
+      cooldownEndsAt: null,
+      lastFeedAt: createdAt.toISOString(),
+      lastFeedId: 'newest',
+    });
+  });
+
+  it('omits lastFeed when the newest READY is past retention', async () => {
+    const createdAt = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000);
+    find.mockResolvedValueOnce([
+      {
+        id: 'old-ready',
+        status: DispenseStatus.READY,
+        createdAt,
+      },
+    ]);
+
+    await expect(service.getPublicStatus()).resolves.toEqual({
+      canFeed: true,
+      cooldownEndsAt: null,
+      lastFeedAt: null,
+      lastFeedId: null,
+    });
+  });
+
+  it('lists ready feeds inside retention newest-first with a take cap', async () => {
+    find.mockResolvedValueOnce([]);
+
+    await service.listReadyForFeeds(1_700_000_000_000);
+
+    expect(find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: DispenseStatus.READY,
+        }),
+        order: { createdAt: 'DESC' },
+        take: 20,
+      }),
     );
   });
 

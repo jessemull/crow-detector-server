@@ -59,7 +59,7 @@ describe('FeederVisitService', () => {
   it('lists newest visits still inside the clip retention window', async () => {
     find.mockResolvedValue([]);
 
-    await service.listNewest();
+    await service.listNewest(1_700_000_000_000);
 
     expect(find).toHaveBeenCalledWith(
       expect.objectContaining({

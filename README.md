@@ -288,7 +288,7 @@ The system provides secure image upload capabilities through pre-signed S3 URLs:
 - **`POST /urls/porch`**: Generate signed URL for porch-camera mp4 uploads.
 - **`POST /urls/feeder`**: Generate a size-capped signed URL for feeder mp4 uploads (`pi-feeder`).
 - **`GET /porch/clips`**: Public list of porch clips with short-lived playback URLs.
-- **`POST /feeder/dispense`**, **`GET /feeder/dispense/{id}`**, **`GET /feeder/clips`**: Public dispense and visit playback.
+- **`GET /feeder/status`**, **`GET /feeder/feeds`**, **`POST /feeder/dispense`**, **`GET /feeder/dispense/{id}`**, **`GET /feeder/clips`**: Public cooldown status, grouped gallery, dispense, and flat visit list.
 - **`GET /feeder/dispense/pending`**, **`PATCH /feeder/dispense/{id}`**, **`POST /feeder/classify`**, **`POST /feeder/visits`**: Feeder host routes.
 
 ### S3 Organization
@@ -315,7 +315,7 @@ The feeder host records a fixed 12-second proof from the public dispense request
 
 - **Proof**: `POST /feeder/dispense` creates a request. The host claims `GET /feeder/dispense/pending`, uploads an mp4, then `PATCH /feeder/dispense/{id}` to `ready` or `failed`.
 - **Visits**: Default host config publishes each motion visit (`FEEDER_REQUIRE_ANIMAL=false`). Set `FEEDER_REQUIRE_ANIMAL=true` to classify via `POST /feeder/classify` and drop empty frames before `POST /feeder/visits`.
-- **Playback**: `GET /feeder/dispense/{id}` and `GET /feeder/clips` return short-lived playback URLs while the object is still inside the 30-day feeder lifecycle.
+- **Playback**: `GET /feeder/feeds` returns proof-first feed sections (plus `ungroupedVisits`). `GET /feeder/status` exposes cooldown for the public button. `GET /feeder/dispense/{id}` and `GET /feeder/clips` still return short-lived URLs while objects are inside the 30-day feeder lifecycle.
 
 ## Commits & Commitizen
 

@@ -67,7 +67,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/). Prefer `mak
 
 ### Scopes
 
-Enforced by commitlint: `auth`, `feed`, `detection`, `porch`, `urls`, `health`, `common`, `config`, `lambda`, `ci`, `docs`, `deps`, `infra`, `docker`
+Enforced by commitlint: `auth`, `feed`, `detection`, `feeder`, `porch`, `urls`, `health`, `common`, `config`, `lambda`, `ci`, `docs`, `deps`, `infra`, `docker`
 
 ### Rules
 

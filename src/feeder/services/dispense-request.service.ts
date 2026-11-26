@@ -13,6 +13,10 @@ import {
   DispenseRequest,
   DispenseStatus,
 } from '../entity/dispense-request.entity';
+import {
+  FEEDER_CLIP_RETENTION_MS,
+  feederClipStillStored,
+} from './feeder-retention';
 
 /** Public button spacing. Independent of the old 4-hour image-feed cooldown. */
 export const DISPENSE_COOLDOWN_MS = 10 * 60 * 1000;
@@ -22,6 +26,20 @@ export const STUCK_RECORDING_MS = 5 * 60 * 1000;
 
 /** S3 object keys are limited to 1024 bytes. */
 export const FEEDER_OBJECT_KEY_MAX_LENGTH = 1024;
+
+/** Newest ready feeds returned by the public gallery. */
+export const MAX_FEEDER_FEEDS = 20;
+
+export function cooldownEndsAtFrom(createdAt: Date): Date {
+  return new Date(createdAt.getTime() + DISPENSE_COOLDOWN_MS);
+}
+
+export type FeederPublicStatus = {
+  canFeed: boolean;
+  cooldownEndsAt: string | null;
+  lastFeedAt: string | null;
+  lastFeedId: string | null;
+};
 
 export function assertFeederMp4Key(key: string, message: string): void {
   if (
@@ -58,9 +76,14 @@ export class DispenseRequestService {
             order: { createdAt: 'DESC' },
           });
           if (recent) {
-            throw new ConflictException(
-              'Feed cooldown active. Try again in a few minutes.',
-            );
+            throw new ConflictException({
+              statusCode: 409,
+              error: 'Conflict',
+              message: 'Feed cooldown active. Try again in a few minutes.',
+              cooldownEndsAt: cooldownEndsAtFrom(
+                recent.createdAt,
+              ).toISOString(),
+            });
           }
 
           const request = manager.create(DispenseRequest, {
@@ -78,6 +101,71 @@ export class DispenseRequestService {
       );
       throw new ServiceUnavailableException('Unable to check feed cooldown');
     }
+  }
+
+  async getPublicStatus(now = Date.now()): Promise<FeederPublicStatus> {
+    // One ordered page so canFeed and lastFeed* come from the same snapshot.
+    const recent = await this.dispenseRepository.find({
+      order: { createdAt: 'DESC' },
+      take: 100,
+    });
+    const newest = recent[0];
+    let lastReady = recent.find((row) => row.status === DispenseStatus.READY);
+    if (newest && !lastReady) {
+      [lastReady] = await this.dispenseRepository.find({
+        where: { status: DispenseStatus.READY },
+        order: { createdAt: 'DESC' },
+        take: 1,
+      });
+    }
+
+    const lastFeedAt =
+      lastReady && feederClipStillStored(lastReady.createdAt, now)
+        ? lastReady.createdAt.toISOString()
+        : null;
+    const lastFeedId =
+      lastReady && feederClipStillStored(lastReady.createdAt, now)
+        ? lastReady.id
+        : null;
+
+    if (!newest) {
+      return {
+        canFeed: true,
+        cooldownEndsAt: null,
+        lastFeedAt,
+        lastFeedId,
+      };
+    }
+
+    const endsAt = cooldownEndsAtFrom(newest.createdAt);
+    if (endsAt.getTime() > now) {
+      return {
+        canFeed: false,
+        cooldownEndsAt: endsAt.toISOString(),
+        lastFeedAt,
+        lastFeedId,
+      };
+    }
+
+    return {
+      canFeed: true,
+      cooldownEndsAt: null,
+      lastFeedAt,
+      lastFeedId,
+    };
+  }
+
+  /** Ready dispenses still inside the feeder object retention window. */
+  async listReadyForFeeds(now = Date.now()): Promise<DispenseRequest[]> {
+    const cutoff = new Date(now - FEEDER_CLIP_RETENTION_MS);
+    return this.dispenseRepository.find({
+      where: {
+        status: DispenseStatus.READY,
+        createdAt: MoreThan(cutoff),
+      },
+      order: { createdAt: 'DESC' },
+      take: MAX_FEEDER_FEEDS,
+    });
   }
 
   async findById(id: string): Promise<DispenseRequest> {

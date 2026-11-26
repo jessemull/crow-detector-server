@@ -1,6 +1,7 @@
 import { DispenseStatus } from './entity/dispense-request.entity';
 import { FeederController } from './feeder.controller';
 import { DispenseRequestService } from './services/dispense-request.service';
+import { FeederFeedsService } from './services/feeder-feeds.service';
 import { FeederPlaybackService } from './services/feeder-playback.service';
 import { FeederVisitService } from './services/feeder-visit.service';
 
@@ -8,6 +9,7 @@ describe('FeederController', () => {
   const dispenseRequestService = {
     create: jest.fn(),
     findById: jest.fn(),
+    getPublicStatus: jest.fn(),
   };
   const feederVisitService = {
     listNewest: jest.fn(),
@@ -15,25 +17,47 @@ describe('FeederController', () => {
   const feederPlaybackService = {
     signPlayback: jest.fn(),
   };
+  const feederFeedsService = {
+    listFeeds: jest.fn(),
+  };
   const controller = new FeederController(
     dispenseRequestService as unknown as DispenseRequestService,
     feederVisitService as unknown as FeederVisitService,
     feederPlaybackService as unknown as FeederPlaybackService,
+    feederFeedsService as unknown as FeederFeedsService,
   );
 
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it('returns the new dispense id without a clip', async () => {
+  it('returns public feeder status', async () => {
+    dispenseRequestService.getPublicStatus.mockResolvedValue({
+      canFeed: true,
+      cooldownEndsAt: null,
+      lastFeedAt: null,
+      lastFeedId: null,
+    });
+
+    await expect(controller.getStatus()).resolves.toEqual({
+      canFeed: true,
+      cooldownEndsAt: null,
+      lastFeedAt: null,
+      lastFeedId: null,
+    });
+  });
+
+  it('returns the new dispense id with cooldownEndsAt', async () => {
     dispenseRequestService.create.mockResolvedValue({
       id: 'req-1',
       status: DispenseStatus.REQUESTED,
+      createdAt: new Date('2026-11-22T20:00:00.000Z'),
     });
 
     await expect(controller.requestDispense()).resolves.toEqual({
       id: 'req-1',
       status: DispenseStatus.REQUESTED,
+      cooldownEndsAt: '2026-11-22T20:10:00.000Z',
     });
   });
 
@@ -84,6 +108,18 @@ describe('FeederController', () => {
       status: DispenseStatus.READY,
     });
     expect(feederPlaybackService.signPlayback).not.toHaveBeenCalled();
+  });
+
+  it('lists feed sections', async () => {
+    feederFeedsService.listFeeds.mockResolvedValue({
+      feeds: [],
+      ungroupedVisits: [],
+    });
+
+    await expect(controller.listFeeds()).resolves.toEqual({
+      feeds: [],
+      ungroupedVisits: [],
+    });
   });
 
   it('lists signed visit clips', async () => {

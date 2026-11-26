@@ -40,7 +40,9 @@ Shared networking (VPC, subnets, security groups) comes from the **`aws-infra-*`
 1. Devices request porch/feeder presigned URLs from Nest (`urls` module).
 2. MP4 objects land under `porch/` or `feeder/` (lifecycle rules in the images stack).
 3. Feeder animal visits may sample frames and call `POST /feeder/classify`.
-4. Public clients list clips via `/porch/clips` and `/feeder/clips`.
+4. Public clients list Shelter Cam via `/porch/clips`. Feeder Cam uses
+   `GET /feeder/status` (cooldown) and `GET /feeder/feeds` (proof + visit
+   sections); `GET /feeder/clips` remains for back-compat flat visit lists.
 
 ---
 
@@ -50,7 +52,7 @@ Shared networking (VPC, subnets, security groups) comes from the **`aws-infra-*`
 | ----------- | --------------------------------------------------------- |
 | `auth`      | ECDSA guard                                               |
 | `detection` | `ClaudeService` only (feeder classify)                    |
-| `feeder`    | Public dispense, visits, clips, host classify             |
+| `feeder`    | Public status/feeds/dispense/clips, visits, host classify |
 | `porch`     | Public porch clip list with short-lived playback URLs     |
 | `urls`      | Presigned S3 URL creation (`/urls/porch`, `/urls/feeder`) |
 | `health`    | Health endpoints                                          |
