@@ -37,6 +37,42 @@ class SweepTests(unittest.TestCase):
             self.assertTrue(fresh.exists())
 
 
+class RequireAnimalTests(unittest.TestCase):
+    def test_require_animal_defaults_to_false(self) -> None:
+        self.assertFalse(feeder.require_animal_for_visit({}))
+
+    def test_require_animal_can_be_enabled(self) -> None:
+        self.assertTrue(
+            feeder.require_animal_for_visit({"FEEDER_REQUIRE_ANIMAL": "true"})
+        )
+
+    def test_visit_publishes_without_classify_by_default(self) -> None:
+        bodies: list[tuple[str, dict | None]] = []
+
+        def write_clip(destination: Path) -> float:
+            destination.write_bytes(b"mp4")
+            return 30.0
+
+        def api(method: str, path: str, body: dict | None = None) -> dict:
+            bodies.append((path, body))
+            return {"id": "visit-1"}
+
+        feeder.record_motion_visit = write_clip
+        feeder.upload_mp4 = lambda path: "feeder/visit.mp4"
+        feeder.api_json = api
+        with tempfile.TemporaryDirectory() as tmp:
+            feeder.STAGING_DIR = Path(tmp)
+            with contextlib.redirect_stdout(io.StringIO()):
+                feeder.handle_visit_once()
+        self.assertEqual(bodies[-1][0], "/feeder/visits")
+        assert bodies[-1][1] is not None
+        self.assertEqual(bodies[-1][1]["animalCount"], 1)
+        self.assertEqual(
+            bodies[-1][1]["detectedAnimals"][0]["name"],
+            "unclassified",
+        )
+
+
 class RecordClipTests(unittest.TestCase):
     def test_proof_uses_the_same_browser_safe_encode_as_visits(self) -> None:
         calls: list[list[str]] = []

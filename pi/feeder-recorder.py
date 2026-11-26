@@ -69,6 +69,15 @@ PRIVATE_KEY_PATH = Path(
 )
 
 
+def require_animal_for_visit(
+    environ: dict[str, str] | None = None,
+) -> bool:
+    """When true, drop visits Claude does not mark as animal. Default is off."""
+    source = os.environ if environ is None else environ
+    raw = source.get("FEEDER_REQUIRE_ANIMAL", "false").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
 def canonical_json(body: dict) -> str:
     """Match JSON.stringify: keep non-ASCII characters and raw line separators."""
     return json.dumps(body, separators=(",", ":"), ensure_ascii=False)
@@ -352,11 +361,21 @@ def handle_visit_once(dispense_request_id: str | None = None) -> None:
     finished = False
     try:
         duration = record_motion_visit(clip)
-        analysis = classify_clip(clip, duration)
-        if not analysis:
-            print("visit dropped: no animal")
-            finished = True
-            return
+        if require_animal_for_visit():
+            analysis = classify_clip(clip, duration)
+            if not analysis:
+                print("visit dropped: no animal")
+                finished = True
+                return
+        else:
+            print("visit classify skipped (FEEDER_REQUIRE_ANIMAL off)")
+            analysis = {
+                "animalCount": 1,
+                "crowCount": 0,
+                "detectedAnimals": [
+                    {"name": "unclassified", "confidence": 0, "count": 1},
+                ],
+            }
         key = upload_mp4(clip)
         body: dict = {
             "videoKey": key,

@@ -109,6 +109,7 @@ Feeder LAN recorder (host laptop/server, not Nest) — see `docs/DEVICES.md` and
 | `FEEDER_PRE_ROLL_SECONDS`     | Seconds before the first motion kept in the file   | No       | `4`                                                |
 | `FEEDER_POST_ROLL_SECONDS`    | Seconds after the last motion kept in the file     | No       | `20`                                               |
 | `FEEDER_SEGMENT_TIME_SECONDS` | Continuous remux segment length                    | No       | `2`                                                |
+| `FEEDER_REQUIRE_ANIMAL`       | When `true`, drop visits Claude does not mark as animal                      | No       | `false`                                            |
 
 Host secrets live in `~/feeder.env` (`chmod 600`) and are never committed. Two systemd units share that file. `scripts/feeder-recorder.service` records the 12-second dispense proof (`./scripts/deploy-feeder-host.sh`). `scripts/feeder-visits.service` runs `pi/feeder-recorder.py --visits` and publishes an animal visit (`./scripts/deploy-feeder-visits-host.sh`). Apply `scripts/db-seed/feeder-video.sql` before the routes are used. `--visit-once` records the next visit and exits. `--dispense-id` links that one visit to a proof.
 
