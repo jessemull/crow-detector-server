@@ -15,7 +15,11 @@ Parameters:
     Type: String
     Default: 'true'
     AllowedValues: ['true', 'false']
-    Description: Set to false when the account already has the GitHub OIDC provider.
+    Description: >
+      true only for the first stack in the account that should own the GitHub
+      OIDC provider. Never flip a stack that already created the provider to
+      false — CloudFormation would drop the resource from the stack. Prefer
+      leaving this true and relying on DeletionPolicy Retain.
 
 Conditions:
   ShouldCreateProvider: !Equals [!Ref CreateOidcProvider, 'true']
@@ -24,6 +28,8 @@ Resources:
   GitHubOidcProvider:
     Type: AWS::IAM::OIDCProvider
     Condition: ShouldCreateProvider
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       Url: https://token.actions.githubusercontent.com
       ClientIdList:
